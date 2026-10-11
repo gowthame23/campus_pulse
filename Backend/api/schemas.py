@@ -315,6 +315,17 @@ class ComplaintResolveRequest(BaseModel):
     notes: Optional[str] = ""
 
 
+class WardenVerifyRequest(BaseModel):
+    verdict: str
+    notes: Optional[str] = ""
+
+
+class AdminDecisionRequest(BaseModel):
+    decision: str
+    notes: Optional[str] = ""
+    reassign_to: Optional[str] = None
+
+
 class ComplaintReopenRequest(BaseModel):
     reason: str
 

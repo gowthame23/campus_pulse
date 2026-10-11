@@ -25,6 +25,8 @@ from api.schemas import (
     ComplaintStatusRequest,
     ComplaintUpdateRequest,
     EscalateRequest,
+    WardenVerifyRequest,
+    AdminDecisionRequest,
     model_to_dict,
 )
 from api.security import get_current_user, require_roles
@@ -886,16 +888,20 @@ def unblock_complaint(
 @router.post("/{complaint_id}/close", response_model=ComplaintResponse)
 def close_complaint(
     complaint_id: str,
-    current_user=Depends(require_roles(Student.ROLE, LocationInCharge.ROLE)),
+    current_user=Depends(
+        require_roles(Student.ROLE, LocationInCharge.ROLE, Administrator.ROLE)
+    ),
     complaint_service=Depends(get_complaint_service),
 ):
     # Backwards-compatible alias for the explicit verification endpoint.
-    # Closing is a workflow transition, not a generic write.
     try:
         complaint = complaint_service.verify_fixed(complaint_id, current_user)
         return _format_complaint(complaint, complaint_service)
+    except PermissionError as p_err:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
 @router.post("/{complaint_id}/assign", response_model=ComplaintResponse)
 def assign_complaint(
     complaint_id: str,
@@ -1093,8 +1099,34 @@ def resolve_complaint(
             detail="You can only resolve complaints assigned to you.",
         )
     try:
-        complaint = complaint_service.mark_resolved(complaint_id, payload.notes)
+        complaint = complaint_service.mark_resolved(complaint_id, current_user.user_id, payload.notes)
         return _format_complaint(complaint, complaint_service)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@router.post("/{complaint_id}/warden-verify", response_model=ComplaintResponse)
+def warden_verify_complaint(
+    complaint_id: str,
+    payload: WardenVerifyRequest,
+    current_user=Depends(
+        require_roles(LocationInCharge.ROLE, Administrator.ROLE)
+    ),
+    complaint_service=Depends(get_complaint_service),
+):
+    complaint = complaint_service.get_complaint(complaint_id)
+    if not complaint:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
+        )
+    _ensure_visible(complaint, current_user, complaint_service)
+    try:
+        complaint = complaint_service.warden_verify(
+            complaint_id, current_user, payload.verdict, payload.notes
+        )
+        return _format_complaint(complaint, complaint_service)
+    except PermissionError as p_err:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
@@ -1102,12 +1134,14 @@ def resolve_complaint(
 @router.post("/{complaint_id}/verify", response_model=ComplaintResponse)
 def verify_complaint(
     complaint_id: str,
-    current_user=Depends(require_roles(Student.ROLE, LocationInCharge.ROLE)),
+    current_user=Depends(require_roles(Student.ROLE, LocationInCharge.ROLE, Administrator.ROLE)),
     complaint_service=Depends(get_complaint_service),
 ):
     try:
         complaint = complaint_service.verify_fixed(complaint_id, current_user)
         return _format_complaint(complaint, complaint_service)
+    except PermissionError as p_err:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
@@ -1116,16 +1150,40 @@ def verify_complaint(
 def reopen_complaint(
     complaint_id: str,
     payload: ComplaintReopenRequest,
-    current_user=Depends(require_roles(Student.ROLE, LocationInCharge.ROLE)),
+    current_user=Depends(require_roles(Student.ROLE, LocationInCharge.ROLE, Administrator.ROLE)),
     complaint_service=Depends(get_complaint_service),
 ):
     try:
-        complaint = complaint_service.report_not_fixed(
+        complaint = complaint_service.reopen_complaint(
             complaint_id, current_user, payload.reason
+        )
+        return _format_complaint(complaint, complaint_service)
+    except PermissionError as p_err:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@router.post("/{complaint_id}/admin-decision", response_model=ComplaintResponse)
+def admin_decision_on_complaint(
+    complaint_id: str,
+    payload: AdminDecisionRequest,
+    current_user=Depends(require_roles(Administrator.ROLE)),
+    complaint_service=Depends(get_complaint_service),
+):
+    complaint = complaint_service.get_complaint(complaint_id)
+    if not complaint:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
+        )
+    try:
+        complaint = complaint_service.admin_decision(
+            complaint_id, current_user, payload.decision, payload.notes, payload.reassign_to
         )
         return _format_complaint(complaint, complaint_service)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
 
 
 @router.patch("/{complaint_id}", response_model=ComplaintResponse)
