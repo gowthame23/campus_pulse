@@ -193,10 +193,12 @@ from api.routers import (
     reports,
     search,
     settings,
+    setup,
     supervisor,
     users,
 )
 
+app.include_router(setup.router)
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(departments.router)

@@ -246,6 +246,12 @@ def download_attachment(
 
     _ensure_attachment_access(complaint, current_user, complaint_service)
 
+    file_path = attachment.get("file_path") or ""
+    if not file_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Attachment file not found."
+        )
+
     from pathlib import Path
     base_storage_dir = getattr(attachment_service, "storage_dir", Path("storage/attachments").resolve())
     clean_filename = file_path.replace("/static/attachments/", "").replace("storage\\attachments\\", "").replace("storage/attachments/", "")

@@ -445,7 +445,6 @@ class LostFoundService:
         if (
             performer_id != "system"
             and performer_id != item["reported_by"]
-            and role_lower not in ("administrator", "app_manager", "super_admin", "admin")
         ):
             raise PermissionError("You can only delete your own reports.")
 

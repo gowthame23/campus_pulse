@@ -1,4 +1,9 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+
+from services.complaint_service import ComplaintConflictError
 
 from api.dependencies import (
     get_audit_service,
@@ -716,6 +721,9 @@ def create_complaint(
             visibility_type=payload.visibility_type,
             issue_id=payload.issue_id,
             visibility=payload.visibility,
+            priority=payload.priority,
+            is_urgent=payload.is_urgent,
+            urgent_reason=payload.urgent_reason,
         )
         return _format_complaint(complaint, complaint_service)
     except PermissionError as p_err:
@@ -725,11 +733,22 @@ def create_complaint(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
 
+class ComplaintProgressRequest(BaseModel):
+    note: str
+    photo_url: Optional[str] = None
+
+
+class ComplaintBlockRequest(BaseModel):
+    reason: str
+    expected_date: Optional[str] = None
+
+
+@router.post("/{complaint_id}/take", response_model=ComplaintResponse)
 @router.post("/{complaint_id}/accept", response_model=ComplaintResponse)
 def accept_complaint(
     complaint_id: str,
     current_user=Depends(
-        require_roles(Coordinator.ROLE, LocationInCharge.ROLE, Administrator.ROLE)
+        require_roles(Coordinator.ROLE, Administrator.ROLE)
     ),
     complaint_service=Depends(get_complaint_service),
 ):
@@ -742,6 +761,123 @@ def accept_complaint(
 
     try:
         complaint = complaint_service.accept_complaint(complaint_id, current_user.user_id)
+        try:
+            from utils.websocket_manager import manager
+            event = {
+                "event": "complaint_accepted",
+                "complaint_id": complaint_id,
+                "assigned_to": current_user.user_id,
+                "status": "Assigned",
+            }
+            manager.push_sync("coordinator", event)
+            manager.push_sync(complaint.created_by, event)
+            loc = complaint_service.auth_service.get_location(complaint.location_id)
+            if loc and getattr(loc, "in_charge_id", None):
+                manager.push_sync(loc.in_charge_id, event)
+        except Exception:
+            pass
+        return _format_complaint(complaint, complaint_service)
+    except ComplaintConflictError as c_err:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(c_err))
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@router.post("/{complaint_id}/start-work", response_model=ComplaintResponse)
+def start_work_on_complaint(
+    complaint_id: str,
+    current_user=Depends(
+        require_roles(Coordinator.ROLE, Administrator.ROLE)
+    ),
+    complaint_service=Depends(get_complaint_service),
+):
+    complaint = complaint_service.get_complaint(complaint_id)
+    if not complaint:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
+        )
+    _ensure_visible(complaint, current_user, complaint_service)
+    try:
+        complaint = complaint_service.start_work(complaint_id, current_user.user_id)
+        try:
+            from utils.websocket_manager import manager
+            event = {
+                "event": "complaint_status_changed",
+                "complaint_id": complaint_id,
+                "status": "In Progress",
+            }
+            manager.push_sync(complaint.created_by, event)
+        except Exception:
+            pass
+        return _format_complaint(complaint, complaint_service)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@router.post("/{complaint_id}/progress", response_model=ComplaintResponse)
+def record_complaint_progress(
+    complaint_id: str,
+    payload: ComplaintProgressRequest,
+    current_user=Depends(
+        require_roles(Coordinator.ROLE, Administrator.ROLE)
+    ),
+    complaint_service=Depends(get_complaint_service),
+):
+    complaint = complaint_service.get_complaint(complaint_id)
+    if not complaint:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
+        )
+    _ensure_visible(complaint, current_user, complaint_service)
+    try:
+        complaint = complaint_service.record_progress(
+            complaint_id, current_user.user_id, payload.note, payload.photo_url
+        )
+        return _format_complaint(complaint, complaint_service)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@router.post("/{complaint_id}/block", response_model=ComplaintResponse)
+def block_complaint(
+    complaint_id: str,
+    payload: ComplaintBlockRequest,
+    current_user=Depends(
+        require_roles(Coordinator.ROLE, Administrator.ROLE)
+    ),
+    complaint_service=Depends(get_complaint_service),
+):
+    complaint = complaint_service.get_complaint(complaint_id)
+    if not complaint:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
+        )
+    _ensure_visible(complaint, current_user, complaint_service)
+    try:
+        complaint = complaint_service.block_complaint(
+            complaint_id, current_user.user_id, payload.reason, payload.expected_date
+        )
+        return _format_complaint(complaint, complaint_service)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@router.post("/{complaint_id}/unblock", response_model=ComplaintResponse)
+def unblock_complaint(
+    complaint_id: str,
+    current_user=Depends(
+        require_roles(Coordinator.ROLE, Administrator.ROLE)
+    ),
+    complaint_service=Depends(get_complaint_service),
+):
+    complaint = complaint_service.get_complaint(complaint_id)
+    if not complaint:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
+        )
+    _ensure_visible(complaint, current_user, complaint_service)
+    try:
+        complaint = complaint_service.unblock_complaint(complaint_id, current_user.user_id)
         return _format_complaint(complaint, complaint_service)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
@@ -927,6 +1063,7 @@ def update_status(
     return _format_complaint(complaint, complaint_service)
 
 
+@router.put("/{complaint_id}/resolve", response_model=ComplaintResponse)
 @router.post("/{complaint_id}/resolve", response_model=ComplaintResponse)
 def resolve_complaint(
     complaint_id: str,
@@ -941,10 +1078,10 @@ def resolve_complaint(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
         )
-    if complaint.status != Complaint.IN_PROGRESS:
+    if complaint.status not in (Complaint.IN_PROGRESS, Complaint.ASSIGNED):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Complaint must be In Progress before it can be resolved.",
+            detail="Complaint must be In Progress or Assigned before it can be resolved.",
         )
     # Coordinator can only resolve their own assigned complaints
     if (
@@ -1391,11 +1528,9 @@ def update_priority(
         )
 
     old_priority = complaint.priority
-    complaint.priority = payload.priority
-    complaint.add_history(
-        f"Priority changed from {old_priority} to {payload.priority} by {current_user.name}. Reason: {payload.reason}"
+    complaint = complaint_service.change_priority(
+        complaint_id, current_user, payload.priority, payload.reason
     )
-    complaint_service.save_complaint(complaint)
 
     audit_service.log(
         current_user.user_id,
