@@ -464,7 +464,7 @@ class ComplaintService:
             raise err
         return complaint
 
-    def mark_resolved(self, complaint_id, notes=""):
+    def mark_resolved(self, complaint_id, user_id=None, notes=""):
         complaint = self.get_complaint(complaint_id)
         if not complaint:
             raise ValueError("Complaint not found.")
@@ -477,40 +477,176 @@ class ComplaintService:
         elif complaint.status != Complaint.IN_PROGRESS:
             raise ValueError("Complaint must be In Progress or Assigned before it can be resolved.")
 
-        # 10. Resolution Validation
+        uid = getattr(user_id, "user_id", str(user_id)) if user_id else (complaint.assigned_to or "system")
+
+        # Resolution photo & notes validation
         attachments = self.attachment_service.list_attachments(complaint_id)
-        has_after_repair = any(a["category"] == "After Repair" for a in attachments)
+        has_after_repair = any(a.get("category", "").lower() in ("after repair", "after_repair") for a in attachments)
 
-        if not has_after_repair and not (notes or "").strip():
-            raise ValueError(
-                "Resolution Notes are mandatory when no 'After Repair' image is provided."
+        p = normalize_priority(complaint.priority)
+        is_high_or_crit = p in ("High", "Critical")
+
+        if is_high_or_crit:
+            if not has_after_repair:
+                raise ValueError("High and Critical priority complaints require a photo attachment of the completed work before resolving.")
+        else:
+            if not has_after_repair and not (notes or "").strip():
+                raise ValueError("Resolution Notes are mandatory when no 'After Repair' image is provided.")
+
+        import random
+        # High/Critical always requires warden in-person check; Normal/Low has ~10% spot check
+        if is_high_or_crit:
+            requires_warden = True
+            is_spot = False
+        else:
+            is_spot = random.random() < 0.10
+            requires_warden = is_spot
+
+        now_ts = now_string()
+        complaint.fixed_at = now_ts
+        complaint.fixed_by = uid
+        complaint.resolved_at = now_ts
+        complaint.resolution_notes = (notes or "").strip()
+
+        loc = self.auth_service.get_location(complaint.location_id)
+        warden_id = getattr(loc, "in_charge_id", None)
+
+        if requires_warden:
+            complaint.requires_warden_check = True
+            complaint.is_spot_check = is_spot
+            complaint.status = Complaint.PENDING_WARDEN_VERIFICATION
+            hist_msg = f"Marked fixed by {uid}."
+            if is_spot:
+                hist_msg += " Randomly selected for warden spot check."
+            else:
+                hist_msg += " Awaiting in-person warden verification."
+            complaint.add_history(hist_msg)
+            self.save_complaint(complaint)
+
+            if warden_id:
+                coord_u = self.auth_service.get_user(uid)
+                c_name = coord_u.name if coord_u else uid
+                alert_text = (
+                    f"Spot check: Complaint {complaint_id} randomly selected for in-person verification."
+                    if is_spot
+                    else f"Complaint {complaint_id} marked fixed by {c_name}. Please verify in person."
+                )
+                self.notification_service.notify(
+                    warden_id,
+                    alert_text,
+                    complaint_id=complaint_id,
+                    title="Warden Verification Required",
+                )
+        else:
+            complaint.requires_warden_check = False
+            complaint.is_spot_check = False
+            complaint.status = Complaint.WAITING_VERIFICATION
+            complaint.student_stage_at = now_ts
+            # 48 hours for student confirmation
+            complaint.verification_due_at = (now() + timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S")
+            complaint.add_history(f"Complaint marked resolved by {uid}; waiting for student confirmation.")
+            self.save_complaint(complaint)
+
+            self.notification_service.notify(
+                complaint.created_by,
+                f"Your complaint {complaint_id} has been marked resolved. Please confirm within 48 hours.",
+                complaint_id=complaint_id,
+                title="Complaint Resolved",
             )
 
-        old_status = complaint.status
-        old_resolved_at = complaint.resolved_at
-        old_notes = complaint.resolution_notes
-        complaint.mark_resolved(notes)
-
-        # Override auto-close days based on dynamic settings
-        from utils.helper import add_days_string
-
         try:
-            auto_close_days = int(self.config_service.get_setting("auto_close_days", 5))
+            from utils.websocket_manager import manager
+            manager.push_sync("coordinator", {
+                "event": "complaint_resolved",
+                "complaint_id": complaint_id,
+                "status": complaint.status,
+                "requires_warden_check": complaint.requires_warden_check,
+            })
+            manager.push_sync(complaint.created_by, {
+                "event": "complaint_resolved",
+                "complaint_id": complaint_id,
+                "status": complaint.status,
+            })
         except Exception:
-            auto_close_days = 5
-        complaint.verification_due_at = add_days_string(auto_close_days)
+            pass
+
+        return complaint
+
+    def warden_verify(self, complaint_id, warden_user, verdict, notes=""):
+        complaint = self.get_complaint(complaint_id)
+        if not complaint:
+            raise ValueError("Complaint not found.")
+
+        warden_id = getattr(warden_user, "user_id", str(warden_user))
+        warden_role = getattr(warden_user, "role", "").lower()
+        warden_name = getattr(warden_user, "name", warden_id)
+
+        # Self-verification guard
+        if warden_id == complaint.assigned_to or warden_id == complaint.created_by:
+            raise PermissionError("You cannot verify a complaint you worked on or filed.")
+
+        # Permission check
+        if warden_role != "administrator":
+            loc = self.auth_service.get_location(complaint.location_id)
+            loc_in_charge = getattr(loc, "in_charge_id", None)
+            user_loc = getattr(warden_user, "location_id", None)
+            if warden_id != loc_in_charge and user_loc != complaint.location_id:
+                raise PermissionError("Only the warden of this location or an administrator can verify.")
+
+        if complaint.status not in (Complaint.PENDING_WARDEN_VERIFICATION, "Pending Warden Verification"):
+            raise ValueError("Complaint is not pending warden verification.")
+
+        v_norm = (verdict or "").strip()
+        now_ts = now_string()
+        if v_norm.lower() in ("verified", "fixed"):
+            complaint.warden_verified_at = now_ts
+            complaint.warden_verified_by = warden_id
+            complaint.warden_verdict = "Verified"
+            complaint.warden_notes = (notes or "").strip()
+            complaint.status = Complaint.WAITING_VERIFICATION
+            complaint.student_stage_at = now_ts
+            complaint.verification_due_at = (now() + timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S")
+            complaint.add_history(f"Verified in person by Warden {warden_name}: {notes or 'No notes'}")
+            self.save_complaint(complaint)
+
+            self.notification_service.notify(
+                complaint.created_by,
+                f"Warden {warden_name} has verified the fix on complaint {complaint_id}. Please confirm to close.",
+                complaint_id=complaint_id,
+                title="Warden Verified Fix",
+            )
+        elif v_norm.lower() in ("not fixed", "not_fixed", "rejected"):
+            complaint.warden_verified_at = now_ts
+            complaint.warden_verified_by = warden_id
+            complaint.warden_verdict = "Not Fixed"
+            complaint.warden_notes = (notes or "").strip()
+            complaint.status = Complaint.IN_PROGRESS
+            complaint.add_history(f"Warden {warden_name} inspected in person and found issue NOT fixed: {notes or 'No notes'}")
+            self.save_complaint(complaint)
+
+            if complaint.assigned_to:
+                self.notification_service.notify(
+                    complaint.assigned_to,
+                    f"RE-WORK REQUIRED: Warden {warden_name} inspected complaint {complaint_id} and reported it not fixed: {notes or 'No notes'}",
+                    complaint_id=complaint_id,
+                    title="Re-work Required",
+                )
+        else:
+            raise ValueError("Verdict must be 'Verified' or 'Not Fixed'.")
 
         try:
-            self.save_complaint(complaint)
-            self.notification_service.resolved(
-                complaint_id, receiver_id=complaint.created_by or "Verifier"
-            )
-        except Exception as err:
-            complaint.status = old_status
-            complaint.resolved_at = old_resolved_at
-            complaint.resolution_notes = old_notes
-            self.save_complaint(complaint)
-            raise err
+            from utils.websocket_manager import manager
+            event_payload = {
+                "event": "warden_verification_completed",
+                "complaint_id": complaint_id,
+                "status": complaint.status,
+                "verdict": complaint.warden_verdict,
+            }
+            manager.push_sync("coordinator", event_payload)
+            manager.push_sync(complaint.created_by, event_payload)
+        except Exception:
+            pass
+
         return complaint
 
     def can_verify(self, complaint, user):
@@ -532,76 +668,333 @@ class ComplaintService:
         complaint = self.get_complaint(complaint_id)
         if not complaint:
             raise ValueError("Complaint not found.")
-        if complaint.status != Complaint.WAITING_VERIFICATION:
+        if complaint.status not in (
+            Complaint.WAITING_VERIFICATION,
+            "Waiting for Verification",
+            "Waiting For Verification",
+            "Resolved",
+        ):
             raise ValueError("Complaint is not waiting for verification.")
-        if not self.can_verify(complaint, user):
-            raise ValueError("This user cannot verify the complaint.")
-        complaint.verification_reports.append({"by": user.user_id, "result": "Fixed"})
-        complaint.close(user.user_id)
+
+        uid = getattr(user, "user_id", str(user))
+        u_role = getattr(user, "role", "").lower()
+        u_name = getattr(user, "name", uid)
+
+        if u_role != "administrator":
+            allowed_creators = {complaint.created_by}
+            if getattr(user, "email", None):
+                allowed_creators.add(user.email)
+            if uid not in allowed_creators:
+                raise PermissionError("Only the student who filed the complaint or an administrator can close it.")
+
+        now_ts = now_string()
+        complaint.status = Complaint.CLOSED
+        complaint.closed_at = now_ts
+        complaint.closed_by = uid
+        complaint.verification_reports.append({"by": uid, "result": "Fixed", "at": now_ts})
+        complaint.add_history(f"Verified and closed by {u_name}.")
         self.save_complaint(complaint)
 
-        # Notify assigned staff member if present
+        # Notify coordinator and warden
         if complaint.assigned_to:
-            self.notification_service.publish(
-                receiver_id=complaint.assigned_to,
-                title="Complaint Verified and Closed",
-                message=f"Complaint {complaint_id} has been verified and closed.",
-                module="Complaint",
-                notification_type="closure",
-                reference_type="Complaint",
-                reference_id=complaint_id,
-                priority="Medium",
+            self.notification_service.notify(
+                complaint.assigned_to,
+                f"Complaint {complaint_id} confirmed fixed and closed by student.",
+                complaint_id=complaint_id,
+                title="Complaint Closed",
             )
-        # Notify verifier
-        self.notification_service.publish(
-            receiver_id=user.user_id,
-            title="Complaint Closed",
-            message=f"Complaint {complaint_id} has been verified and closed successfully.",
-            module="Complaint",
-            notification_type="closure",
-            reference_type="Complaint",
-            reference_id=complaint_id,
-            priority="Medium",
-        )
+        loc = self.auth_service.get_location(complaint.location_id)
+        warden_id = getattr(loc, "in_charge_id", None)
+        if warden_id and warden_id != uid:
+            self.notification_service.notify(
+                warden_id,
+                f"Complaint {complaint_id} verified and closed by student.",
+                complaint_id=complaint_id,
+                title="Complaint Closed",
+            )
+
+        try:
+            from utils.websocket_manager import manager
+            manager.push_sync("coordinator", {
+                "event": "complaint_closed",
+                "complaint_id": complaint_id,
+                "status": "Closed",
+            })
+        except Exception:
+            pass
+
         return complaint
 
     def report_not_fixed(self, complaint_id, user, reason):
+        return self.reopen_complaint(complaint_id, user, reason)
+
+    def reopen_complaint(self, complaint_id, user, reason):
         complaint = self.get_complaint(complaint_id)
         if not complaint:
             raise ValueError("Complaint not found.")
-        if complaint.status != Complaint.WAITING_VERIFICATION:
-            raise ValueError("Complaint is not waiting for verification.")
-        if not self.can_verify(complaint, user):
-            raise ValueError("This user cannot report on this complaint.")
+
+        uid = getattr(user, "user_id", str(user))
+        u_role = getattr(user, "role", "").lower()
+        u_name = getattr(user, "name", uid)
+
+        if u_role != "administrator":
+            allowed_creators = {complaint.created_by}
+            if getattr(user, "email", None):
+                allowed_creators.add(user.email)
+            if uid not in allowed_creators:
+                raise PermissionError("Only the student who filed the complaint can reopen it.")
+
+        valid_status = False
+        if complaint.status in (
+            Complaint.WAITING_VERIFICATION,
+            "Waiting for Verification",
+            "Waiting For Verification",
+            "Resolved",
+        ):
+            valid_status = True
+        elif complaint.status in (Complaint.CLOSED, Complaint.AUTO_CLOSED):
+            closed_dt = parse_date(complaint.closed_at)
+            if closed_dt and (now() - closed_dt).total_seconds() <= 48 * 3600:
+                valid_status = True
+            elif not closed_dt:
+                valid_status = True
+
+        if not valid_status:
+            raise ValueError("Complaint can only be reopened when waiting for verification or within 48 hours of closing.")
+
+        complaint.reopen_count = int(getattr(complaint, "reopen_count", 0)) + 1
+        complaint.verification_due_at = None
+        complaint.student_stage_at = None
+        complaint.auto_close_reminded = False
+
+        loc = self.auth_service.get_location(complaint.location_id)
+        warden_id = getattr(loc, "in_charge_id", None)
+
+        if complaint.reopen_count < 3:
+            complaint.status = Complaint.IN_PROGRESS
+            complaint.add_history(f"Reopened by student {u_name} (reopen #{complaint.reopen_count}): {reason}")
+            self.save_complaint(complaint)
+
+            if complaint.assigned_to:
+                self.notification_service.notify(
+                    complaint.assigned_to,
+                    f"Complaint {complaint_id} reopened by student (reopen #{complaint.reopen_count}): {reason}",
+                    complaint_id=complaint_id,
+                    title="Complaint Reopened",
+                )
+            if warden_id:
+                self.notification_service.notify(
+                    warden_id,
+                    f"Complaint {complaint_id} in your location was reopened by student (reopen #{complaint.reopen_count}): {reason}",
+                    complaint_id=complaint_id,
+                    title="Complaint Reopened",
+                )
+            event_name = "complaint_reopened"
+        else:
+            complaint.status = "Admin Review"
+            complaint.admin_review_reason = f"Exceeded maximum reopens (3). Disputed between student and coordinator: {reason}"
+            complaint.add_history("Complaint escalated to Admin Review after 3 reopens.")
+            self.save_complaint(complaint)
+
+            for admin_u in self.auth_service.list_users(role="administrator"):
+                if admin_u.active and not getattr(admin_u, "is_deleted", False):
+                    self.notification_service.notify(
+                        admin_u.user_id,
+                        f"DISPUTED TICKET: Complaint {complaint_id} has been reopened 3 times. Requires administrator intervention.",
+                        complaint_id=complaint_id,
+                        title="Disputed Ticket (Admin Review)",
+                    )
+            self.notification_service.notify(
+                complaint.created_by,
+                "Your complaint has reached the maximum reopens and is now under Administrator review.",
+                complaint_id=complaint_id,
+                title="Under Admin Review",
+            )
+            if complaint.assigned_to:
+                self.notification_service.notify(
+                    complaint.assigned_to,
+                    f"Complaint {complaint_id} reached 3 reopens and escalated to Admin Review.",
+                    complaint_id=complaint_id,
+                    title="Escalated to Admin Review",
+                )
+            if warden_id:
+                self.notification_service.notify(
+                    warden_id,
+                    f"Complaint {complaint_id} escalated to Admin Review.",
+                    complaint_id=complaint_id,
+                    title="Escalated to Admin Review",
+                )
+            event_name = "complaint_admin_review"
 
         try:
-            max_reopen = int(self.config_service.get_setting("max_reopen_count", 3))
+            from utils.websocket_manager import manager
+            manager.push_sync("coordinator", {
+                "event": event_name,
+                "complaint_id": complaint_id,
+                "status": complaint.status,
+                "reopen_count": complaint.reopen_count,
+            })
+            manager.push_sync(complaint.created_by, {
+                "event": event_name,
+                "complaint_id": complaint_id,
+                "status": complaint.status,
+            })
         except Exception:
-            max_reopen = 3
+            pass
 
-        if complaint.reopen_count >= max_reopen:
-            raise ValueError(
-                f"Cannot reopen complaint. Reopen limit of {max_reopen} has been reached."
+        return complaint
+
+    def admin_decision(self, complaint_id, admin_user, decision, notes="", reassign_to=None):
+        complaint = self.get_complaint(complaint_id)
+        if not complaint:
+            raise ValueError("Complaint not found.")
+
+        admin_id = getattr(admin_user, "user_id", str(admin_user))
+        admin_name = getattr(admin_user, "name", admin_id)
+
+        if complaint.status != "Admin Review":
+            raise ValueError("Complaint is not in Admin Review status.")
+
+        d_norm = (decision or "").strip()
+        loc = self.auth_service.get_location(complaint.location_id)
+        warden_id = getattr(loc, "in_charge_id", None)
+        now_ts = now_string()
+
+        if d_norm.lower() == "close":
+            complaint.status = Complaint.CLOSED
+            complaint.closed_at = now_ts
+            complaint.closed_by = admin_id
+            complaint.admin_decision = f"Closed: {notes}"
+            complaint.admin_decided_by = admin_id
+            complaint.admin_decided_at = now_ts
+            complaint.add_history(f"Admin Review decision by {admin_name}: Closed. Notes: {notes}")
+            self.save_complaint(complaint)
+
+            self.notification_service.notify(
+                complaint.created_by,
+                f"Your complaint {complaint_id} was reviewed and closed by Administrator: {notes}",
+                complaint_id=complaint_id,
+                title="Admin Decision: Closed",
             )
+            if complaint.assigned_to:
+                self.notification_service.notify(
+                    complaint.assigned_to,
+                    f"Complaint {complaint_id} closed by Administrator: {notes}",
+                    complaint_id=complaint_id,
+                    title="Admin Decision: Closed",
+                )
+            if warden_id:
+                self.notification_service.notify(
+                    warden_id,
+                    f"Complaint {complaint_id} closed by Administrator: {notes}",
+                    complaint_id=complaint_id,
+                    title="Admin Decision: Closed",
+                )
+        elif d_norm.lower() == "reopen":
+            complaint.status = Complaint.IN_PROGRESS
+            if reassign_to:
+                new_coord = self.auth_service.get_user(reassign_to)
+                if not new_coord or (new_coord.role or "").lower() != "coordinator":
+                    raise ValueError("Reassign target must be a valid coordinator.")
+                complaint.assigned_to = reassign_to
+                complaint.assigned_at = now_ts
 
-        old_status = complaint.status
-        old_reopen_count = complaint.reopen_count
-        complaint.reopen(user.user_id, reason)
+            complaint.admin_decision = f"Reopened: {notes}"
+            complaint.admin_decided_by = admin_id
+            complaint.admin_decided_at = now_ts
+            complaint.add_history(f"Admin Review decision by {admin_name}: Reopened. Assigned to: {complaint.assigned_to}. Notes: {notes}")
+            self.save_complaint(complaint)
+
+            self.notification_service.notify(
+                complaint.created_by,
+                f"Your complaint {complaint_id} has been reopened following Administrator review.",
+                complaint_id=complaint_id,
+                title="Admin Decision: Reopened",
+            )
+            if complaint.assigned_to:
+                self.notification_service.notify(
+                    complaint.assigned_to,
+                    f"Complaint {complaint_id} reopened and assigned to you by Administrator: {notes}",
+                    complaint_id=complaint_id,
+                    title="Admin Decision: Reopened",
+                )
+            if warden_id:
+                self.notification_service.notify(
+                    warden_id,
+                    f"Complaint {complaint_id} reopened by Administrator.",
+                    complaint_id=complaint_id,
+                    title="Admin Decision: Reopened",
+                )
+        else:
+            raise ValueError("Decision must be 'Close' or 'Reopen'.")
 
         try:
-            if complaint.reopen_count >= 2 and not complaint.admin_notified:
-                complaint.admin_notified = True
-                self.notification_service.repeated_reopen(complaint_id)
-            self.save_complaint(complaint)
-            self.notification_service.reopened(
-                complaint_id, receiver_id=complaint.assigned_to or "Coordinator"
-            )
-        except Exception as err:
-            complaint.status = old_status
-            complaint.reopen_count = old_reopen_count
-            self.save_complaint(complaint)
-            raise err
+            from utils.websocket_manager import manager
+            manager.push_sync("coordinator", {
+                "event": "complaint_admin_decision",
+                "complaint_id": complaint_id,
+                "status": complaint.status,
+                "admin_decision": complaint.admin_decision,
+            })
+        except Exception:
+            pass
+
         return complaint
+
+    def get_coordinator_stats(self):
+        coordinators = self.auth_service.list_users(role="coordinator")
+        all_complaints = self.list_all(include_archived=True)
+        current_time = now()
+        thirty_days_ago = current_time - timedelta(days=30)
+
+        stats = []
+        for c in coordinators:
+            cid = c.user_id
+            c_complaints = [comp for comp in all_complaints if comp.assigned_to == cid]
+
+            assigned_count = sum(1 for comp in c_complaints if comp.status == Complaint.ASSIGNED)
+            in_prog_count = sum(1 for comp in c_complaints if comp.status == Complaint.IN_PROGRESS)
+
+            resolved_30d = 0
+            res_hours_list = []
+            reopen_count_total = 0
+
+            for comp in c_complaints:
+                if comp.reopen_count and comp.reopen_count > 0:
+                    reopen_count_total += 1
+
+                res_ts = parse_date(getattr(comp, "fixed_at", None) or comp.resolved_at)
+                if res_ts and res_ts >= thirty_days_ago:
+                    resolved_30d += 1
+
+                created_ts = parse_date(comp.created_at)
+                if created_ts and res_ts and res_ts >= created_ts:
+                    res_hours = (res_ts - created_ts).total_seconds() / 3600.0
+                    res_hours_list.append(res_hours)
+
+            avg_res_hrs = round(sum(res_hours_list) / len(res_hours_list), 1) if res_hours_list else 0.0
+            reopen_rate = round(reopen_count_total / len(c_complaints), 2) if c_complaints else 0.0
+
+            overdue_count = 0
+            for comp in c_complaints:
+                if comp.status in (Complaint.ASSIGNED, Complaint.IN_PROGRESS, STATUS_BLOCKED):
+                    sla_deadline_dt = parse_date(getattr(comp, "sla_deadline", None))
+                    if sla_deadline_dt and current_time > sla_deadline_dt:
+                        overdue_count += 1
+
+            stats.append({
+                "coordinator_id": cid,
+                "name": c.name,
+                "email": c.email,
+                "assigned_count": assigned_count,
+                "in_progress_count": in_prog_count,
+                "resolved_last_30_days": resolved_30d,
+                "avg_resolution_hours": avg_res_hrs,
+                "reopen_rate": reopen_rate,
+                "overdue_count": overdue_count,
+            })
+        return stats
+
 
     def find_least_loaded_coordinator(self, location_id, department_id):
         assignments = (
@@ -801,6 +1194,36 @@ class ComplaintService:
                                     title="Warden Verification Overdue",
                                 )
                             changed = True
+
+            # 4. Auto-close background check for Waiting for Verification tickets
+            if complaint.status in (Complaint.WAITING_VERIFICATION, "Waiting for Verification", "Waiting For Verification"):
+                due_dt = parse_date(complaint.verification_due_at)
+                if due_dt:
+                    # 24h reminder before auto-close
+                    if current_time > (due_dt - timedelta(hours=24)) and not getattr(complaint, "auto_close_reminded", False):
+                        complaint.auto_close_reminded = True
+                        self.notification_service.notify(
+                            complaint.created_by,
+                            f"Reminder: Complaint {complaint.complaint_id} will auto-close in 24 hours. Please confirm if fixed.",
+                            complaint_id=complaint.complaint_id,
+                            title="Auto-Close Reminder",
+                        )
+                        changed = True
+
+                    # Expired -> Auto close
+                    if current_time > due_dt:
+                        complaint.status = Complaint.AUTO_CLOSED
+                        complaint.auto_closed = True
+                        complaint.closed_at = current_time.strftime("%Y-%m-%d %H:%M:%S")
+                        complaint.closed_by = "system"
+                        complaint.add_history("Auto-closed after 48 hours without student response.")
+                        self.notification_service.notify(
+                            complaint.created_by,
+                            f"Complaint {complaint.complaint_id} was automatically closed after 48h of inactivity. You may reopen within 48h if not fixed.",
+                            complaint_id=complaint.complaint_id,
+                            title="Complaint Auto-Closed",
+                        )
+                        changed = True
 
         if changed:
             self._save_complaints(complaints)
