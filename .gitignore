@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.pytest_cache/
+.pytest_tmp/
+Backend/.pytest_tmp/
+
+# Runtime data and logs
+*.db
+*.db-journal
+*.log
+storage/attachments/
+Backend/storage/attachments/
+storage/lost_found_photos/
+Backend/storage/lost_found_photos/
+
+# Frontend dependencies and build output
+node_modules/
+dist/
+
+# Local development and debug material
+scratch/
+.agents/
+.codex/
+.claude/
+
+# IDE and operating system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
