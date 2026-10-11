@@ -233,6 +233,33 @@ def delete_item(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
 
 
+class ModerateItemRequest(BaseModel):
+    reason: str
+    action: Optional[str] = "hide"
+
+
+@router.post("/items/{item_id}/moderate")
+@router.put("/items/{item_id}/moderate")
+def moderate_item(
+    item_id: str,
+    payload: ModerateItemRequest,
+    current_user=Depends(get_current_user),
+    lf_service=Depends(get_lost_found_service),
+):
+    try:
+        return lf_service.moderate_item(
+            item_id,
+            performer_id=current_user.user_id,
+            user_role=current_user.role,
+            reason=payload.reason,
+            action=payload.action or "hide",
+        )
+    except PermissionError as p_err:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
+
+
 # ==========================================
 # 2. IMAGE MANAGEMENT API
 # ==========================================

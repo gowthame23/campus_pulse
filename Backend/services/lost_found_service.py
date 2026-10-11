@@ -164,12 +164,17 @@ class LostFoundService:
             query += " AND l.reported_by = ?"
             params.append(reported_by)
 
-        # Role Scoping
+        # Role Scoping & Soft-hidden moderation filter
         if user:
             role = (user.role or "").lower()
+            if role not in ("administrator", "app_manager", "superadmin", "admin"):
+                query += " AND (l.is_hidden = 0 OR l.is_hidden IS NULL OR l.reported_by = ?)"
+                params.append(user.user_id)
             if role == "student":
                 query += " AND (l.visibility = 'Public' OR l.reported_by = ?)"
                 params.append(user.user_id)
+        else:
+            query += " AND (l.is_hidden = 0 OR l.is_hidden IS NULL)"
 
         if report_type:
             query += " AND LOWER(l.report_type) = LOWER(?)"
@@ -435,6 +440,50 @@ class LostFoundService:
             pass
 
         return updated
+
+    def moderate_item(self, item_id, performer_id="system", user_role="Administrator", reason="", action="hide"):
+        if not (reason or "").strip():
+            raise ValueError("Moderation reason is mandatory.")
+        role_lower = (user_role or "").lower()
+        if role_lower not in ("administrator", "app_manager", "superadmin", "admin"):
+            raise PermissionError("Only Administrators and App Managers can moderate Lost & Found items.")
+        item = self.get_item(item_id)
+        if not item:
+            raise ValueError("Item not found.")
+
+        is_hidden = 1 if (action or "").lower() == "hide" else 0
+        now = now_string()
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE lost_found_items SET is_hidden = ?, moderation_reason = ?, moderated_by = ?, moderated_at = ? WHERE item_id = ?",
+                (is_hidden, reason, performer_id, now, item_id),
+            )
+
+        if hasattr(self, "log_audit"):
+            try:
+                self.log_audit(performer_id, "MODERATE_ITEM", f"Item {item_id} moderated ({action}): {reason}")
+            except Exception:
+                pass
+
+        try:
+            if hasattr(self, "notification_service") and self.notification_service:
+                self.notification_service.create_notification(
+                    recipient_id=item["reported_by"],
+                    title=f"Lost & Found Item {'Hidden' if is_hidden else 'Restored'}",
+                    message=f"Your post '{item.get('title')}' was moderated by staff: {reason}",
+                    severity="warning",
+                )
+        except Exception:
+            pass
+
+        return {
+            "item_id": item_id,
+            "is_hidden": bool(is_hidden),
+            "moderation_reason": reason,
+            "moderated_by": performer_id,
+            "moderated_at": now,
+            "message": f"Item {action}d successfully.",
+        }
 
     def delete_item(self, item_id, performer_id="system", user_role="Student"):
         item = self.get_item(item_id)

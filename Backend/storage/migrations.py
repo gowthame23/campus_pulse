@@ -43,6 +43,7 @@ def run_migrations(db_path: str = "storage/campus_pulse.db"):
         _migrate_locations_table(conn)
         _migrate_operational_tables(conn)
         _migrate_push_subscriptions_table(conn)
+        _migrate_lost_found_items_table(conn)
         _normalize_priorities_and_deadlines(conn)
         _reroute_warden_assigned_open_complaints(conn)
 
@@ -143,6 +144,7 @@ def _migrate_complaints_table(conn: sqlite3.Connection):
         "photo_skip_reason": "TEXT",
         "reopen_notes": "TEXT",
         "resolution_proof_url": "TEXT",
+        "affected_upgraded": "INTEGER DEFAULT 0",
     }
 
     for col_name, col_type in new_columns.items():
@@ -378,3 +380,18 @@ def _migrate_push_subscriptions_table(conn: sqlite3.Connection):
         CREATE INDEX IF NOT EXISTS idx_push_sub_user ON push_subscriptions(user_id);
     """)
     logger.info("push_subscriptions table migration verified.")
+
+
+def _migrate_lost_found_items_table(conn: sqlite3.Connection):
+    """Ensure lost_found_items table has is_hidden, moderation_reason, moderated_by, moderated_at columns."""
+    existing_cols = _get_existing_columns(conn, "lost_found_items")
+    lf_cols = {
+        "is_hidden": "INTEGER DEFAULT 0",
+        "moderation_reason": "TEXT",
+        "moderated_by": "TEXT",
+        "moderated_at": "TEXT",
+    }
+    for col_name, col_type in lf_cols.items():
+        if col_name not in existing_cols:
+            conn.execute(f"ALTER TABLE lost_found_items ADD COLUMN {col_name} {col_type};")
+            logger.info(f"Added column {col_name} to lost_found_items table.")

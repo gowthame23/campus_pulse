@@ -1389,8 +1389,8 @@ class SQLiteRepository:
                         user_id, name, email, password, role, first_login, active,
                         department_id, location_id, created_at, phone_number, status,
                         profile_photo, updated_at, last_login, last_logout, created_by,
-                        is_deleted, deleted_at, deleted_by
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        is_deleted, deleted_at, deleted_by, photo_skip_streak, force_next_warden_check, language
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     [self._user_to_values(item) for item in data.get("users", [])],
                 )
@@ -1441,11 +1441,11 @@ class SQLiteRepository:
                         deletion_reason, deletion_requested_at,
                         wrong_location_corrected_at, wrong_location_corrections,
                         last_progress_code, photo_skipped, photo_skip_reason,
-                        reopen_notes, resolution_proof_url
+                        reopen_notes, resolution_proof_url, affected_upgraded
                     ) VALUES (
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                     )
                     """,
                     [
@@ -1509,8 +1509,8 @@ class SQLiteRepository:
                 connection.execute("DELETE FROM attachments")
                 connection.executemany(
                     """
-                    INSERT INTO attachments (attachment_id, complaint_id, uploaded_by, uploader_role, category, original_filename, stored_filename, file_path, file_size, uploaded_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO attachments (attachment_id, complaint_id, uploaded_by, uploader_role, category, original_filename, stored_filename, file_path, file_size, uploaded_at, source, sha256, exif_taken_at, kind, flags)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     [
                         (
@@ -1524,6 +1524,11 @@ class SQLiteRepository:
                             a["file_path"],
                             a["file_size"],
                             a["uploaded_at"],
+                            a.get("source", "gallery"),
+                            a.get("sha256"),
+                            a.get("exif_taken_at"),
+                            a.get("kind", "attachment"),
+                            a.get("flags"),
                         )
                         for a in data.get("attachments", [])
                     ],
@@ -1563,6 +1568,9 @@ class SQLiteRepository:
             int(item.get("is_deleted", False)),
             item.get("deleted_at"),
             item.get("deleted_by"),
+            int(item.get("photo_skip_streak", 0) or 0),
+            int(item.get("force_next_warden_check", 0) or 0),
+            item.get("language", "en"),
         )
 
     def _department_to_values(self, item):
@@ -1664,6 +1672,7 @@ class SQLiteRepository:
             item.get("photo_skip_reason"),
             item.get("reopen_notes"),
             item.get("resolution_proof_url"),
+            int(bool(item.get("affected_upgraded", False))),
         )
 
     def _row_to_user(self, row):
@@ -1688,6 +1697,9 @@ class SQLiteRepository:
             "is_deleted": bool(row["is_deleted"]) if "is_deleted" in row.keys() else False,
             "deleted_at": row["deleted_at"] if "deleted_at" in row.keys() else None,
             "deleted_by": row["deleted_by"] if "deleted_by" in row.keys() else None,
+            "photo_skip_streak": int(row["photo_skip_streak"]) if "photo_skip_streak" in row.keys() and row["photo_skip_streak"] is not None else 0,
+            "force_next_warden_check": int(row["force_next_warden_check"]) if "force_next_warden_check" in row.keys() and row["force_next_warden_check"] is not None else 0,
+            "language": row["language"] if "language" in row.keys() and row["language"] else "en",
         }
 
     def _row_to_department(self, row):
@@ -1801,4 +1813,5 @@ class SQLiteRepository:
             "photo_skip_reason": row["photo_skip_reason"] if "photo_skip_reason" in row.keys() else None,
             "reopen_notes": row["reopen_notes"] if "reopen_notes" in row.keys() else None,
             "resolution_proof_url": row["resolution_proof_url"] if "resolution_proof_url" in row.keys() else None,
+            "affected_upgraded": bool(row["affected_upgraded"]) if "affected_upgraded" in row.keys() and row["affected_upgraded"] is not None else False,
         }

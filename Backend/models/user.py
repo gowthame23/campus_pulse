@@ -51,6 +51,9 @@ class User:
         staff_department=None,
         assigned_locations=None,
         assigned_categories=None,
+        photo_skip_streak=0,
+        force_next_warden_check=0,
+        language="en",
     ):
         self.user_id = user_id
         self.name = name
@@ -94,6 +97,9 @@ class User:
         self.staff_department = staff_department
         self.assigned_locations = assigned_locations or []
         self.assigned_categories = assigned_categories or []
+        self.photo_skip_streak = int(photo_skip_streak or 0)
+        self.force_next_warden_check = int(force_next_warden_check or 0)
+        self.language = language or "en"
 
     def check_password(self, password):
         return verify_password(password, self.password)
@@ -144,6 +150,9 @@ class User:
             "staff_department": self.staff_department or self.department_id,
             "assigned_locations": self.assigned_locations,
             "assigned_categories": self.assigned_categories,
+            "photo_skip_streak": self.photo_skip_streak,
+            "force_next_warden_check": self.force_next_warden_check,
+            "language": self.language,
         }
 
     @classmethod
@@ -185,4 +194,7 @@ class User:
             staff_department=data.get("staff_department") or data.get("department"),
             assigned_locations=data.get("assigned_locations", []),
             assigned_categories=data.get("assigned_categories", []),
+            photo_skip_streak=int(data.get("photo_skip_streak", 0) or 0),
+            force_next_warden_check=int(data.get("force_next_warden_check", 0) or 0),
+            language=data.get("language", "en"),
         )

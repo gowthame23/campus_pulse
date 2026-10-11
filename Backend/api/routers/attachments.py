@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
@@ -69,6 +69,8 @@ def upload_attachments(
     complaint_id: str,
     files: List[UploadFile] = File(...),
     category: str = Form("Additional"),
+    source: str = Form("gallery"),
+    kind: Optional[str] = Form(None),
     current_user=Depends(get_current_user),
     attachment_service=Depends(get_attachment_service),
     complaint_service=Depends(get_complaint_service),
@@ -140,6 +142,7 @@ def upload_attachments(
         )
 
     uploaded_metadata = []
+    job_start = getattr(complaint, "started_at", None) or getattr(complaint, "assigned_at", None)
 
     for file in files:
         file_bytes = file.file.read()
@@ -151,6 +154,9 @@ def upload_attachments(
                 category=category,
                 filename=file.filename,
                 file_bytes=file_bytes,
+                source=source,
+                kind=kind,
+                job_started_at=job_start,
             )
             uploaded_metadata.append(meta)
         except ValueError as err:

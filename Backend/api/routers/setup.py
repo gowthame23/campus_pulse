@@ -1,5 +1,5 @@
-from typing import Any, Dict, List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Any, Dict, List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from api.dependencies import get_auth_service, get_complaint_service
@@ -7,16 +7,27 @@ from api.security import require_roles, get_current_user
 from models.administrator import Administrator
 from models.app_manager import AppManager
 from models.coordinator import Coordinator
+from models.location_in_charge import LocationInCharge
 
 router = APIRouter(tags=["setup"])
 
 
 @router.get("/coordinators/stats")
 def get_coordinator_stats(
-    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
+    location_id: Optional[str] = None,
+    department_id: Optional[str] = None,
+    from_date: Optional[str] = Query(None, alias="from"),
+    to_date: Optional[str] = Query(None, alias="to"),
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE, LocationInCharge.ROLE, Coordinator.ROLE)),
     complaint_service=Depends(get_complaint_service),
 ):
-    return complaint_service.get_coordinator_stats()
+    return complaint_service.get_coordinator_stats(
+        location_id=location_id,
+        department_id=department_id,
+        from_date=from_date,
+        to_date=to_date,
+        current_user=current_user,
+    )
 
 
 class CoordinatorAssignmentsUpdateRequest(BaseModel):
