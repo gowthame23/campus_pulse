@@ -32,6 +32,7 @@ import { departmentService } from "../../services/departmentService.js";
 import { formatDate } from "../../utils/dateFormatter.js";
 import { getStatusTone, getSlaTone } from "../../utils/statusColor.js";
 import { COMPLAINT_STATUS } from "../../utils/constants.js";
+import { getStudentStageText } from "../student/StudentDashboard.jsx";
 
 const isClosedStatus = (statusStr) => {
   if (!statusStr) return false;
@@ -469,9 +470,14 @@ export default function ComplaintListPage() {
     { key: "complaint_type", header: "Type / Category" },
     {
       key: "status",
-      header: "Status",
+      header: "Status & Stage",
       render: (row) => (
-        <Badge tone={getStatusTone(row.status)}>{row.status}</Badge>
+        <div className="flex flex-col gap-1 items-start">
+          <Badge tone={getStatusTone(row.status)}>{row.status}</Badge>
+          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-tight">
+            {getStudentStageText(row)}
+          </span>
+        </div>
       ),
     },
     {

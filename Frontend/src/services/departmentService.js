@@ -20,4 +20,5 @@ export const departmentService = {
     apiClient.delete(`/departments/coordinators/assignments/${assignmentId}`),
   getUnassignedCombinations: () =>
     apiClient.get("/departments/coordinators/unassigned-combinations"),
+  getCoverageGaps: () => apiClient.get("/departments/coverage-gaps"),
 };

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { authService } from "../services/authService";
+import { complaintService } from "../services/complaintService";
 
 const AuthContext = createContext(null);
 const TOKEN_KEY = "campusPulseToken";
@@ -98,60 +99,85 @@ export function AuthProvider({ children }) {
     };
   }, [token]);
 
-  // WebSocket for real-time notifications (connect when authenticated)
+  // WebSocket for real-time notifications (connect with single-use ticket)
   useEffect(() => {
     if (!token || !user) return; // only when authenticated
-    let ws;
-    try {
-      const apiBase =
-        import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
-      const wsBase = apiBase.replace(/^http/, "ws");
-      const wsUrl = `${wsBase.replace(/\/$/, "")}/notifications/ws/${user.user_id}`;
-      // append token for websocket authentication
-      const token = localStorage.getItem(TOKEN_KEY);
-      const sep = wsUrl.includes("?") ? "&" : "?";
-      const wsUrlWithToken = token
-        ? `${wsUrl}${sep}token=${encodeURIComponent(token)}`
-        : wsUrl;
-      ws = new WebSocket(wsUrlWithToken);
+    let ws = null;
+    let isCancelled = false;
+    let reconnectTimeout = null;
 
-      ws.addEventListener("open", () => {
-        // optional: send a ping or initial message
+    async function connect() {
+      if (isCancelled) return;
+      try {
+        const apiBase =
+          import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+        const wsBase = apiBase.replace(/^http/, "ws");
+        const wsUrl = `${wsBase.replace(/\/$/, "")}/notifications/ws/${user.user_id}`;
+
+        let queryParam = "";
         try {
-          ws.send("ping");
-        } catch (e) {
-          /* ignore */
+          const ticketRes = await complaintService.getWsTicket();
+          if (ticketRes?.data?.ticket) {
+            queryParam = `ticket=${encodeURIComponent(ticketRes.data.ticket)}`;
+          }
+        } catch {
+          // Fallback to token if ticket endpoint is unavailable
+          const authToken = localStorage.getItem(TOKEN_KEY);
+          if (authToken) {
+            queryParam = `token=${encodeURIComponent(authToken)}`;
+          }
         }
-      });
 
-      ws.addEventListener("message", (evt) => {
-        try {
-          const payload = JSON.parse(evt.data);
-          // Dispatch a custom event so UI components can react
-          window.dispatchEvent(
-            new CustomEvent("campus-pulse-notification", { detail: payload }),
-          );
-        } catch (err) {
-          // If message is plain text, forward as-is
-          window.dispatchEvent(
-            new CustomEvent("campus-pulse-notification", {
-              detail: { event: "message", data: evt.data },
-            }),
-          );
+        if (isCancelled) return;
+
+        const sep = wsUrl.includes("?") ? "&" : "?";
+        const fullWsUrl = queryParam ? `${wsUrl}${sep}${queryParam}` : wsUrl;
+        ws = new WebSocket(fullWsUrl);
+
+        ws.addEventListener("open", () => {
+          try {
+            ws.send("ping");
+          } catch {}
+        });
+
+        ws.addEventListener("message", (evt) => {
+          try {
+            const payload = JSON.parse(evt.data);
+            window.dispatchEvent(
+              new CustomEvent("campus-pulse-notification", { detail: payload }),
+            );
+          } catch {
+            window.dispatchEvent(
+              new CustomEvent("campus-pulse-notification", {
+                detail: { event: "message", data: evt.data },
+              }),
+            );
+          }
+        });
+
+        ws.addEventListener("close", (evt) => {
+          // On non-normal close, reconnect after delay using a newly fetched single-use ticket
+          if (!isCancelled && evt.code !== 1000) {
+            reconnectTimeout = setTimeout(connect, 5000);
+          }
+        });
+      } catch {
+        if (!isCancelled) {
+          reconnectTimeout = setTimeout(connect, 10000);
         }
-      });
-
-      ws.addEventListener("close", () => {
-        // no-op; will reconnect on next login or refresh
-      });
-    } catch (err) {
-      // ignore websocket setup errors in UI
+      }
     }
 
+    connect();
+
     return () => {
+      isCancelled = true;
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
       try {
-        if (ws && ws.readyState === WebSocket.OPEN) ws.close();
-      } catch (e) {}
+        if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+          ws.close(1000, "Component unmounted");
+        }
+      } catch {}
     };
   }, [token, user]);
 

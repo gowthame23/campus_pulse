@@ -9,9 +9,14 @@ import {
   RefreshCw,
   MapPin,
   Building,
+  AlertTriangle,
+  CheckCircle2,
+  Network,
+  Layers,
 } from "lucide-react";
 import Button from "../../components/Button.jsx";
 import Card from "../../components/Card.jsx";
+import Badge from "../../components/Badge.jsx";
 import EmptyState from "../../components/EmptyState.jsx";
 import Input from "../../components/Input.jsx";
 import Loader from "../../components/Loader.jsx";
@@ -32,6 +37,7 @@ export default function DepartmentManagementPage() {
   const [error, setError] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState("");
+  const [viewMode, setViewMode] = useState("grid"); // "grid" | "hierarchy"
 
   // Edit State
   const [editTarget, setEditTarget] = useState(null);
@@ -48,9 +54,12 @@ export default function DepartmentManagementPage() {
   const [viewCategoriesTarget, setViewCategoriesTarget] = useState(null);
 
   const { data, loading, reload } = useAsyncData(async () => {
-    const [locationsRes, coordinatorsRes] = await Promise.all([
-      locationService.list(),
-      userService.list(ROLES.COORDINATOR),
+    const [locationsRes, coordinatorsRes, coverageGapsRes] = await Promise.all([
+      locationService.list().catch(() => ({ data: [] })),
+      userService.list(ROLES.COORDINATOR).catch(() => ({ data: [] })),
+      departmentService
+        .getCoverageGaps()
+        .catch(() => ({ data: { unassigned_pairs: [], unassigned_warden_locations: [] } })),
     ]);
 
     const departmentsRes = await departmentService.list({
@@ -62,6 +71,7 @@ export default function DepartmentManagementPage() {
       locations: locationsRes.data || [],
       departments: departmentsRes.data || [],
       coordinators: coordinatorsRes.data || [],
+      coverageGaps: coverageGapsRes.data || { unassigned_pairs: [], unassigned_warden_locations: [] },
     };
   }, [showArchived, selectedLocation]);
 
@@ -247,6 +257,150 @@ export default function DepartmentManagementPage() {
     return data?.departments || [];
   }, [data]);
 
+  const mappingGridColumns = [
+    {
+      key: "location",
+      header: "Location",
+      render: (row) => {
+        const locObj = (data?.locations || []).find(
+          (l) => l.location_id === row.location_id,
+        );
+        const locName = locObj ? locObj.name : row.location_id;
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+            <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
+            {locName || "-"}
+          </span>
+        );
+      },
+    },
+    {
+      key: "name",
+      header: "Department",
+      render: (row) => (
+        <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
+          {row.name}
+        </span>
+      ),
+    },
+    {
+      key: "complaint_types",
+      header: "Covered Categories",
+      render: (row) => {
+        const types = row.complaint_types || [];
+        if (types.length === 0) return "-";
+        return (
+          <span className="text-xs text-slate-600 dark:text-slate-400 line-clamp-1" title={types.join(", ")}>
+            {types.join(", ")}
+          </span>
+        );
+      },
+    },
+    {
+      key: "coordinator_id",
+      header: "Assigned Coordinator",
+      render: (row) => (
+        <Select
+          value={row.coordinator_id || ""}
+          onChange={(event) =>
+            assignCoordinator(row.department_id, event.target.value)
+          }
+          aria-label="Assign coordinator"
+          className="!min-h-9 !py-1 !text-xs min-w-[150px]"
+          disabled={row.archived}
+        >
+          <option value="">Unassigned</option>
+          {(data?.coordinators || [])
+            .filter(
+              (user) => user.active || user.user_id === row.coordinator_id,
+            )
+            .map((user) => (
+              <option key={user.user_id} value={user.user_id}>
+                {user.name}
+                {!user.active ? " (Disabled)" : ""}
+              </option>
+            ))}
+        </Select>
+      ),
+    },
+    {
+      key: "coverage_status",
+      header: "Coverage Status",
+      render: (row) => {
+        const isAssigned = !!row.coordinator_id;
+        return isAssigned ? (
+          <Badge tone="success">
+            <span className="flex items-center gap-1">
+              <CheckCircle2 className="h-3 w-3" />
+              Covered
+            </span>
+          </Badge>
+        ) : (
+          <Badge tone="warning">
+            <span className="flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              Gap (Unassigned)
+            </span>
+          </Badge>
+        );
+      },
+    },
+    {
+      key: "sla_days",
+      header: "SLA Limit",
+      render: (row) => `${row.sla_days} days`,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (row) => (
+        <div className="flex items-center gap-1.5">
+          {row.archived ? (
+            <Button
+              variant="subtle"
+              size="sm"
+              onClick={() => restoreDepartment(row.department_id)}
+              className="!p-1.5"
+              title="Restore Department"
+            >
+              <RefreshCw className="h-3.5 w-3.5 text-emerald-600" />
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="subtle"
+                size="sm"
+                onClick={() => startEdit(row)}
+                className="!p-1.5"
+                title="Edit Department"
+              >
+                <Edit2 className="h-3.5 w-3.5 text-slate-500" />
+              </Button>
+              <Button
+                variant="subtle"
+                size="sm"
+                onClick={() => archiveDepartment(row.department_id)}
+                className="!p-1.5"
+                title="Archive Department"
+              >
+                <Archive className="h-3.5 w-3.5 text-amber-500" />
+              </Button>
+              <Button
+                variant="subtle"
+                size="sm"
+                onClick={() => startDelete(row)}
+                className="!p-1.5 hover:text-red-600"
+                title="Delete Department"
+              >
+                <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+              </Button>
+            </>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   const columns = [
     { key: "name", header: "Department" },
     {
@@ -406,6 +560,44 @@ export default function DepartmentManagementPage() {
       <Toast message={message} tone="success" onClose={() => setMessage("")} />
       <Toast message={error} tone="danger" onClose={() => setError("")} />
 
+      {/* Coverage Gaps Alert Panel */}
+      {data?.coverageGaps?.unassigned_pairs?.length > 0 && (
+        <div className="p-4 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 shadow-xs space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-lg bg-amber-200/80 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 shrink-0">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold">
+                  Coverage gaps: {data.coverageGaps.unassigned_pairs.length} department/location pair{data.coverageGaps.unassigned_pairs.length === 1 ? "" : "s"} have no coordinator assigned.
+                </h3>
+                <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-0.5">
+                  Complaints filed in these areas cannot be auto-routed and will sit in the unassigned queue. Assign coordinators using the mapping grid below.
+                </p>
+              </div>
+            </div>
+            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-200/80 dark:bg-amber-900 text-amber-900 dark:text-amber-100 shrink-0">
+              {data.coverageGaps.unassigned_pairs.length} Gaps
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-1">
+            {data.coverageGaps.unassigned_pairs.map((gap, idx) => (
+              <span
+                key={idx}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 border border-amber-300/80 dark:border-amber-700 text-slate-800 dark:text-slate-200"
+              >
+                <MapPin className="h-3 w-3 text-amber-600 shrink-0" />
+                <span className="font-bold">{gap.department_name}</span>
+                <span className="text-slate-400">@</span>
+                <span>{gap.location_name}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Register form card */}
       <Card>
         <div className="mb-4">
@@ -492,7 +684,35 @@ export default function DepartmentManagementPage() {
             </select>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-3 shrink-0 flex-wrap">
+            {/* View Mode Toggle */}
+            <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setViewMode("grid")}
+                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  viewMode === "grid"
+                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                }`}
+              >
+                <Network className="h-3.5 w-3.5" />
+                Mapping Grid
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("hierarchy")}
+                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  viewMode === "hierarchy"
+                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                }`}
+              >
+                <Layers className="h-3.5 w-3.5" />
+                Grouped by Location
+              </button>
+            </div>
+
             {/* Show Archived Checkbox */}
             <label className="flex items-center gap-2 cursor-pointer select-none px-2 shrink-0">
               <input
@@ -524,7 +744,7 @@ export default function DepartmentManagementPage() {
         <Loader label="Loading location hierarchy and departments" variant="skeleton" />
       )}
 
-      {/* Render Location Hierarchy Cards with Departments inside each Location */}
+      {/* Render Location Hierarchy Cards or Mapping Grid based on viewMode */}
       {!loading && (
         <div className="grid gap-6">
           {(() => {
@@ -533,6 +753,48 @@ export default function DepartmentManagementPage() {
             const rawDepartments = showArchived
               ? allDepartments.filter((d) => d.archived === true)
               : allDepartments.filter((d) => !d.archived);
+
+            const filteredByLoc = selectedLocation
+              ? rawDepartments.filter((d) => d.location_id === selectedLocation)
+              : rawDepartments;
+
+            if (viewMode === "grid") {
+              return (
+                <Card className="!p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800 mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                        <Network className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                          Department ⟷ Location ⟶ Coordinator Mapping Grid
+                        </h2>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                          Direct routing map with coverage status and coordinator assignments
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-500 font-semibold">
+                      Showing {filteredByLoc.length} department/location pairs
+                    </div>
+                  </div>
+
+                  {filteredByLoc.length === 0 ? (
+                    <EmptyState
+                      title={showArchived ? "No archived departments found" : "No departments found"}
+                      description={showArchived ? "There are currently no archived departments." : "Try selecting another location or configure a new department above."}
+                    />
+                  ) : (
+                    <Table
+                      columns={mappingGridColumns}
+                      rows={filteredByLoc}
+                      getRowKey={(row) => row.department_id}
+                    />
+                  )}
+                </Card>
+              );
+            }
 
             const targetLocations = selectedLocation
               ? rawLocations.filter((l) => l.location_id === selectedLocation)

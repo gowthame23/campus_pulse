@@ -11,8 +11,19 @@ export function getStatusTone(status) {
     [COMPLAINT_STATUS.AUTO_CLOSED]: "success", // Green (verified fixed by auto-close)
     [COMPLAINT_STATUS.REOPENED]: "orange", // Orange
     [COMPLAINT_STATUS.AWAITING_ASSIGNMENT]: "warning",
+    [COMPLAINT_STATUS.WAITING_FOR_PARTS]: "amber",
+    "Waiting for Parts": "amber",
+    [COMPLAINT_STATUS.PENDING_WARDEN_VERIFICATION]: "purple",
+    "Pending Warden Verification": "purple",
+    [COMPLAINT_STATUS.ADMIN_REVIEW]: "danger",
+    "Admin Review": "danger",
   };
-  return tones[status] || "default";
+  if (tones[status]) return tones[status];
+  const s = String(status || "").toLowerCase();
+  if (s.includes("warden")) return "purple";
+  if (s.includes("parts")) return "amber";
+  if (s.includes("admin review")) return "danger";
+  return "default";
 }
 
 export function getSlaTone(slaStatus) {

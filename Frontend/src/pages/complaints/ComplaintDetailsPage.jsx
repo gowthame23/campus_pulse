@@ -41,6 +41,8 @@ import { attachmentService } from "../../services/attachmentService.js";
 import { departmentService } from "../../services/departmentService.js";
 import { locationService } from "../../services/locationService.js";
 import { userService } from "../../services/userService.js";
+import StageTimeline from "../../components/StageTimeline.jsx";
+import ResponsiblePersonnelCard from "../../components/ResponsiblePersonnelCard.jsx";
 import { COMPLAINT_STATUS, ROLES } from "../../utils/constants.js";
 import { formatDate } from "../../utils/dateFormatter.js";
 import { getStatusTone, getSlaTone } from "../../utils/statusColor.js";
@@ -93,6 +95,38 @@ export default function ComplaintDetailsPage() {
   const [attachments, setAttachments] = useState([]);
   const [attachmentUrls, setAttachmentUrls] = useState({});
   const [uploadCategory, setUploadCategory] = useState("Before Repair");
+
+  // User directory for personnel lookup
+  const [allUsers, setAllUsers] = useState([]);
+
+  // Workflow action modals
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [progressNoteText, setProgressNoteText] = useState("");
+  const [submittingProgressNote, setSubmittingProgressNote] = useState(false);
+
+  const [showPauseModal, setShowPauseModal] = useState(false);
+  const [pauseReasonText, setPauseReasonText] = useState("");
+  const [submittingPause, setSubmittingPause] = useState(false);
+
+  const [showResolveModal, setShowResolveModal] = useState(false);
+  const [resolveNotesText, setResolveNotesText] = useState("");
+  const [resolvePhotoFile, setResolvePhotoFile] = useState(null);
+  const [submittingResolve, setSubmittingResolve] = useState(false);
+
+  const [showWardenVerifyModal, setShowWardenVerifyModal] = useState(false);
+  const [wardenVerdictChoice, setWardenVerdictChoice] = useState("Verified");
+  const [wardenVerdictNotes, setWardenVerdictNotes] = useState("");
+  const [submittingWardenVerify, setSubmittingWardenVerify] = useState(false);
+
+  const [showStudentReopenModal, setShowStudentReopenModal] = useState(false);
+  const [studentReopenReason, setStudentReopenReason] = useState("");
+  const [submittingStudentReopen, setSubmittingStudentReopen] = useState(false);
+
+  const [showAdminDecisionModal, setShowAdminDecisionModal] = useState(false);
+  const [adminDecisionChoice, setAdminDecisionChoice] = useState("Close");
+  const [adminDecisionNotes, setAdminDecisionNotes] = useState("");
+  const [adminReassignCoord, setAdminReassignCoord] = useState("");
+  const [submittingAdminDecision, setSubmittingAdminDecision] = useState(false);
 
   const navigate = useNavigate();
 
@@ -303,12 +337,58 @@ export default function ComplaintDetailsPage() {
     [locations, complaint],
   );
 
+  const coordinatorUser = useMemo(() => {
+    return (allUsers || []).find(
+      (u) =>
+        u.user_id === complaint?.assigned_to ||
+        u.email === complaint?.assigned_to ||
+        u.id === complaint?.assigned_to,
+    ) || null;
+  }, [allUsers, complaint?.assigned_to]);
+
+  const wardenUser = useMemo(() => {
+    return (
+      (allUsers || []).find(
+        (u) =>
+          u.user_id === location?.in_charge_id ||
+          u.id === location?.in_charge_id ||
+          (u.role === "location_in_charge" && u.location_id === complaint?.location_id),
+      ) || null
+    );
+  }, [allUsers, location?.in_charge_id, complaint?.location_id]);
+
+  const userRole = (user?.role || "").toLowerCase();
+  const isCoordinator = userRole === "coordinator";
+  const isWarden = userRole === "location_in_charge" || userRole === "warden";
+  const isAppManager = userRole === "app_manager";
+  const isAdmin = userRole === "administrator" || userRole === "admin";
+  const isStudent = userRole === "student";
+
+  const isLocationWarden =
+    isWarden &&
+    (location?.in_charge_id === user?.user_id ||
+      user?.location_id === complaint?.location_id ||
+      isAdmin);
+
+  const isSelfWorkOnTicket =
+    user?.user_id === complaint?.assigned_to ||
+    user?.email === complaint?.assigned_to ||
+    user?.user_id === complaint?.created_by;
+
+  const canWardenVerify =
+    (isLocationWarden || isAdmin) &&
+    complaint?.status === "Pending Warden Verification" &&
+    !isSelfWorkOnTicket;
+
+  const canStudentConfirmOrReopen =
+    (isOwner || isAdmin) &&
+    complaint?.status === "Waiting for Verification";
+
+  const canAdminDecide =
+    isAdmin && complaint?.status === "Admin Review";
+
   const canChangePriority =
-    user &&
-    (user.role === ROLES.ADMINISTRATOR ||
-      user.role === ROLES.APP_MANAGER ||
-      user.role === ROLES.COORDINATOR ||
-      user.role === ROLES.LOCATION_IN_CHARGE);
+    user && (isAdmin || isAppManager || isLocationWarden);
 
   async function load() {
     setLoading(true);
@@ -320,23 +400,24 @@ export default function ComplaintDetailsPage() {
         locationResponse,
         commentsResponse,
         attachmentsResponse,
+        usersResponse,
       ] = await Promise.all([
         complaintService.getById(complaintId),
         departmentService.list().catch(() => ({ data: [] })),
         locationService.list().catch(() => ({ data: [] })),
         complaintService.getComments(complaintId).catch(() => ({ data: [] })),
         attachmentService.list(complaintId).catch(() => ({ data: [] })),
+        userService.list().catch(() => ({ data: [] })),
       ]);
       setComplaint(complaintResponse.data);
-      setDepartments(departmentResponse.data);
-      setLocations(locationResponse.data);
-      setComments(commentsResponse.data);
-      setAttachments(attachmentsResponse.data);
+      setDepartments(departmentResponse.data || []);
+      setLocations(locationResponse.data || []);
+      setComments(commentsResponse.data || []);
+      setAttachments(attachmentsResponse.data || []);
+      const userList = usersResponse.data || [];
+      setAllUsers(userList);
+      setCoordinators(userList.filter((u) => (u.role || "").toLowerCase() === "coordinator"));
       setSelectedPriority(complaintResponse.data.priority || "Medium");
-      if ([ROLES.APP_MANAGER, ROLES.ADMINISTRATOR].includes(user?.role)) {
-        const usersResponse = await userService.list(ROLES.COORDINATOR);
-        setCoordinators(usersResponse.data);
-      }
     } catch (err) {
       setError(getApiError(err, "Unable to load complaint."));
     } finally {
@@ -559,6 +640,218 @@ export default function ComplaintDetailsPage() {
     }
   };
 
+  const handleAcceptComplaint = async () => {
+    setMessage("");
+    setError("");
+    try {
+      await complaintService.accept(complaintId);
+      setMessage("Complaint accepted and assigned to you.");
+      load();
+    } catch (err) {
+      if (err.response?.status === 409) {
+        setError("Taken by another coordinator. Refreshing status...");
+      } else {
+        setError(getApiError(err, "Failed to accept complaint."));
+      }
+      load();
+    }
+  };
+
+  const handleStartWork = async () => {
+    setMessage("");
+    setError("");
+    try {
+      await complaintService.startWork(complaintId);
+      setMessage("Work marked in progress.");
+      load();
+    } catch (err) {
+      setError(getApiError(err, "Failed to start work."));
+    }
+  };
+
+  const handleProgressNoteSubmit = async (e) => {
+    e.preventDefault();
+    if (!progressNoteText.trim()) return;
+    setSubmittingProgressNote(true);
+    setMessage("");
+    setError("");
+    try {
+      await complaintService.addProgressNote(complaintId, progressNoteText.trim());
+      setMessage("Progress note logged successfully.");
+      setProgressNoteText("");
+      setShowProgressModal(false);
+      load();
+    } catch (err) {
+      setError(getApiError(err, "Failed to add progress note."));
+    } finally {
+      setSubmittingProgressNote(false);
+    }
+  };
+
+  const handlePauseSubmit = async (e) => {
+    e.preventDefault();
+    if (!pauseReasonText.trim()) {
+      setError("Please specify reason for pausing work.");
+      return;
+    }
+    setSubmittingPause(true);
+    setMessage("");
+    setError("");
+    try {
+      await complaintService.pause(complaintId, pauseReasonText.trim());
+      setMessage("Complaint paused (Waiting for Parts).");
+      setPauseReasonText("");
+      setShowPauseModal(false);
+      load();
+    } catch (err) {
+      setError(getApiError(err, "Failed to pause work."));
+    } finally {
+      setSubmittingPause(false);
+    }
+  };
+
+  const handleResumeWork = async () => {
+    setMessage("");
+    setError("");
+    try {
+      await complaintService.resume(complaintId);
+      setMessage("Work resumed. Complaint returned to In Progress.");
+      load();
+    } catch (err) {
+      setError(getApiError(err, "Failed to resume work."));
+    }
+  };
+
+  const handleResolveSubmit = async (e) => {
+    e.preventDefault();
+    const p = (complaint.priority || "Medium").toLowerCase();
+    const isHighOrCrit = p === "high" || p === "critical";
+    const hasExistingAfterRepair = attachments.some(
+      (a) => (a.category || "").toLowerCase() === "after repair",
+    );
+
+    if (isHighOrCrit && !hasExistingAfterRepair && !resolvePhotoFile) {
+      setError(
+        "High and Critical priority complaints require an 'After Repair' photo before resolving.",
+      );
+      return;
+    }
+
+    if (!hasExistingAfterRepair && !resolvePhotoFile && !resolveNotesText.trim()) {
+      setError(
+        "Resolution notes are mandatory when no 'After Repair' image is uploaded.",
+      );
+      return;
+    }
+
+    setSubmittingResolve(true);
+    setMessage("");
+    setError("");
+    try {
+      if (resolvePhotoFile) {
+        await attachmentService.upload(
+          complaintId,
+          [resolvePhotoFile],
+          "After Repair",
+        );
+      }
+      await complaintService.resolve(complaintId, resolveNotesText.trim());
+      setMessage("Complaint marked resolved!");
+      setResolveNotesText("");
+      setResolvePhotoFile(null);
+      setShowResolveModal(false);
+      load();
+    } catch (err) {
+      setError(getApiError(err, "Failed to mark complaint resolved."));
+    } finally {
+      setSubmittingResolve(false);
+    }
+  };
+
+  const handleWardenVerifySubmit = async (verdict, notes) => {
+    setSubmittingWardenVerify(true);
+    setMessage("");
+    setError("");
+    try {
+      await complaintService.wardenVerify(complaintId, verdict, notes);
+      setMessage(`Warden verification submitted: ${verdict}.`);
+      setShowWardenVerifyModal(false);
+      setWardenVerdictNotes("");
+      load();
+    } catch (err) {
+      setError(getApiError(err, "Failed to submit warden verification."));
+    } finally {
+      setSubmittingWardenVerify(false);
+    }
+  };
+
+  const handleStudentConfirm = async () => {
+    setMessage("");
+    setError("");
+    try {
+      await complaintService.verify(complaintId);
+      setMessage("Resolution verified and complaint permanently closed!");
+      load();
+    } catch (err) {
+      setError(getApiError(err, "Failed to confirm resolution."));
+    }
+  };
+
+  const handleStudentReopenSubmit = async (e) => {
+    e.preventDefault();
+    if (!studentReopenReason.trim()) {
+      setError("Please provide a reason why the issue is still not fixed.");
+      return;
+    }
+    setSubmittingStudentReopen(true);
+    setMessage("");
+    setError("");
+    try {
+      await complaintService.reopen(complaintId, studentReopenReason.trim());
+      setMessage("Complaint reopened.");
+      setStudentReopenReason("");
+      setShowStudentReopenModal(false);
+      load();
+    } catch (err) {
+      setError(getApiError(err, "Failed to reopen complaint."));
+    } finally {
+      setSubmittingStudentReopen(false);
+    }
+  };
+
+  const handleAdminDecisionSubmit = async (e) => {
+    e.preventDefault();
+    if (!adminDecisionNotes.trim()) {
+      setError("Decision notes are required.");
+      return;
+    }
+    if (adminDecisionChoice === "Reopen" && !adminReassignCoord) {
+      setError("Please select a coordinator to assign the reopened ticket to.");
+      return;
+    }
+    setSubmittingAdminDecision(true);
+    setMessage("");
+    setError("");
+    try {
+      await complaintService.adminDecision(
+        complaintId,
+        adminDecisionChoice,
+        adminDecisionNotes.trim(),
+        adminDecisionChoice === "Reopen" ? adminReassignCoord : null,
+      );
+      setMessage(
+        `Administrator review decision applied: ${adminDecisionChoice}.`,
+      );
+      setShowAdminDecisionModal(false);
+      setAdminDecisionNotes("");
+      load();
+    } catch (err) {
+      setError(getApiError(err, "Failed to apply administrator decision."));
+    } finally {
+      setSubmittingAdminDecision(false);
+    }
+  };
+
   const askConfirm = (config) => setConfirmAction(config);
   const resolveComplaint = (values) => {
     const afterRepair = attachments.filter(
@@ -672,85 +965,12 @@ export default function ComplaintDetailsPage() {
         </div>
       </div>
 
-      {/* Horizontal Lifecycle Stepper */}
-      <div className="rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#101726] p-4 sm:p-5 shadow-xs">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Workflow Status
-            </span>
-            {isReopened && (
-              <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200/60 dark:border-amber-900/60 flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                Reopened ({complaint.reopen_count}x)
-              </span>
-            )}
-            {complaint.escalated && (
-              <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full border border-rose-200/60 dark:border-rose-900/60 flex items-center gap-1">
-                <ShieldAlert className="h-3 w-3" />
-                Escalated
-              </span>
-            )}
-          </div>
-          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-            Step {Math.min(currentStepIdx + 1, 6)} of 6:{" "}
-            <span className="font-bold text-slate-800 dark:text-slate-200">
-              {LIFECYCLE_STEPS[currentStepIdx]?.label}
-            </span>
-          </span>
-        </div>
-
-        {/* Stepper Progress Bar */}
-        <div className="relative">
-          {/* Track line behind steps */}
-          <div className="absolute top-4 left-6 right-6 h-0.5 bg-slate-200 dark:bg-slate-800 -translate-y-1/2 z-0 hidden sm:block" />
-          
-          <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 relative z-10">
-            {LIFECYCLE_STEPS.map((step, idx) => {
-              const isPast = idx < currentStepIdx;
-              const isCurrent = idx === currentStepIdx;
-              const isUpcoming = idx > currentStepIdx;
-
-              return (
-                <div
-                  key={step.label}
-                  className="flex flex-col items-center sm:items-center text-center"
-                >
-                  <div
-                    className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-xs ${
-                      isPast
-                        ? "bg-emerald-600 text-white"
-                        : isCurrent
-                          ? "bg-primary text-white ring-4 ring-primary/20 scale-105"
-                          : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700"
-                    }`}
-                  >
-                    {isPast ? (
-                      <Check className="h-4 w-4" />
-                    ) : (
-                      <span>{idx + 1}</span>
-                    )}
-                  </div>
-                  <span
-                    className={`mt-2 text-xs font-semibold ${
-                      isCurrent
-                        ? "text-primary dark:text-blue-400 font-bold"
-                        : isPast
-                          ? "text-slate-800 dark:text-slate-200"
-                          : "text-slate-400 dark:text-slate-500"
-                    }`}
-                  >
-                    {step.label}
-                  </span>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 hidden sm:inline">
-                    {step.desc}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      {/* Vertical Stage Timeline & Live Countdown Timers */}
+      <StageTimeline
+        complaint={complaint}
+        coordinatorUser={coordinatorUser}
+        wardenUser={wardenUser}
+      />
 
       {/* Deletion Request Alert Banner for App Manager / Admin */}
       {complaint?.deletion_requested && canDirectDelete && (
@@ -1150,165 +1370,208 @@ export default function ComplaintDetailsPage() {
               Action Center
             </h2>
             <div className="grid gap-3">
-              {user &&
-                (user.role === ROLES.COORDINATOR || user.role === ROLES.LOCATION_IN_CHARGE) &&
-                complaint.status === "Submitted" &&
-                !complaint.assigned_to && (
+              {/* Coordinator Intake / Accept Button */}
+              {isCoordinator &&
+                ["Submitted", "Pending", "Awaiting Coordinator Assignment"].includes(complaint.status) &&
+                (!complaint.assigned_to || complaint.assigned_to === user?.user_id) && (
                   <Button
                     type="button"
-                    onClick={handleTakeComplaint}
+                    onClick={handleAcceptComplaint}
                     variant="primary"
-                    className="w-full font-bold py-2.5 text-xs"
-                  >
-                    Take Complaint
-                  </Button>
-                )}
-              {canCoordinate &&
-                ![
-                  COMPLAINT_STATUS.WAITING_VERIFICATION,
-                  COMPLAINT_STATUS.CLOSED,
-                  COMPLAINT_STATUS.AUTO_CLOSED,
-                ].includes(complaint.status) && (
-                  <>
-                    {/* Accept / Assign: only from Pending, Submitted, Reopened */}
-                    {[
-                      COMPLAINT_STATUS.PENDING,
-                      COMPLAINT_STATUS.SUBMITTED,
-                      COMPLAINT_STATUS.REOPENED,
-                      COMPLAINT_STATUS.AWAITING_ASSIGNMENT,
-                    ].includes(complaint.status) && (
-                      <form
-                        className="grid gap-3"
-                        onSubmit={handleSubmit(assignComplaint)}
-                      >
-                        {[ROLES.APP_MANAGER, ROLES.ADMINISTRATOR].includes(
-                          user?.role,
-                        ) && (
-                          <Select
-                            label="Assign Coordinator"
-                            {...register("coordinator_id")}
-                          >
-                            <option value="">Choose coordinator</option>
-                            {coordinators.map((item) => (
-                              <option key={item.user_id} value={item.user_id}>
-                                {item.name}
-                              </option>
-                            ))}
-                          </Select>
-                        )}
-                        <Button
-                          type="submit"
-                          variant="warning"
-                          disabled={isSubmitting}
-                          className="w-full font-bold text-xs"
-                        >
-                          {[ROLES.APP_MANAGER, ROLES.ADMINISTRATOR].includes(
-                            user?.role,
-                          )
-                            ? "Assign Coordinator"
-                            : "Accept & Assign to Self"}
-                        </Button>
-                      </form>
-                    )}
-
-                    {/* Start Work: only from Assigned */}
-                    {complaint.status === COMPLAINT_STATUS.ASSIGNED && (
-                      <Button
-                        onClick={() =>
-                          runAction(
-                            () =>
-                              complaintService.updateStatus(
-                                complaintId,
-                                COMPLAINT_STATUS.IN_PROGRESS,
-                              ),
-                            "Work started.",
-                          )
-                        }
-                        variant="subtle"
-                        className="w-full font-bold py-2.5 text-xs"
-                      >
-                        Start Work (In Progress)
-                      </Button>
-                    )}
-
-                    {/* Resolve: only from In Progress */}
-                    {complaint.status === COMPLAINT_STATUS.IN_PROGRESS && (
-                      <form
-                        className="grid gap-3 border-t border-slate-100 dark:border-slate-800/80 pt-3"
-                        onSubmit={handleSubmit(resolveComplaint)}
-                      >
-                        <Textarea
-                          label="Resolution Summary"
-                          placeholder="Specify work details..."
-                          {...register("notes")}
-                        />
-                        <Button
-                          type="submit"
-                          variant="success"
-                          disabled={isSubmitting}
-                          className="w-full font-bold text-xs"
-                        >
-                          Mark Resolved
-                        </Button>
-                      </form>
-                    )}
-                  </>
-                )}
-
-              {canVerify && (
-                <>
-                  <Button
-                    onClick={() =>
-                      askConfirm({
-                        title: "Verify Resolution",
-                        message:
-                          "Confirm this complaint has been resolved correctly and can now be closed.",
-                        confirmLabel: "Verify Fixed",
-                        tone: "success",
-                        action: () =>
-                          runAction(
-                            () => complaintService.verify(complaintId),
-                            "Complaint verified and closed.",
-                          ),
-                      })
-                    }
-                    variant="success"
-                    className="w-full font-bold py-2.5 flex items-center justify-center gap-1.5 text-xs"
+                    className="w-full font-bold py-2.5 text-xs flex items-center justify-center gap-1.5"
                   >
                     <CheckCircle2 className="h-4 w-4" />
-                    Verify as Fixed
+                    Accept Complaint & Claim Ticket
                   </Button>
+                )}
 
-                  <form
-                    className="grid gap-3 border-t border-slate-100 dark:border-slate-800/80 pt-3"
-                    onSubmit={handleSubmit(reopenComplaint)}
-                  >
-                    <Textarea
-                      label="Reason Not Fixed"
-                      placeholder="Specify what remains broken..."
-                      error={errors.reason?.message}
-                      {...register("reason", {
-                        required: "Please specify the reason for reopening.",
-                      })}
-                    />
-                    <Button
-                      type="submit"
-                      variant="danger"
-                      disabled={isSubmitting}
-                      className="w-full font-bold text-xs"
-                    >
-                      Report Not Fixed
-                    </Button>
-                  </form>
-                </>
+              {/* Coordinator Work Execution Controls */}
+              {isCoordinator && complaint.status === "Assigned" && (
+                <Button
+                  type="button"
+                  onClick={handleStartWork}
+                  variant="primary"
+                  className="w-full font-bold py-2.5 text-xs flex items-center justify-center gap-1.5"
+                >
+                  <Wrench className="h-4 w-4" />
+                  Start Work (In Progress)
+                </Button>
               )}
 
-              {!canCoordinate && !canVerify && (
-                <div className="flex flex-col items-center justify-center p-3 text-center">
-                  <AlertCircle className="h-5 w-5 text-slate-300 dark:text-slate-600" />
-                  <p className="text-xs font-medium text-slate-400 dark:text-slate-500 mt-1.5">
-                    No active actions required for your role at this stage.
+              {isCoordinator && complaint.status === "In Progress" && (
+                <div className="grid gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => setShowProgressModal(true)}
+                    variant="outline"
+                    className="w-full font-bold py-2 text-xs flex items-center justify-center gap-1.5"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Add Progress Note
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setShowPauseModal(true)}
+                    variant="outline"
+                    className="w-full font-bold py-2 text-xs text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 flex items-center justify-center gap-1.5"
+                  >
+                    <Clock className="h-4 w-4" />
+                    Waiting for Parts (Pause)
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setShowResolveModal(true)}
+                    variant="success"
+                    className="w-full font-bold py-2.5 text-xs flex items-center justify-center gap-1.5"
+                  >
+                    <Check className="h-4 w-4" />
+                    Mark Done / Resolve Work
+                  </Button>
+                </div>
+              )}
+
+              {isCoordinator && complaint.status === "Waiting for Parts" && (
+                <Button
+                  type="button"
+                  onClick={handleResumeWork}
+                  variant="primary"
+                  className="w-full font-bold py-2.5 text-xs flex items-center justify-center gap-1.5"
+                >
+                  <Check className="h-4 w-4" />
+                  Resume Work (Parts Arrived)
+                </Button>
+              )}
+
+              {/* App Manager / Admin Assignment if unassigned */}
+              {(isAdmin || isAppManager) &&
+                ["Submitted", "Pending", "Awaiting Coordinator Assignment"].includes(complaint.status) && (
+                  <form
+                    className="grid gap-2 border-t border-slate-100 dark:border-slate-800/80 pt-2"
+                    onSubmit={handleSubmit(assignComplaint)}
+                  >
+                    <Select label="Assign Coordinator" {...register("coordinator_id")}>
+                      <option value="">Choose coordinator</option>
+                      {coordinators.map((c) => (
+                        <option key={c.user_id} value={c.user_id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </Select>
+                    <Button type="submit" variant="primary" disabled={isSubmitting} className="w-full font-bold text-xs">
+                      Assign Coordinator
+                    </Button>
+                  </form>
+                )}
+
+              {/* Warden Verification Controls */}
+              {complaint.status === "Pending Warden Verification" && (
+                <div className="p-3 rounded-xl border border-purple-200 dark:border-purple-900/60 bg-purple-50/50 dark:bg-purple-950/20 space-y-2.5">
+                  <div className="flex items-center gap-2 text-purple-900 dark:text-purple-200 text-xs font-bold">
+                    <ShieldAlert className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    Pending Warden Verification
+                  </div>
+                  {isSelfWorkOnTicket && !isAdmin ? (
+                    <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium">
+                      Self-Verification Guard: You cannot verify a complaint you worked on or filed.
+                    </p>
+                  ) : (isLocationWarden || isAdmin) ? (
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <Button
+                        type="button"
+                        variant="success"
+                        onClick={() => {
+                          setWardenVerdictChoice("Verified");
+                          setShowWardenVerifyModal(true);
+                        }}
+                        className="font-bold text-xs py-2"
+                      >
+                        Verified Fixed
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="danger"
+                        onClick={() => {
+                          setWardenVerdictChoice("Not Fixed");
+                          setShowWardenVerifyModal(true);
+                        }}
+                        className="font-bold text-xs py-2"
+                      >
+                        Not Fixed
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Awaiting in-person inspection from location warden.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Student Confirmation Controls */}
+              {complaint.status === "Waiting for Verification" && (
+                <div className="p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-900 dark:text-emerald-100 flex items-center gap-1.5">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      Student Confirmation Required
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-slate-500">
+                      Reopen: {complaint.reopen_count || 0}/3
+                    </span>
+                  </div>
+                  {(isOwner || isAdmin) ? (
+                    <div className="space-y-2">
+                      <Button
+                        type="button"
+                        variant="success"
+                        onClick={handleStudentConfirm}
+                        className="w-full font-bold py-2.5 text-xs flex items-center justify-center gap-1.5 shadow-sm"
+                      >
+                        <Check className="h-4 w-4" />
+                        Confirm & Close Ticket
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowStudentReopenModal(true)}
+                        className="w-full font-bold py-2 text-xs text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-900 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center justify-center gap-1.5"
+                      >
+                        <AlertTriangle className="h-4 w-4" />
+                        Still Not Fixed / Reopen
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Work has been marked resolved. Awaiting student verification.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Admin Decision for Admin Review */}
+              {complaint.status === "Admin Review" && (
+                <div className="p-3.5 rounded-xl border border-rose-300 dark:border-rose-900 bg-rose-50/80 dark:bg-rose-950/30 space-y-2.5">
+                  <div className="flex items-center gap-2 text-rose-900 dark:text-rose-200 text-xs font-bold">
+                    <ShieldAlert className="h-4 w-4 text-rose-600" />
+                    Admin Review Required (Disputed Ticket)
+                  </div>
+                  <p className="text-[11px] text-rose-800 dark:text-rose-300 font-medium">
+                    This ticket reached the maximum student reopen attempts (3/3).
                   </p>
+                  {isAdmin ? (
+                    <Button
+                      type="button"
+                      variant="primary"
+                      onClick={() => setShowAdminDecisionModal(true)}
+                      className="w-full font-bold text-xs py-2 mt-1"
+                    >
+                      Issue Admin Review Decision
+                    </Button>
+                  ) : (
+                    <p className="text-[11px] text-slate-500 font-medium italic">
+                      Under review by campus administration.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -1323,24 +1586,17 @@ export default function ComplaintDetailsPage() {
                     </span>
                   </div>
                   {user?.role === ROLES.STUDENT &&
-                    !["Closed", "Closed (Auto Closed)"].includes(
-                      complaint.status,
-                    ) && (
+                    !["Closed", "Closed (Auto Closed)"].includes(complaint.status) && (
                       <Button
                         onClick={async () => {
                           try {
                             setError("");
                             setMessage("");
-                            const res =
-                              await complaintService.markAffected(complaintId);
+                            const res = await complaintService.markAffected(complaintId);
                             setComplaint(res.data);
-                            setMessage(
-                              "You have been marked as affected by this issue.",
-                            );
+                            setMessage("You have been marked as affected by this issue.");
                           } catch (err) {
-                            setError(
-                              getApiError(err, "Could not mark as affected."),
-                            );
+                            setError(getApiError(err, "Could not mark as affected."));
                           }
                         }}
                         variant="subtle"
@@ -1355,49 +1611,13 @@ export default function ComplaintDetailsPage() {
             </div>
           </Card>
 
-          {/* Personnel & Responsibilities Card */}
-          <Card>
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-2">
-              <User className="h-4 w-4 text-primary" />
-              Personnel & Assignments
-            </h2>
-            <div className="space-y-3 text-xs">
-              <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
-                <span className="text-slate-400 dark:text-slate-500 font-medium">
-                  Assigned Staff:
-                </span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200 text-right">
-                  {complaint.assigned_to || (
-                    <span className="text-amber-500 font-medium">Unassigned</span>
-                  )}
-                </span>
-              </div>
-              <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
-                <span className="text-slate-400 dark:text-slate-500 font-medium">
-                  Reported By:
-                </span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200 text-right">
-                  {complaint.created_by || "Student"}
-                </span>
-              </div>
-              <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
-                <span className="text-slate-400 dark:text-slate-500 font-medium">
-                  Visibility:
-                </span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">
-                  {complaint.visibility_type || "Private"}
-                </span>
-              </div>
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-slate-400 dark:text-slate-500 font-medium">
-                  Reopen Count:
-                </span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">
-                  {complaint.reopen_count || 0}
-                </span>
-              </div>
-            </div>
-          </Card>
+          {/* Responsible Personnel Card */}
+          <ResponsiblePersonnelCard
+            complaint={complaint}
+            location={location}
+            coordinatorUser={coordinatorUser}
+            wardenUser={wardenUser}
+          />
 
           {/* SLA & Timeline Summary Card */}
           <Card>
@@ -1625,6 +1845,318 @@ export default function ComplaintDetailsPage() {
                 disabled={submittingDeletionRequest}
               >
                 {submittingDeletionRequest ? "Submitting..." : "Send Deletion Request"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Progress Note Modal */}
+      {showProgressModal && (
+        <Modal
+          isOpen={showProgressModal}
+          onClose={() => setShowProgressModal(false)}
+          title="📝 Add Progress Note"
+        >
+          <form onSubmit={handleProgressNoteSubmit} className="space-y-4">
+            <p className="text-xs text-slate-500">
+              Record real-time field progress or status notes on this work ticket.
+            </p>
+            <Textarea
+              label="Progress Update"
+              value={progressNoteText}
+              onChange={(e) => setProgressNoteText(e.target.value)}
+              placeholder="e.g. Technician arrived, dismantled panel, testing wiring..."
+              rows={4}
+              required
+            />
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowProgressModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={submittingProgressNote}
+              >
+                {submittingProgressNote ? "Saving..." : "Log Progress Note"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Pause / Waiting for Parts Modal */}
+      {showPauseModal && (
+        <Modal
+          isOpen={showPauseModal}
+          onClose={() => setShowPauseModal(false)}
+          title="⏸️ Pause Work (Waiting for Parts)"
+        >
+          <form onSubmit={handlePauseSubmit} className="space-y-4">
+            <p className="text-xs text-slate-500">
+              Temporarily halt active turnaround SLA while waiting for replacement parts or materials.
+            </p>
+            <Textarea
+              label="Parts / Materials Reason"
+              value={pauseReasonText}
+              onChange={(e) => setPauseReasonText(e.target.value)}
+              placeholder="e.g. Awaiting 25A MCB switch delivery from central store..."
+              rows={3}
+              required
+            />
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowPauseModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" variant="warning" disabled={submittingPause}>
+                {submittingPause ? "Pausing..." : "Pause Ticket"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Mark Done / Resolve Modal */}
+      {showResolveModal && (
+        <Modal
+          isOpen={showResolveModal}
+          onClose={() => setShowResolveModal(false)}
+          title="✅ Mark Work Completed"
+        >
+          <form onSubmit={handleResolveSubmit} className="space-y-4">
+            <p className="text-xs text-slate-500">
+              Complete physical repair work and submit for verification.
+              {["high", "critical"].includes(
+                (complaint?.priority || "").toLowerCase(),
+              ) && (
+                <span className="block mt-1 font-bold text-amber-600 dark:text-amber-400">
+                  ⚠️ High/Critical priority complaints require an "After Repair" photo attachment.
+                </span>
+              )}
+            </p>
+            <Textarea
+              label="Resolution Notes"
+              value={resolveNotesText}
+              onChange={(e) => setResolveNotesText(e.target.value)}
+              placeholder="Describe work completed, components replaced, or safety tests done..."
+              rows={3}
+            />
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                After Repair Photo{" "}
+                {["high", "critical"].includes(
+                  (complaint?.priority || "").toLowerCase(),
+                )
+                  ? "(Required)"
+                  : "(Recommended)"}
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) =>
+                  setResolvePhotoFile(e.target.files?.[0] || null)
+                }
+                className="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90 cursor-pointer"
+              />
+              {resolvePhotoFile && (
+                <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-1">
+                  Selected: {resolvePhotoFile.name}
+                </p>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowResolveModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="success"
+                disabled={submittingResolve}
+              >
+                {submittingResolve ? "Submitting..." : "Submit Resolution"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Warden Verify Modal */}
+      {showWardenVerifyModal && (
+        <Modal
+          isOpen={showWardenVerifyModal}
+          onClose={() => setShowWardenVerifyModal(false)}
+          title={`🛡️ Warden Verification: ${wardenVerdictChoice}`}
+        >
+          <div className="space-y-4">
+            <p className="text-xs text-slate-500">
+              {wardenVerdictChoice === "Verified"
+                ? "Confirm in-person inspection of completed work. This will advance the ticket to student confirmation."
+                : "Report work as unsatisfactory or issue not fixed. The ticket will return to In Progress for coordinator rework."}
+            </p>
+            <Textarea
+              label={
+                wardenVerdictChoice === "Verified"
+                  ? "Inspection Notes (Optional)"
+                  : "Reason Not Fixed (Required)"
+              }
+              value={wardenVerdictNotes}
+              onChange={(e) => setWardenVerdictNotes(e.target.value)}
+              placeholder={
+                wardenVerdictChoice === "Verified"
+                  ? "e.g. Inspected on-site; wire conduit properly secured and tested."
+                  : "e.g. Wire cover plate is missing, corridor switch still sparks..."
+              }
+              rows={3}
+              required={wardenVerdictChoice === "Not Fixed"}
+            />
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowWardenVerifyModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant={
+                  wardenVerdictChoice === "Verified" ? "success" : "danger"
+                }
+                disabled={
+                  submittingWardenVerify ||
+                  (wardenVerdictChoice === "Not Fixed" &&
+                    !wardenVerdictNotes.trim())
+                }
+                onClick={() =>
+                  handleWardenVerifySubmit(
+                    wardenVerdictChoice,
+                    wardenVerdictNotes,
+                  )
+                }
+              >
+                {submittingWardenVerify
+                  ? "Submitting..."
+                  : `Confirm ${wardenVerdictChoice}`}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Student Reopen Modal */}
+      {showStudentReopenModal && (
+        <Modal
+          isOpen={showStudentReopenModal}
+          onClose={() => setShowStudentReopenModal(false)}
+          title="⚠️ Report Issue Still Not Fixed"
+        >
+          <form onSubmit={handleStudentReopenSubmit} className="space-y-4">
+            <p className="text-xs text-slate-500">
+              Please explain why the issue is not satisfactory. Reopening returns the ticket for coordinator rework.
+              <span className="block mt-1 font-bold text-slate-700 dark:text-slate-300">
+                Cycle {(complaint?.reopen_count || 0) + 1} of 3. (After 3 reopens, the complaint escalates to Administrator Review).
+              </span>
+            </p>
+            <Textarea
+              label="Reason Issue Not Fixed"
+              value={studentReopenReason}
+              onChange={(e) => setStudentReopenReason(e.target.value)}
+              placeholder="Explain clearly what is still broken or why the repair is incomplete..."
+              rows={4}
+              required
+            />
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowStudentReopenModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="danger"
+                disabled={submittingStudentReopen}
+              >
+                {submittingStudentReopen ? "Submitting..." : "Reopen Complaint"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Admin Decision Modal */}
+      {showAdminDecisionModal && (
+        <Modal
+          isOpen={showAdminDecisionModal}
+          onClose={() => setShowAdminDecisionModal(false)}
+          title="⚖️ Administrator Review Decision"
+        >
+          <form onSubmit={handleAdminDecisionSubmit} className="space-y-4">
+            <p className="text-xs text-slate-500">
+              Disputed complaint review. Choose whether to permanently close the ticket or reopen and reassign.
+            </p>
+            <Select
+              label="Review Action Decision"
+              value={adminDecisionChoice}
+              onChange={(e) => setAdminDecisionChoice(e.target.value)}
+            >
+              <option value="Close">Close — Work is acceptable or verified safe</option>
+              <option value="Reopen">Reopen — Requires further work and staff reassignment</option>
+            </Select>
+
+            {adminDecisionChoice === "Reopen" && (
+              <Select
+                label="Reassign To Coordinator"
+                value={adminReassignCoord}
+                onChange={(e) => setAdminReassignCoord(e.target.value)}
+                required
+              >
+                <option value="">Select Coordinator...</option>
+                {coordinators.map((c) => (
+                  <option key={c.user_id} value={c.user_id}>
+                    {c.name} ({c.email})
+                  </option>
+                ))}
+              </Select>
+            )}
+
+            <Textarea
+              label="Administrator Decision Notes"
+              value={adminDecisionNotes}
+              onChange={(e) => setAdminDecisionNotes(e.target.value)}
+              placeholder="State the findings of your investigation and rationale for this decision..."
+              rows={4}
+              required
+            />
+
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowAdminDecisionModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={submittingAdminDecision}
+              >
+                {submittingAdminDecision ? "Applying..." : "Submit Admin Decision"}
               </Button>
             </div>
           </form>
