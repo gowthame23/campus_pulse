@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { authService } from "../services/authService";
 import { complaintService } from "../services/complaintService";
+import { pushService } from "../services/pushService";
 
 const AuthContext = createContext(null);
 const TOKEN_KEY = "campusPulseToken";
@@ -193,11 +194,20 @@ export function AuthProvider({ children }) {
     setToken(accessToken);
     setUser(currentUser);
     setSessionMessage("");
+
+    // Trigger push notification subscription after login (not on first page load)
+    try {
+      pushService.subscribeUser().catch(() => {});
+    } catch {}
+
     return currentUser;
   };
 
   const logout = async () => {
     try {
+      try {
+        await pushService.unsubscribeUser();
+      } catch {}
       if (token) await authService.logout();
     } finally {
       clearSession();

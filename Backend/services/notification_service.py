@@ -263,6 +263,16 @@ class NotificationService:
                     extra={"receiver_id": receiver_id, "notification_id": nid},
                 )
 
+        # Web Push notification dispatch
+        try:
+            from services.push_service import send_web_push_for_notification
+            send_web_push_for_notification(receiver_id, notification_payload)
+        except Exception:
+            logger.exception(
+                "Web push notification dispatch failed",
+                extra={"receiver_id": receiver_id, "notification_id": nid},
+            )
+
         return notification_payload
 
     # Backward compatible helper methods
