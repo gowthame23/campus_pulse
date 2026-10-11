@@ -3,12 +3,16 @@ import sqlite3
 from pathlib import Path
 
 
+from storage.migrations import run_migrations
+
+
 class SQLiteRepository:
     def __init__(self, db_path, default_data):
         self.path = Path(db_path)
         self.default_data = default_data
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize_schema()
+        run_migrations(str(self.path))
         if self._is_empty():
             self.save(default_data)
 
@@ -3634,8 +3638,22 @@ class SQLiteRepository:
                         complaint_type, description, status, assigned_to, created_at, updated_at,
                         resolved_at, verification_due_at, reopen_count, auto_closed, escalated,
                         admin_notified, resolution_notes, verification_reports, history, archived,
-                        priority, category, visibility_type, attachment_url, title
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        priority, category, visibility_type, attachment_url, title,
+                        sla_deadline, assigned_at, started_at, auto_assigned, blocked_reason,
+                        blocked_until, blocked_at, sla_reminders_sent, escalation_level,
+                        warden_escalation_level, team_location_id, team_department_id,
+                        is_urgent, urgent_reason, fixed_at, fixed_by, warden_verified_at,
+                        warden_verified_by, warden_verdict, warden_notes, student_stage_at,
+                        closed_at, closed_by, requires_warden_check, is_spot_check,
+                        auto_close_reminded, admin_review_reason, admin_decision,
+                        admin_decided_by, admin_decided_at, deletion_requested,
+                        deletion_requested_by, deletion_requested_name, deletion_requested_role,
+                        deletion_reason, deletion_requested_at
+                    ) VALUES (
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    )
                     """,
                     [
                         self._complaint_to_values(item)
@@ -3810,6 +3828,42 @@ class SQLiteRepository:
             item.get("visibility_type", "Private"),
             item.get("attachment_url"),
             item.get("title", ""),
+            item.get("sla_deadline"),
+            item.get("assigned_at"),
+            item.get("started_at"),
+            int(bool(item.get("auto_assigned", False))),
+            item.get("blocked_reason"),
+            item.get("blocked_until"),
+            item.get("blocked_at"),
+            int(item.get("sla_reminders_sent", 0)),
+            int(item.get("escalation_level", 0)),
+            int(item.get("warden_escalation_level", 0)),
+            item.get("team_location_id"),
+            item.get("team_department_id"),
+            int(bool(item.get("is_urgent", False))),
+            item.get("urgent_reason"),
+            item.get("fixed_at"),
+            item.get("fixed_by"),
+            item.get("warden_verified_at"),
+            item.get("warden_verified_by"),
+            item.get("warden_verdict"),
+            item.get("warden_notes"),
+            item.get("student_stage_at"),
+            item.get("closed_at"),
+            item.get("closed_by"),
+            int(bool(item.get("requires_warden_check", False))),
+            int(bool(item.get("is_spot_check", False))),
+            int(bool(item.get("auto_close_reminded", False))),
+            item.get("admin_review_reason"),
+            item.get("admin_decision"),
+            item.get("admin_decided_by"),
+            item.get("admin_decided_at"),
+            int(bool(item.get("deletion_requested", False))),
+            item.get("deletion_requested_by"),
+            item.get("deletion_requested_name"),
+            item.get("deletion_requested_role"),
+            item.get("deletion_reason"),
+            item.get("deletion_requested_at"),
         )
 
     def _row_to_user(self, row):
@@ -3904,4 +3958,40 @@ class SQLiteRepository:
                 if ("title" in row.keys() and row["title"] is not None)
                 else ""
             ),
+            "sla_deadline": row["sla_deadline"] if "sla_deadline" in row.keys() else None,
+            "assigned_at": row["assigned_at"] if "assigned_at" in row.keys() else None,
+            "started_at": row["started_at"] if "started_at" in row.keys() else None,
+            "auto_assigned": bool(row["auto_assigned"]) if "auto_assigned" in row.keys() and row["auto_assigned"] is not None else False,
+            "blocked_reason": row["blocked_reason"] if "blocked_reason" in row.keys() else None,
+            "blocked_until": row["blocked_until"] if "blocked_until" in row.keys() else None,
+            "blocked_at": row["blocked_at"] if "blocked_at" in row.keys() else None,
+            "sla_reminders_sent": row["sla_reminders_sent"] if "sla_reminders_sent" in row.keys() and row["sla_reminders_sent"] is not None else 0,
+            "escalation_level": row["escalation_level"] if "escalation_level" in row.keys() and row["escalation_level"] is not None else 0,
+            "warden_escalation_level": row["warden_escalation_level"] if "warden_escalation_level" in row.keys() and row["warden_escalation_level"] is not None else 0,
+            "team_location_id": row["team_location_id"] if "team_location_id" in row.keys() else None,
+            "team_department_id": row["team_department_id"] if "team_department_id" in row.keys() else None,
+            "is_urgent": bool(row["is_urgent"]) if "is_urgent" in row.keys() and row["is_urgent"] is not None else False,
+            "urgent_reason": row["urgent_reason"] if "urgent_reason" in row.keys() else None,
+            "fixed_at": row["fixed_at"] if "fixed_at" in row.keys() else None,
+            "fixed_by": row["fixed_by"] if "fixed_by" in row.keys() else None,
+            "warden_verified_at": row["warden_verified_at"] if "warden_verified_at" in row.keys() else None,
+            "warden_verified_by": row["warden_verified_by"] if "warden_verified_by" in row.keys() else None,
+            "warden_verdict": row["warden_verdict"] if "warden_verdict" in row.keys() else None,
+            "warden_notes": row["warden_notes"] if "warden_notes" in row.keys() else None,
+            "student_stage_at": row["student_stage_at"] if "student_stage_at" in row.keys() else None,
+            "closed_at": row["closed_at"] if "closed_at" in row.keys() else None,
+            "closed_by": row["closed_by"] if "closed_by" in row.keys() else None,
+            "requires_warden_check": bool(row["requires_warden_check"]) if "requires_warden_check" in row.keys() and row["requires_warden_check"] is not None else False,
+            "is_spot_check": bool(row["is_spot_check"]) if "is_spot_check" in row.keys() and row["is_spot_check"] is not None else False,
+            "auto_close_reminded": bool(row["auto_close_reminded"]) if "auto_close_reminded" in row.keys() and row["auto_close_reminded"] is not None else False,
+            "admin_review_reason": row["admin_review_reason"] if "admin_review_reason" in row.keys() else None,
+            "admin_decision": row["admin_decision"] if "admin_decision" in row.keys() else None,
+            "admin_decided_by": row["admin_decided_by"] if "admin_decided_by" in row.keys() else None,
+            "admin_decided_at": row["admin_decided_at"] if "admin_decided_at" in row.keys() else None,
+            "deletion_requested": bool(row["deletion_requested"]) if "deletion_requested" in row.keys() and row["deletion_requested"] is not None else False,
+            "deletion_requested_by": row["deletion_requested_by"] if "deletion_requested_by" in row.keys() else None,
+            "deletion_requested_name": row["deletion_requested_name"] if "deletion_requested_name" in row.keys() else None,
+            "deletion_requested_role": row["deletion_requested_role"] if "deletion_requested_role" in row.keys() else None,
+            "deletion_reason": row["deletion_reason"] if "deletion_reason" in row.keys() else None,
+            "deletion_requested_at": row["deletion_requested_at"] if "deletion_requested_at" in row.keys() else None,
         }

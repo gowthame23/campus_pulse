@@ -5,7 +5,10 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+from core.constants import INACTIVE_STATUSES
 from utils.helper import csv_safe, generate_id, now_string
+
+_INACTIVE_SQL = ", ".join(f"'{s}'" for s in INACTIVE_STATUSES)
 
 
 class ReportService:
@@ -541,8 +544,8 @@ class ReportService:
         with self._connect() as conn:
             rows = [dict(r) for r in conn.execute(query, params).fetchall()]
             total = len(rows)
-            open_cnt = sum(1 for r in rows if r["status"] not in ("Resolved", "Closed", "Cancelled"))
-            closed_cnt = sum(1 for r in rows if r["status"] in ("Resolved", "Closed"))
+            open_cnt = sum(1 for r in rows if r["status"] not in INACTIVE_STATUSES)
+            closed_cnt = sum(1 for r in rows if r["status"] in ("Resolved", "Closed", "Closed (Auto Closed)"))
             overdue_cnt = sum(1 for r in rows if r.get("escalated") == 1 or r["status"] == "Escalated")
             reopened_cnt = sum(1 for r in rows if r.get("reopen_count", 0) > 0 or r["status"] == "Reopened")
 
@@ -577,7 +580,7 @@ class ReportService:
 
     def get_location_report(self, user_role, user_id=None, from_date=None, to_date=None):
         self.check_access(user_role)
-        query = "SELECT location_id, COUNT(*) as total, SUM(CASE WHEN status NOT IN ('Resolved', 'Closed', 'Cancelled') THEN 1 ELSE 0 END) as open_cnt, SUM(CASE WHEN status IN ('Resolved', 'Closed') THEN 1 ELSE 0 END) as closed_cnt FROM complaints WHERE 1=1"
+        query = f"SELECT location_id, COUNT(*) as total, SUM(CASE WHEN status NOT IN ({_INACTIVE_SQL}) THEN 1 ELSE 0 END) as open_cnt, SUM(CASE WHEN status IN ('Resolved', 'Closed', 'Closed (Auto Closed)') THEN 1 ELSE 0 END) as closed_cnt FROM complaints WHERE 1=1"
         params = []
         if from_date:
             query += " AND created_at >= ?"
@@ -593,7 +596,7 @@ class ReportService:
 
     def get_department_report(self, user_role, user_id=None, from_date=None, to_date=None):
         self.check_access(user_role)
-        query = "SELECT department_id, COUNT(*) as total, SUM(CASE WHEN status IN ('Resolved', 'Closed') THEN 1 ELSE 0 END) as resolved_cnt FROM complaints WHERE 1=1"
+        query = "SELECT department_id, COUNT(*) as total, SUM(CASE WHEN status IN ('Resolved', 'Closed', 'Closed (Auto Closed)') THEN 1 ELSE 0 END) as resolved_cnt FROM complaints WHERE 1=1"
         params = []
         if from_date:
             query += " AND created_at >= ?"
@@ -621,7 +624,7 @@ class ReportService:
 
     def get_coordinator_performance_report(self, user_role, user_id=None, from_date=None, to_date=None):
         self.check_access(user_role)
-        query = "SELECT assigned_to as coordinator_id, COUNT(*) as assigned, SUM(CASE WHEN status IN ('Resolved', 'Closed') THEN 1 ELSE 0 END) as resolved, SUM(CASE WHEN status = 'Reopened' THEN 1 ELSE 0 END) as reopened, SUM(CASE WHEN status NOT IN ('Resolved', 'Closed', 'Cancelled') THEN 1 ELSE 0 END) as pending FROM complaints WHERE assigned_to IS NOT NULL AND assigned_to != ''"
+        query = f"SELECT assigned_to as coordinator_id, COUNT(*) as assigned, SUM(CASE WHEN status IN ('Resolved', 'Closed', 'Closed (Auto Closed)') THEN 1 ELSE 0 END) as resolved, SUM(CASE WHEN status = 'Reopened' THEN 1 ELSE 0 END) as reopened, SUM(CASE WHEN status NOT IN ({_INACTIVE_SQL}) THEN 1 ELSE 0 END) as pending FROM complaints WHERE assigned_to IS NOT NULL AND assigned_to != ''"
         params = []
         if from_date:
             query += " AND created_at >= ?"

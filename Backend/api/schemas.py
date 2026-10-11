@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
 
 
 class LoginRequest(BaseModel):
@@ -294,6 +294,9 @@ class ComplaintCreateRequest(BaseModel):
     title: Optional[str] = Field("", max_length=200)
     description: str = Field(..., max_length=5000)
     attachment_url: Optional[str] = None
+    priority: Optional[str] = None
+    is_urgent: bool = False
+    urgent_reason: Optional[str] = None
 
 
 class ComplaintAffectedRequest(BaseModel):
@@ -377,6 +380,46 @@ class ComplaintResponse(BaseModel):
     deletion_requested_role: Optional[str] = None
     deletion_reason: Optional[str] = None
     deletion_requested_at: Optional[str] = None
+
+    # Tracking & Lifecycle extensions
+    sla_deadline: Optional[str] = None
+    assigned_at: Optional[str] = None
+    started_at: Optional[str] = None
+    fixed_at: Optional[str] = None
+    fixed_by: Optional[str] = None
+    warden_verified_at: Optional[str] = None
+    warden_verified_by: Optional[str] = None
+    warden_verdict: Optional[str] = None
+    warden_notes: Optional[str] = None
+    student_stage_at: Optional[str] = None
+    closed_at: Optional[str] = None
+    closed_by: Optional[str] = None
+    requires_warden_check: Optional[bool] = False
+    is_spot_check: Optional[bool] = False
+    is_urgent: Optional[bool] = False
+    urgent_reason: Optional[str] = None
+    auto_assigned: Optional[bool] = False
+    blocked_reason: Optional[str] = None
+    blocked_until: Optional[str] = None
+    blocked_at: Optional[str] = None
+    sla_reminders_sent: Optional[int] = 0
+    escalation_level: Optional[int] = 0
+    warden_escalation_level: Optional[int] = 0
+    team_location_id: Optional[str] = None
+    team_department_id: Optional[str] = None
+    admin_review_reason: Optional[str] = None
+    admin_decision: Optional[str] = None
+    admin_decided_by: Optional[str] = None
+    admin_decided_at: Optional[str] = None
+    location_name: Optional[str] = None
+    department_name: Optional[str] = None
+    assigned_coordinator_name: Optional[str] = None
+    assigned_coordinator_id: Optional[str] = None
+    location_in_charge_name: Optional[str] = None
+    location_in_charge_id: Optional[str] = None
+    progress_updates: Optional[List[Dict[str, Any]]] = None
+
+    model_config = ConfigDict(extra="allow")
 
 
 class ComplaintDeleteRequestPayload(BaseModel):

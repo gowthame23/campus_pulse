@@ -23,9 +23,31 @@ def _get_headers_for(username, password):
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
+def _get_admin_headers():
+    _reset_limiter()
+    login_res = client.post("/auth/login", json={"username": "gowthamejjurothu@gmail.com", "password": "Admin@123"})
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+def _new_student():
+    email = f"student_{uuid.uuid4().hex[:8]}@probe.edu"
+    admin_headers = _get_admin_headers()
+    res = client.post("/users", json={
+        "name": "Probe Student", "email": email, "role": "student",
+        "password": "Temp@Pass123", "confirm_password": "Temp@Pass123", "location_id": "LOC_HOSTEL_A",
+    }, headers=admin_headers)
+    assert res.status_code == 201
+    headers = _get_headers_for(email, "Temp@Pass123")
+    change = client.post("/auth/change-password", json={
+        "old_password": "Temp@Pass123", "new_password": "Stud@Pass456", "confirm_password": "Stud@Pass456",
+    }, headers=headers)
+    assert change.status_code == 200
+    return _get_headers_for(email, "Stud@Pass456")
+
 def test_attachment_security_cross_user_denial_and_invalid_ids():
-    student1_headers = _get_headers_for("gowtham.e23@iiits.in", "Student@123")
-    admin_headers = _get_headers_for("gowthamejjurothu@gmail.com", "Admin@123")
+    admin_headers = _get_admin_headers()
+    student1_headers = _new_student()
 
     # 1. Non-existent complaint ID returns 404
     res_404 = client.get("/complaints/CMP-NONEXISTENT-999/attachments", headers=admin_headers)

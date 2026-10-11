@@ -1,16 +1,36 @@
+from core.constants import (
+    AUTO_CLOSE_HOURS,
+    STATUS_ADMIN_REVIEW,
+    STATUS_ASSIGNED,
+    STATUS_AUTO_CLOSED,
+    STATUS_BLOCKED,
+    STATUS_CANCELLED,
+    STATUS_CLOSED,
+    STATUS_IN_PROGRESS,
+    STATUS_PENDING_WARDEN,
+    STATUS_REJECTED,
+    STATUS_REOPENED,
+    STATUS_SUBMITTED,
+    STATUS_WAITING_STUDENT,
+    normalize_priority,
+)
 from utils.helper import add_days_string, generate_id, now_string
 
 
 class Complaint:
-    SUBMITTED = "Submitted"
-    PENDING = "Pending"
-    ASSIGNED = "Assigned"
-    IN_PROGRESS = "In Progress"
+    SUBMITTED = STATUS_SUBMITTED
+    PENDING = STATUS_SUBMITTED
+    ASSIGNED = STATUS_ASSIGNED
+    IN_PROGRESS = STATUS_IN_PROGRESS
     RESOLVED = "Resolved"
-    WAITING_VERIFICATION = "Waiting for Verification"
-    CLOSED = "Closed"
-    AUTO_CLOSED = "Closed (Auto Closed)"
-    REOPENED = "Reopened"
+    WAITING_VERIFICATION = STATUS_WAITING_STUDENT
+    PENDING_WARDEN_VERIFICATION = STATUS_PENDING_WARDEN
+    CLOSED = STATUS_CLOSED
+    AUTO_CLOSED = STATUS_AUTO_CLOSED
+    REOPENED = STATUS_REOPENED
+    ADMIN_REVIEW = STATUS_ADMIN_REVIEW
+    REJECTED = STATUS_REJECTED
+    CANCELLED = STATUS_CANCELLED
     AWAITING_ASSIGNMENT = "Awaiting Coordinator Assignment"
 
     def __init__(
@@ -41,6 +61,42 @@ class Complaint:
         category=None,
         visibility_type="Private",
         title="",
+        sla_deadline=None,
+        assigned_at=None,
+        started_at=None,
+        auto_assigned=False,
+        blocked_reason=None,
+        blocked_until=None,
+        blocked_at=None,
+        sla_reminders_sent=0,
+        escalation_level=0,
+        warden_escalation_level=0,
+        team_location_id=None,
+        team_department_id=None,
+        is_urgent=False,
+        urgent_reason=None,
+        fixed_at=None,
+        fixed_by=None,
+        warden_verified_at=None,
+        warden_verified_by=None,
+        warden_verdict=None,
+        warden_notes=None,
+        student_stage_at=None,
+        closed_at=None,
+        closed_by=None,
+        requires_warden_check=False,
+        is_spot_check=False,
+        auto_close_reminded=False,
+        admin_review_reason=None,
+        admin_decision=None,
+        admin_decided_by=None,
+        admin_decided_at=None,
+        deletion_requested=False,
+        deletion_requested_by=None,
+        deletion_requested_name=None,
+        deletion_requested_role=None,
+        deletion_reason=None,
+        deletion_requested_at=None,
     ):
         self.complaint_id = complaint_id or generate_id("CMP")
         self.archived = bool(archived)
@@ -51,7 +107,7 @@ class Complaint:
         self.complaint_type = complaint_type
         self.description = description
         self.attachment_url = attachment_url
-        self.status = status or self.PENDING
+        self.status = status or self.SUBMITTED
         self.assigned_to = assigned_to
         self.created_at = created_at or now_string()
         self.updated_at = updated_at or self.created_at
@@ -61,13 +117,51 @@ class Complaint:
         self.auto_closed = bool(auto_closed)
         self.escalated = bool(escalated)
         self.admin_notified = bool(admin_notified)
-        self.resolution_notes = resolution_notes
+        self.resolution_notes = resolution_notes or ""
         self.verification_reports = verification_reports or []
         self.history = history or []
-        self.priority = priority
+        self.priority = normalize_priority(priority)
         self.category = category or complaint_type or "General"
         self.visibility_type = visibility_type
-        self.title = title
+        self.title = title or ""
+
+        # Tracking and Workflow extensions
+        self.sla_deadline = sla_deadline
+        self.assigned_at = assigned_at
+        self.started_at = started_at
+        self.auto_assigned = bool(auto_assigned)
+        self.blocked_reason = blocked_reason
+        self.blocked_until = blocked_until
+        self.blocked_at = blocked_at
+        self.sla_reminders_sent = int(sla_reminders_sent)
+        self.escalation_level = int(escalation_level)
+        self.warden_escalation_level = int(warden_escalation_level)
+        self.team_location_id = team_location_id
+        self.team_department_id = team_department_id
+        self.is_urgent = bool(is_urgent)
+        self.urgent_reason = urgent_reason
+        self.fixed_at = fixed_at
+        self.fixed_by = fixed_by
+        self.warden_verified_at = warden_verified_at
+        self.warden_verified_by = warden_verified_by
+        self.warden_verdict = warden_verdict
+        self.warden_notes = warden_notes
+        self.student_stage_at = student_stage_at
+        self.closed_at = closed_at
+        self.closed_by = closed_by
+        self.requires_warden_check = bool(requires_warden_check)
+        self.is_spot_check = bool(is_spot_check)
+        self.auto_close_reminded = bool(auto_close_reminded)
+        self.admin_review_reason = admin_review_reason
+        self.admin_decision = admin_decision
+        self.admin_decided_by = admin_decided_by
+        self.admin_decided_at = admin_decided_at
+        self.deletion_requested = bool(deletion_requested)
+        self.deletion_requested_by = deletion_requested_by
+        self.deletion_requested_name = deletion_requested_name
+        self.deletion_requested_role = deletion_requested_role
+        self.deletion_reason = deletion_reason
+        self.deletion_requested_at = deletion_requested_at
 
     def add_history(self, message):
         self.updated_at = now_string()
@@ -75,38 +169,46 @@ class Complaint:
 
     def assign(self, coordinator_id):
         self.assigned_to = coordinator_id
+        self.assigned_at = now_string()
         self.status = self.ASSIGNED
         self.add_history(f"Assigned to {coordinator_id}.")
 
     def start_progress(self):
         self.status = self.IN_PROGRESS
-        self.add_history("Work moved to in progress.")
+        self.started_at = now_string()
+        self.add_history("Work started by coordinator.")
 
     def mark_resolved(self, notes=""):
         self.status = self.WAITING_VERIFICATION
         self.resolved_at = now_string()
-        self.verification_due_at = add_days_string(5)
-        self.resolution_notes = notes
-        self.add_history("Complaint resolved; waiting for verification.")
+        self.fixed_at = self.resolved_at
+        self.resolution_notes = notes or ""
+        self.add_history("Complaint marked done; waiting for verification.")
 
     def close(self, verifier_id):
         self.status = self.CLOSED
+        self.closed_at = now_string()
+        self.closed_by = verifier_id
         self.add_history(f"Closed after verification by {verifier_id}.")
 
     def auto_close(self):
         self.status = self.AUTO_CLOSED
         self.auto_closed = True
-        at = now_string()
+        self.closed_at = now_string()
+        self.closed_by = "System Auto-Close"
+        at = self.closed_at
         date = at[:10]
         time = at[11:19]
         self.add_history(
-            f"Automatically Closed. Date: {date}, Time: {time}, Reason: Auto closed after 5 days without verification."
+            f"Automatically Closed. Date: {date}, Time: {time}, Reason: Auto closed after {AUTO_CLOSE_HOURS} hours without verification."
         )
 
     def reopen(self, reporter_id, reason):
         self.status = self.REOPENED
         self.reopen_count += 1
         self.verification_due_at = None
+        self.student_stage_at = None
+        self.auto_close_reminded = False
         self.verification_reports.append(
             {
                 "by": reporter_id,
@@ -119,52 +221,76 @@ class Complaint:
 
     def to_dict(self):
         d = self.__dict__.copy()
-        d["priority"] = getattr(self, "priority", "Medium")
+        d["priority"] = normalize_priority(getattr(self, "priority", "Medium"))
         d["category"] = getattr(self, "category", self.complaint_type or "General")
         d["visibility_type"] = getattr(self, "visibility_type", "Private")
         d["title"] = getattr(self, "title", "")
-        d["deletion_requested"] = getattr(self, "deletion_requested", False)
-        d["deletion_requested_by"] = getattr(self, "deletion_requested_by", None)
-        d["deletion_requested_name"] = getattr(self, "deletion_requested_name", None)
-        d["deletion_requested_role"] = getattr(self, "deletion_requested_role", None)
-        d["deletion_reason"] = getattr(self, "deletion_reason", None)
-        d["deletion_requested_at"] = getattr(self, "deletion_requested_at", None)
         return d
 
     @classmethod
     def from_dict(cls, data):
         c = cls(
-            data["created_by"],
-            data["creator_role"],
-            data["location_id"],
-            data["department_id"],
-            data["complaint_type"],
-            data["description"],
-            data.get("complaint_id"),
-            data.get("status"),
-            data.get("assigned_to"),
-            data.get("created_at"),
-            data.get("updated_at"),
-            data.get("resolved_at"),
-            data.get("verification_due_at"),
-            data.get("reopen_count", 0),
-            data.get("auto_closed", False),
-            data.get("escalated", False),
-            data.get("admin_notified", False),
-            data.get("resolution_notes", ""),
-            data.get("verification_reports", []),
-            data.get("history", []),
-            data.get("archived", False),
-            data.get("attachment_url"),
+            created_by=data["created_by"],
+            creator_role=data["creator_role"],
+            location_id=data["location_id"],
+            department_id=data["department_id"],
+            complaint_type=data["complaint_type"],
+            description=data["description"],
+            complaint_id=data.get("complaint_id"),
+            status=data.get("status"),
+            assigned_to=data.get("assigned_to"),
+            created_at=data.get("created_at"),
+            updated_at=data.get("updated_at"),
+            resolved_at=data.get("resolved_at"),
+            verification_due_at=data.get("verification_due_at"),
+            reopen_count=data.get("reopen_count", 0),
+            auto_closed=data.get("auto_closed", False),
+            escalated=data.get("escalated", False),
+            admin_notified=data.get("admin_notified", False),
+            resolution_notes=data.get("resolution_notes", ""),
+            verification_reports=data.get("verification_reports", []),
+            history=data.get("history", []),
+            archived=data.get("archived", False),
+            attachment_url=data.get("attachment_url"),
             priority=data.get("priority", "Medium"),
             category=data.get("category", data.get("complaint_type", "General")),
             visibility_type=data.get("visibility_type", "Private"),
             title=data.get("title", ""),
+            sla_deadline=data.get("sla_deadline"),
+            assigned_at=data.get("assigned_at"),
+            started_at=data.get("started_at"),
+            auto_assigned=data.get("auto_assigned", False),
+            blocked_reason=data.get("blocked_reason"),
+            blocked_until=data.get("blocked_until"),
+            blocked_at=data.get("blocked_at"),
+            sla_reminders_sent=data.get("sla_reminders_sent", 0),
+            escalation_level=data.get("escalation_level", 0),
+            warden_escalation_level=data.get("warden_escalation_level", 0),
+            team_location_id=data.get("team_location_id"),
+            team_department_id=data.get("team_department_id"),
+            is_urgent=data.get("is_urgent", False),
+            urgent_reason=data.get("urgent_reason"),
+            fixed_at=data.get("fixed_at"),
+            fixed_by=data.get("fixed_by"),
+            warden_verified_at=data.get("warden_verified_at"),
+            warden_verified_by=data.get("warden_verified_by"),
+            warden_verdict=data.get("warden_verdict"),
+            warden_notes=data.get("warden_notes"),
+            student_stage_at=data.get("student_stage_at"),
+            closed_at=data.get("closed_at"),
+            closed_by=data.get("closed_by"),
+            requires_warden_check=data.get("requires_warden_check", False),
+            is_spot_check=data.get("is_spot_check", False),
+            auto_close_reminded=data.get("auto_close_reminded", False),
+            admin_review_reason=data.get("admin_review_reason"),
+            admin_decision=data.get("admin_decision"),
+            admin_decided_by=data.get("admin_decided_by"),
+            admin_decided_at=data.get("admin_decided_at"),
+            deletion_requested=data.get("deletion_requested", False),
+            deletion_requested_by=data.get("deletion_requested_by"),
+            deletion_requested_name=data.get("deletion_requested_name"),
+            deletion_requested_role=data.get("deletion_requested_role"),
+            deletion_reason=data.get("deletion_reason"),
+            deletion_requested_at=data.get("deletion_requested_at"),
         )
-        c.deletion_requested = data.get("deletion_requested", False)
-        c.deletion_requested_by = data.get("deletion_requested_by")
-        c.deletion_requested_name = data.get("deletion_requested_name")
-        c.deletion_requested_role = data.get("deletion_requested_role")
-        c.deletion_reason = data.get("deletion_reason")
-        c.deletion_requested_at = data.get("deletion_requested_at")
         return c

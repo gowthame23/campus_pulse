@@ -1,6 +1,12 @@
 import sqlite3
 from pathlib import Path
 
+from core.constants import INACTIVE_STATUSES, TERMINAL_STATUSES
+
+_INACTIVE_SQL = ", ".join(f"'{s}'" for s in INACTIVE_STATUSES)
+_TERMINAL_SQL = ", ".join(f"'{s}'" for s in TERMINAL_STATUSES)
+
+
 class DashboardService:
     def __init__(self, db_path="storage/campus_pulse.db"):
         self.db_path = Path(db_path)
@@ -32,13 +38,13 @@ class DashboardService:
         with self._connect() as conn:
             # Active Complaints
             act_comp = conn.execute(
-                "SELECT COUNT(*) FROM complaints WHERE created_by = ? AND status NOT IN ('Resolved', 'Closed', 'Cancelled')",
+                f"SELECT COUNT(*) FROM complaints WHERE created_by = ? AND status NOT IN ({_INACTIVE_SQL})",
                 (user_id,)
             ).fetchone()[0]
 
             # Public Complaints Joined / Affected
             pub_comp = conn.execute(
-                "SELECT COUNT(*) FROM complaints WHERE (visibility_type = 'Public' OR visibility_type = 1) AND status NOT IN ('Closed', 'Cancelled')",
+                f"SELECT COUNT(*) FROM complaints WHERE (visibility_type = 'Public' OR visibility_type = 1) AND status NOT IN ({_TERMINAL_SQL})",
             ).fetchone()[0]
 
             # Lost Items reported
@@ -111,7 +117,7 @@ class DashboardService:
     def get_coordinator_dashboard(self, user_id):
         with self._connect() as conn:
             assigned_cnt = conn.execute(
-                "SELECT COUNT(*) FROM complaints WHERE assigned_to = ? AND status NOT IN ('Closed', 'Cancelled')",
+                f"SELECT COUNT(*) FROM complaints WHERE assigned_to = ? AND status NOT IN ({_TERMINAL_SQL})",
                 (user_id,)
             ).fetchone()[0]
 
@@ -131,7 +137,7 @@ class DashboardService:
             ).fetchone()[0]
 
             overdue_cnt = conn.execute(
-                "SELECT COUNT(*) FROM complaints WHERE assigned_to = ? AND status NOT IN ('Resolved', 'Closed', 'Cancelled') AND escalated = 1",
+                f"SELECT COUNT(*) FROM complaints WHERE assigned_to = ? AND status NOT IN ({_INACTIVE_SQL}) AND escalated = 1",
                 (user_id,)
             ).fetchone()[0]
 
@@ -196,7 +202,7 @@ class DashboardService:
                 scope_params = []
 
             open_cnt = conn.execute(
-                "SELECT COUNT(*) FROM complaints WHERE status NOT IN ('Resolved', 'Closed', 'Cancelled')" + scope_clause,
+                f"SELECT COUNT(*) FROM complaints WHERE status NOT IN ({_INACTIVE_SQL})" + scope_clause,
                 scope_params,
             ).fetchone()[0]
 
@@ -278,7 +284,7 @@ class DashboardService:
                 scope_params = []
 
             open_cnt = conn.execute(
-                "SELECT COUNT(*) FROM complaints WHERE status NOT IN ('Resolved', 'Closed', 'Cancelled')" + scope_clause,
+                f"SELECT COUNT(*) FROM complaints WHERE status NOT IN ({_INACTIVE_SQL})" + scope_clause,
                 scope_params,
             ).fetchone()[0]
 
@@ -322,7 +328,7 @@ class DashboardService:
     def get_admin_dashboard(self, user_id):
         with self._connect() as conn:
             total_users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-            open_cnt = conn.execute("SELECT COUNT(*) FROM complaints WHERE status NOT IN ('Resolved', 'Closed', 'Cancelled')").fetchone()[0]
+            open_cnt = conn.execute(f"SELECT COUNT(*) FROM complaints WHERE status NOT IN ({_INACTIVE_SQL})").fetchone()[0]
             closed_cnt = conn.execute("SELECT COUNT(*) FROM complaints WHERE status IN ('Resolved', 'Closed')").fetchone()[0]
             lost_cnt = conn.execute("SELECT COUNT(*) FROM lost_found_items WHERE report_type IN ('Lost', 'LOST') AND status != 'Deleted' AND (is_deleted = 0 OR is_deleted IS NULL)").fetchone()[0]
             found_cnt = conn.execute("SELECT COUNT(*) FROM lost_found_items WHERE report_type IN ('Found', 'FOUND') AND status != 'Deleted' AND (is_deleted = 0 OR is_deleted IS NULL)").fetchone()[0]

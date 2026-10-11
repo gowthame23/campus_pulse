@@ -19,7 +19,24 @@ def now_string():
 def parse_date(value):
     if not value:
         return None
-    return datetime.strptime(value, DATE_FORMAT)
+    if isinstance(value, datetime):
+        return value
+    val_str = str(value).strip()
+    try:
+        return datetime.strptime(val_str, DATE_FORMAT)
+    except (ValueError, TypeError):
+        pass
+    try:
+        return datetime.fromisoformat(val_str)
+    except (ValueError, TypeError):
+        pass
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(val_str, fmt)
+        except (ValueError, TypeError):
+            pass
+    return None
+
 
 
 def add_days_string(days):

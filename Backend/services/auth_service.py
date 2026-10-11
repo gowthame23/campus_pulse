@@ -2048,6 +2048,100 @@ class AuthService:
             conn.execute("DELETE FROM coordinator_assignments WHERE assignment_id = ?", (assignment_id,))
         return True
 
+    def set_coordinator_assignments(self, coordinator_id, assignments, assigned_by="system"):
+        user = self.get_user(coordinator_id)
+        if not user:
+            raise ValueError("Coordinator user not found.")
+        if (user.role or "").lower() != "coordinator":
+            raise ValueError("User must have coordinator role.")
+
+        now_str = now_string()
+        with self._connect() as conn:
+            conn.execute("UPDATE coordinator_assignments SET status = 'Inactive' WHERE coordinator_id = ?", (coordinator_id,))
+            inserted = []
+            for item in assignments:
+                loc_id = item.get("location_id") or "ALL"
+                dept_id = item.get("department_id")
+                if not dept_id:
+                    continue
+                asgn_id = generate_id("ASGN")
+                conn.execute(
+                    """
+                    INSERT INTO coordinator_assignments (assignment_id, coordinator_id, department_id, location_id, assigned_at, assigned_by, status)
+                    VALUES (?, ?, ?, ?, ?, ?, 'Active')
+                    ON CONFLICT(coordinator_id, location_id, department_id) DO UPDATE SET
+                        status = 'Active',
+                        assigned_at = excluded.assigned_at,
+                        assigned_by = excluded.assigned_by
+                    """,
+                    (asgn_id, coordinator_id, dept_id, loc_id, now_str, assigned_by)
+                )
+                inserted.append({
+                    "assignment_id": asgn_id,
+                    "coordinator_id": coordinator_id,
+                    "department_id": dept_id,
+                    "location_id": loc_id,
+                    "assigned_at": now_str,
+                    "assigned_by": assigned_by,
+                    "status": "Active"
+                })
+            conn.commit()
+            return inserted
+
+    def get_coverage_gaps(self):
+        all_locs = [l for l in self.list_locations() if getattr(l, "active", True) and not getattr(l, "archived", False)]
+        all_depts = [d for d in self.list_departments() if getattr(d, "active", True) and not getattr(d, "archived", False)]
+
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT DISTINCT ca.location_id, ca.department_id
+                FROM coordinator_assignments ca
+                JOIN users u ON ca.coordinator_id = u.user_id
+                WHERE (ca.status IS NULL OR ca.status = 'Active')
+                  AND u.active = 1 AND (u.is_deleted IS NULL OR u.is_deleted = 0)
+                  AND (u.status IS NULL OR u.status = 'Active')
+                """
+            ).fetchall()
+            assigned_pairs = set()
+            all_loc_depts = set()
+            for r in rows:
+                loc_id = r["location_id"]
+                dept_id = r["department_id"]
+                if loc_id == "ALL":
+                    all_loc_depts.add(dept_id)
+                else:
+                    assigned_pairs.add((loc_id, dept_id))
+
+        unassigned_pairs = []
+        for loc in all_locs:
+            for dept in all_depts:
+                if dept.department_id in all_loc_depts:
+                    continue
+                if (loc.location_id, dept.department_id) not in assigned_pairs:
+                    unassigned_pairs.append({
+                        "location_id": loc.location_id,
+                        "location_name": loc.name,
+                        "department_id": dept.department_id,
+                        "department_name": dept.name,
+                    })
+
+        unassigned_warden_locations = []
+        for loc in all_locs:
+            warden_id = getattr(loc, "in_charge_id", None)
+            warden_user = self.get_user(warden_id) if warden_id else None
+            if not warden_user or not warden_user.active or getattr(warden_user, "is_deleted", False) or getattr(warden_user, "status", "Active") != "Active":
+                unassigned_warden_locations.append({
+                    "location_id": loc.location_id,
+                    "location_name": loc.name,
+                    "in_charge_id": warden_id,
+                })
+
+        return {
+            "unassigned_pairs": unassigned_pairs,
+            "unassigned_warden_locations": unassigned_warden_locations,
+        }
+
     def is_coordinator_assigned(self, coordinator_id, location_id, department_id):
         user = self.get_user(coordinator_id)
         if not user or (user.role or "").lower() != "coordinator":

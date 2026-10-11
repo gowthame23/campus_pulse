@@ -1,10 +1,31 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
+from core.constants import (
+    ACCEPT_DEADLINE_HOURS,
+    CATEGORY_PRIORITY_MAP,
+    INACTIVE_STATUSES,
+    PRIORITIES,
+    SLA_ACTIVE_STATUSES,
+    SLA_HOURS,
+    STATUS_ASSIGNED,
+    STATUS_BLOCKED,
+    STATUS_IN_PROGRESS,
+    STATUS_PENDING_WARDEN,
+    STATUS_SUBMITTED,
+    STATUS_WAITING_STUDENT,
+    normalize_priority,
+    normalize_role,
+)
 from models.complaint import Complaint
 from models.location_in_charge import LocationInCharge
 from models.student import Student
 from storage.sqlite_repository import SQLiteRepository
-from utils.helper import now, parse_date
+from utils.helper import now, now_string, parse_date
+
+
+class ComplaintConflictError(Exception):
+    """Raised when an atomic operation conflicts with existing complaint state."""
+    pass
 
 
 class ComplaintService:
@@ -126,6 +147,9 @@ class ComplaintService:
         visibility_type="Private",
         issue_id=None,
         visibility=None,
+        priority=None,
+        is_urgent=False,
+        urgent_reason=None,
     ):
         # 1. Role Verification - Only Students and Location In-Charges can create complaints
         if (getattr(user, "role", "") or "").lower() not in ("student", "location_in_charge"):
@@ -206,20 +230,42 @@ class ComplaintService:
             raise ValueError("Selected department is inactive.")
 
         # 4. Issue & Priority Validation
-        priority = "Medium"
-        if issue_id:
-            import sqlite3
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            issue_row = conn.execute("SELECT * FROM department_issues WHERE issue_id = ?", (issue_id,)).fetchone()
-            conn.close()
-            if issue_row:
-                iss_dict = dict(issue_row)
-                if iss_dict.get("department_id") != department_id:
-                    raise ValueError("Selected issue does not belong to the chosen department.")
-                if iss_dict.get("active") == 0:
-                    raise ValueError("Selected issue is inactive.")
-                priority = iss_dict.get("default_priority") or "Medium"
+        final_priority = None
+        if priority:
+            final_priority = normalize_priority(priority)
+        elif issue_id:
+            try:
+                import sqlite3
+                conn = sqlite3.connect(self.repository.path)
+                conn.row_factory = sqlite3.Row
+                issue_row = conn.execute("SELECT * FROM department_issues WHERE issue_id = ?", (issue_id,)).fetchone()
+                conn.close()
+                if issue_row:
+                    iss_dict = dict(issue_row)
+                    if iss_dict.get("department_id") != department_id:
+                        raise ValueError("Selected issue does not belong to the chosen department.")
+                    if iss_dict.get("active") == 0:
+                        raise ValueError("Selected issue is inactive.")
+                    final_priority = normalize_priority(iss_dict.get("default_priority"))
+            except Exception as e:
+                if isinstance(e, ValueError):
+                    raise e
+
+        if not final_priority:
+            cat_key = (category or "").strip().lower()
+            ct_key = (complaint_type or "").strip().lower()
+            if cat_key in CATEGORY_PRIORITY_MAP:
+                final_priority = CATEGORY_PRIORITY_MAP[cat_key]
+            elif ct_key in CATEGORY_PRIORITY_MAP:
+                final_priority = CATEGORY_PRIORITY_MAP[ct_key]
+            else:
+                final_priority = "Medium"
+
+        if is_urgent:
+            if final_priority in ("Low", "Medium"):
+                final_priority = "High"
+
+        final_priority = normalize_priority(final_priority)
 
         # 5. Prevent duplicate rapid submissions from same student
         current_time = now()
@@ -239,7 +285,11 @@ class ComplaintService:
                         "Duplicate complaint detected. You have already submitted this issue recently."
                     )
 
-        # 6. Create Complaint instance
+        # 6. Compute initial SLA deadline
+        sla_hours = SLA_HOURS.get(final_priority, 48)
+        sla_deadline = (current_time + timedelta(hours=sla_hours)).isoformat()
+
+        # 7. Create Complaint instance
         complaint = Complaint(
             user.user_id,
             user.role,
@@ -248,45 +298,114 @@ class ComplaintService:
             complaint_type,
             description,
             attachment_url=attachment_url,
-            priority=priority,
+            priority=final_priority,
             category=category,
             visibility_type=visibility_type,
             title=title,
         )
+        complaint.sla_deadline = sla_deadline
+        complaint.is_urgent = bool(is_urgent)
+        complaint.urgent_reason = urgent_reason if is_urgent else None
 
-        complaint.status = Complaint.SUBMITTED
-        complaint.assigned_to = None
-        complaint.add_history("Complaint submitted.")
+        # 8. Auto-routing: Check active coordinators for (location, department)
+        assignments = (
+            self.auth_service.list_coordinator_assignments(
+                location_id=location_id, department_id=department_id
+            )
+            or []
+        )
+        all_loc_assignments = (
+            self.auth_service.list_coordinator_assignments(
+                location_id="ALL", department_id=department_id
+            )
+            or []
+        )
 
+        candidate_coords = []
+        seen_coords = set()
+        for a in assignments + all_loc_assignments:
+            cid = a.get("coordinator_id")
+            if cid and cid not in seen_coords:
+                seen_coords.add(cid)
+                u = self.auth_service.get_user(cid)
+                if (
+                    u
+                    and getattr(u, "active", False)
+                    and not getattr(u, "is_deleted", False)
+                    and getattr(u, "status", "Active") == "Active"
+                ):
+                    candidate_coords.append(cid)
+
+        if len(candidate_coords) == 1:
+            coord_id = candidate_coords[0]
+            complaint.assigned_to = coord_id
+            complaint.status = Complaint.ASSIGNED
+            complaint.assigned_at = complaint.created_at
+            complaint.auto_assigned = True
+            complaint.add_history(f"Auto-assigned to coordinator {coord_id}.")
+            self.notification_service.notify(
+                coord_id,
+                f"Complaint {complaint.complaint_id} ({complaint.priority}) assigned to you.",
+                complaint_id=complaint.complaint_id,
+                title="New Assigned Complaint",
+            )
+        elif len(candidate_coords) >= 2:
+            complaint.assigned_to = None
+            complaint.status = Complaint.SUBMITTED
+            complaint.team_location_id = location_id
+            complaint.team_department_id = department_id
+            complaint.add_history("Multiple coordinators available. Placed in coordinator accept queue.")
+            for cid in candidate_coords:
+                self.notification_service.notify(
+                    cid,
+                    f"New work available in your queue: {complaint.title or complaint.category} ({complaint.priority}).",
+                    complaint_id=complaint.complaint_id,
+                    title="Work Available in Queue",
+                )
+        else:
+            complaint.assigned_to = None
+            complaint.status = Complaint.SUBMITTED
+            complaint.add_history("No coordinator assigned for this location/department. Placed in queue.")
+            loc_obj = self.auth_service.get_location(location_id)
+            dept_obj = self.auth_service.get_department(department_id)
+            loc_label = loc_obj.name if loc_obj else location_id
+            dept_label = dept_obj.name if dept_obj else department_id
+            alert_msg = f"Complaint {complaint.complaint_id} filed in {loc_label}/{dept_label} has no coordinator assigned. Please assign coverage."
+
+            warden_id = getattr(loc_obj, "in_charge_id", None)
+            if warden_id:
+                self.notification_service.notify(
+                    warden_id, alert_msg, complaint_id=complaint.complaint_id, title="Coverage Gap Alert"
+                )
+            app_mgr_id = getattr(loc_obj, "app_manager_id", None)
+            if app_mgr_id:
+                self.notification_service.notify(
+                    app_mgr_id, alert_msg, complaint_id=complaint.complaint_id, title="Coverage Gap Alert"
+                )
+            for admin_u in self.auth_service.list_users(role="administrator"):
+                if admin_u.active and not getattr(admin_u, "is_deleted", False):
+                    self.notification_service.notify(
+                        admin_u.user_id, alert_msg, complaint_id=complaint.complaint_id, title="Coverage Gap Alert"
+                    )
+
+        # 9. In ALL cases: ALWAYS notify the warden of the complaint's location
+        loc_obj = self.auth_service.get_location(location_id)
+        warden_id = getattr(loc_obj, "in_charge_id", None)
+        if warden_id:
+            self.notification_service.notify(
+                warden_id,
+                f"New complaint filed in your location: {complaint.title or complaint.category} ({complaint.priority})",
+                complaint_id=complaint.complaint_id,
+                title="New Complaint in Your Location",
+            )
+
+        # 10. Notify submitter
         self.notification_service.notify(
             user.user_id,
             f"Your complaint {complaint.complaint_id} has been submitted successfully.",
             complaint_id=complaint.complaint_id,
             title="Complaint Submitted",
         )
-
-        # Section 11: Notify only students associated with the complaint's location
-        if str(complaint.visibility_type).capitalize() in ("Public", "Community"):
-            loc = self.auth_service.get_location(location_id)
-            loc_name = loc.name if loc else location_id
-            loc_id_clean = loc.location_id if loc else location_id
-
-            all_students = self.auth_service.list_users(role="student")
-            for st in all_students:
-                if st.user_id == user.user_id:
-                    continue
-                is_associated = (
-                    st.location_id == loc_id_clean
-                    or (getattr(st, "hostel", None) and str(st.hostel).strip().lower() == loc_name.strip().lower())
-                    or (getattr(st, "block", None) and str(st.block).strip().lower() == loc_name.strip().lower())
-                )
-                if is_associated:
-                    self.notification_service.notify(
-                        st.user_id,
-                        f"Notice: A public complaint '{complaint.title or complaint.category}' was reported in your location ({loc_name}).",
-                        complaint_id=complaint.complaint_id,
-                        title="Public Complaint in Your Area",
-                    )
 
         self._enrich_sla(complaint)
         self.save_complaint(complaint)
@@ -324,9 +443,17 @@ class ComplaintService:
         complaint = self.get_complaint(complaint_id)
         if not complaint:
             raise ValueError("Complaint not found.")
+        target_user = self.auth_service.get_user(coordinator_id)
+        if not target_user:
+            raise ValueError("Assigned user does not exist.")
+        if (target_user.role or "").lower() != "coordinator":
+            raise ValueError("Complaints can only be assigned to coordinators.")
+        if not target_user.active or getattr(target_user, "is_deleted", False) or getattr(target_user, "status", "Active") != "Active":
+            raise ValueError("Coordinator is inactive.")
         old_status = complaint.status
         old_assigned = complaint.assigned_to
         complaint.assign(coordinator_id)
+        complaint.assigned_at = complaint.assigned_at or now_string()
         try:
             self.save_complaint(complaint)
             self.notification_service.assigned(complaint_id, coordinator_id)
@@ -342,9 +469,13 @@ class ComplaintService:
         if not complaint:
             raise ValueError("Complaint not found.")
 
-        # Only allow resolving from In Progress status
-        if complaint.status != Complaint.IN_PROGRESS:
-            raise ValueError("Complaint must be In Progress before it can be resolved.")
+        # Allow resolving from In Progress (or Assigned with implicit transition)
+        if complaint.status == Complaint.ASSIGNED:
+            complaint.status = Complaint.IN_PROGRESS
+            complaint.started_at = complaint.started_at or now_string()
+            complaint.add_history("Work implicitly started upon resolution.")
+        elif complaint.status != Complaint.IN_PROGRESS:
+            raise ValueError("Complaint must be In Progress or Assigned before it can be resolved.")
 
         # 10. Resolution Validation
         attachments = self.attachment_service.list_attachments(complaint_id)
@@ -383,6 +514,8 @@ class ComplaintService:
         return complaint
 
     def can_verify(self, complaint, user):
+        if user.user_id == complaint.assigned_to:
+            return False
         if complaint.creator_role == Student.ROLE:
             if user.user_id == complaint.created_by:
                 return True
@@ -470,70 +603,205 @@ class ComplaintService:
             raise err
         return complaint
 
+    def find_least_loaded_coordinator(self, location_id, department_id):
+        assignments = (
+            self.auth_service.list_coordinator_assignments(
+                location_id=location_id, department_id=department_id
+            )
+            or []
+        )
+        all_loc_assignments = (
+            self.auth_service.list_coordinator_assignments(
+                location_id="ALL", department_id=department_id
+            )
+            or []
+        )
+        candidate_ids = []
+        seen = set()
+        for a in assignments + all_loc_assignments:
+            cid = a.get("coordinator_id")
+            if cid and cid not in seen:
+                seen.add(cid)
+                u = self.auth_service.get_user(cid)
+                if (
+                    u
+                    and getattr(u, "active", False)
+                    and not getattr(u, "is_deleted", False)
+                    and getattr(u, "status", "Active") == "Active"
+                ):
+                    candidate_ids.append(cid)
+
+        if not candidate_ids:
+            return None
+        if len(candidate_ids) == 1:
+            return candidate_ids[0]
+
+        counts = {cid: 0 for cid in candidate_ids}
+        for c in self.list_all():
+            if c.assigned_to in counts and c.status in SLA_ACTIVE_STATUSES:
+                counts[c.assigned_to] += 1
+
+        return min(counts.keys(), key=lambda k: counts[k])
+
     def apply_automatic_rules(self, complaints=None):
         complaints = complaints or self._load_complaints()
         changed = False
         current_time = now()
-        dept_cache = {}
+        loc_cache = {}
+
+        def _get_loc(loc_id):
+            if loc_id not in loc_cache:
+                loc_cache[loc_id] = self.auth_service.get_location(loc_id)
+            return loc_cache[loc_id]
+
         for complaint in complaints:
-            if complaint.status == Complaint.WAITING_VERIFICATION:
+            # 1. 48h Auto-Close & 24h Reminder for Waiting for Verification
+            if complaint.status in (Complaint.WAITING_VERIFICATION, "Waiting for Verification"):
                 due_at = parse_date(complaint.verification_due_at)
+                # Check 24h reminder
+                if not getattr(complaint, "auto_close_reminded", False):
+                    stage_start = parse_date(getattr(complaint, "student_stage_at", None) or complaint.resolved_at or complaint.updated_at)
+                    if stage_start and current_time > stage_start + timedelta(hours=24):
+                        complaint.auto_close_reminded = True
+                        complaint.add_history("24-hour auto-close reminder sent to student.")
+                        self.notification_service.notify(
+                            complaint.created_by,
+                            f"Reminder: Complaint {complaint.complaint_id} was resolved. It will auto-close in 24 hours if no action is taken.",
+                            complaint_id=complaint.complaint_id,
+                            title="Resolution Auto-Close Reminder",
+                        )
+                        changed = True
+
+                # Check 48h deadline for auto-close
                 if due_at and current_time > due_at:
                     complaint.auto_close()
+                    complaint.add_history("Auto-closed after 48h student inactivity.")
                     changed = True
-            if complaint.status not in (
-                Complaint.CLOSED,
-                Complaint.AUTO_CLOSED,
-                Complaint.RESOLVED,
-                Complaint.WAITING_VERIFICATION,
-            ):
-                if complaint.department_id not in dept_cache:
-                    dept_cache[complaint.department_id] = self.auth_service.get_department(
-                        complaint.department_id
-                    )
-                department = dept_cache[complaint.department_id]
-                created_at = parse_date(complaint.created_at)
-                if department and created_at:
-                    due_date = created_at + timedelta(days=department.sla_days)
-                    days_overdue = (current_time - due_date).days
-                    if days_overdue >= 0:
-                        has_notified_coord = any(
-                            "SLA exceeded; notified coordinator" in h["message"]
-                            for h in complaint.history
-                        )
-                        if not has_notified_coord:
-                            complaint.add_history("SLA exceeded; notified coordinator.")
-                            coordinator_id = department.coordinator_id or "Coordinator"
+
+            # 2. SLA Countdown & Escalation Ladder for active tickets
+            if complaint.status in SLA_ACTIVE_STATUSES or (complaint.status not in INACTIVE_STATUSES and complaint.status not in (Complaint.WAITING_VERIFICATION, "Waiting for Verification")):
+                sla_deadline_dt = parse_date(complaint.sla_deadline)
+                if not sla_deadline_dt:
+                    created_dt = parse_date(complaint.created_at) or current_time
+                    p = normalize_priority(complaint.priority)
+                    sla_hours = SLA_HOURS.get(p, 48)
+                    sla_deadline_dt = created_dt + timedelta(hours=sla_hours)
+                    complaint.sla_deadline = sla_deadline_dt.isoformat()
+                    changed = True
+
+                if current_time > sla_deadline_dt:
+                    loc = _get_loc(complaint.location_id)
+                    warden_id = getattr(loc, "in_charge_id", None)
+                    app_mgr_id = getattr(loc, "app_manager_id", None)
+
+                    # Level 1: Overdue -> Coordinator + Warden
+                    if int(getattr(complaint, "escalation_level", 0)) < 1:
+                        complaint.escalation_level = 1
+                        complaint.escalated = True
+                        complaint.add_history("SLA deadline exceeded. Escalated to Coordinator and Warden.")
+                        if complaint.assigned_to:
                             self.notification_service.notify(
-                                coordinator_id,
-                                f"Overdue alert: Complaint {complaint.complaint_id} is past due.",
+                                complaint.assigned_to,
+                                f"Complaint {complaint.complaint_id} ({complaint.priority}) is OVERDUE. Deadline was {complaint.sla_deadline}.",
                                 complaint_id=complaint.complaint_id,
                                 title="SLA Overdue Alert",
                             )
-                            changed = True
-                    if days_overdue >= 2:
-                        if not complaint.escalated:
-                            complaint.escalated = True
-                            complaint.add_history(
-                                "SLA exceeded by 2+ days; escalated to App Manager."
+                        if warden_id:
+                            self.notification_service.notify(
+                                warden_id,
+                                f"Complaint {complaint.complaint_id} ({complaint.priority}) in your location is OVERDUE.",
+                                complaint_id=complaint.complaint_id,
+                                title="SLA Overdue Alert",
                             )
-                            self.notification_service.sla_exceeded(
-                                complaint.complaint_id
-                            )
+                        changed = True
+
+                    # Level 2: Overdue + 24h -> App Manager
+                    if current_time > sla_deadline_dt + timedelta(hours=24):
+                        if int(getattr(complaint, "escalation_level", 0)) < 2:
+                            complaint.escalation_level = 2
+                            complaint.add_history("SLA deadline exceeded by 24h. Escalated to App Manager.")
+                            if app_mgr_id:
+                                self.notification_service.notify(
+                                    app_mgr_id,
+                                    f"Complaint {complaint.complaint_id} ({complaint.priority}) is 24h past SLA. Escalated to App Manager.",
+                                    complaint_id=complaint.complaint_id,
+                                    title="SLA 24h Escalation",
+                                )
                             changed = True
-                    if days_overdue >= 4:
-                        if not complaint.admin_notified:
+
+                    # Level 3: Overdue + 48h -> Administrator
+                    if current_time > sla_deadline_dt + timedelta(hours=48):
+                        if int(getattr(complaint, "escalation_level", 0)) < 3:
+                            complaint.escalation_level = 3
                             complaint.admin_notified = True
+                            complaint.add_history("SLA deadline exceeded by 48h. Escalated to Administrator.")
+                            for admin_u in self.auth_service.list_users(role="administrator"):
+                                if admin_u.active and not getattr(admin_u, "is_deleted", False):
+                                    self.notification_service.notify(
+                                        admin_u.user_id,
+                                        f"CRITICAL: Complaint {complaint.complaint_id} ({complaint.priority}) is 48h past SLA. Escalated to Administrator.",
+                                        complaint_id=complaint.complaint_id,
+                                        title="SLA Critical Escalation",
+                                    )
+                            changed = True
+
+                # Accept queue deadline check for unassigned Submitted tickets
+                if complaint.status == Complaint.SUBMITTED and not complaint.assigned_to:
+                    created_dt = parse_date(complaint.created_at) or current_time
+                    p = normalize_priority(complaint.priority)
+                    accept_hours = ACCEPT_DEADLINE_HOURS.get(p, 4)
+                    if current_time > created_dt + timedelta(hours=accept_hours):
+                        least_loaded = self.find_least_loaded_coordinator(complaint.location_id, complaint.department_id)
+                        if least_loaded:
+                            complaint.assigned_to = least_loaded
+                            complaint.status = Complaint.ASSIGNED
+                            complaint.assigned_at = current_time.isoformat()
+                            complaint.auto_assigned = True
                             complaint.add_history(
-                                "SLA exceeded by 4+ days; escalated to Administrator."
+                                f"Accept deadline expired ({accept_hours}h). Auto-assigned to least-loaded coordinator {least_loaded}."
                             )
                             self.notification_service.notify(
-                                "Administrator",
-                                f"CRITICAL: prolonged delay for complaint {complaint.complaint_id}. Escalated to Admin.",
+                                least_loaded,
+                                f"Complaint {complaint.complaint_id} ({complaint.priority}) auto-assigned to you after queue timeout.",
                                 complaint_id=complaint.complaint_id,
-                                title="SLA Critical Escalation",
+                                title="Complaint Auto-Assigned",
                             )
                             changed = True
+
+            # 3. Complaints pending warden verification (>24h reminder to warden, >48h to App Manager)
+            if complaint.status in (Complaint.PENDING_WARDEN_VERIFICATION, "Pending Warden Verification"):
+                fixed_dt = parse_date(getattr(complaint, "fixed_at", None) or complaint.resolved_at or complaint.updated_at)
+                if fixed_dt:
+                    loc = _get_loc(complaint.location_id)
+                    warden_id = getattr(loc, "in_charge_id", None)
+                    app_mgr_id = getattr(loc, "app_manager_id", None)
+
+                    if current_time > fixed_dt + timedelta(hours=24):
+                        if int(getattr(complaint, "warden_escalation_level", 0)) < 1:
+                            complaint.warden_escalation_level = 1
+                            complaint.add_history("Pending warden verification >24h. Reminder sent to Warden.")
+                            if warden_id:
+                                self.notification_service.notify(
+                                    warden_id,
+                                    f"Complaint {complaint.complaint_id} has been waiting for your verification for >24 hours. Please inspect.",
+                                    complaint_id=complaint.complaint_id,
+                                    title="Pending Verification Reminder",
+                                )
+                            changed = True
+
+                    if current_time > fixed_dt + timedelta(hours=48):
+                        if int(getattr(complaint, "warden_escalation_level", 0)) < 2:
+                            complaint.warden_escalation_level = 2
+                            complaint.add_history("Pending warden verification >48h. Escalated to App Manager.")
+                            if app_mgr_id:
+                                self.notification_service.notify(
+                                    app_mgr_id,
+                                    f"Complaint {complaint.complaint_id} has been waiting for warden verification for >48 hours in {loc.name if loc else complaint.location_id}.",
+                                    complaint_id=complaint.complaint_id,
+                                    title="Warden Verification Overdue",
+                                )
+                            changed = True
+
         if changed:
             self._save_complaints(complaints)
 
@@ -705,38 +973,163 @@ class ComplaintService:
         return complaint
 
     def accept_complaint(self, complaint_id, coordinator_id):
-        complaint = self.get_complaint(complaint_id)
-        if not complaint:
-            raise ValueError("Complaint not found.")
-        if complaint.status not in (
-            Complaint.PENDING,
-            Complaint.SUBMITTED,
-            Complaint.REOPENED,
-        ):
-            raise ValueError(
-                "Only Pending, Submitted, or Reopened complaints can be accepted."
+        coord_user = self.auth_service.get_user(coordinator_id)
+        if not coord_user or (coord_user.role or "").lower() not in ("coordinator", "administrator"):
+            raise ValueError("Only coordinators or administrators can accept complaints.")
+        if not coord_user.active or getattr(coord_user, "is_deleted", False) or getattr(coord_user, "status", "Active") != "Active":
+            raise ValueError("Coordinator is inactive.")
+
+        now_str = now_string()
+        with self.repository._connect() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE complaints
+                SET assigned_to = ?, status = 'Assigned', assigned_at = ?, updated_at = ?
+                WHERE complaint_id = ? AND (assigned_to IS NULL OR status = 'Submitted')
+                """,
+                (coordinator_id, now_str, now_str, complaint_id),
             )
-        complaint.status = Complaint.IN_PROGRESS
-        if not complaint.assigned_to:
-            complaint.assigned_to = coordinator_id
-        complaint.add_history(f"Accepted and work started by staff {coordinator_id}.")
-        self.save_complaint(complaint)
+            if cursor.rowcount == 0:
+                row = conn.execute("SELECT status, assigned_to FROM complaints WHERE complaint_id = ?", (complaint_id,)).fetchone()
+                if not row:
+                    raise ValueError("Complaint not found.")
+                raise ComplaintConflictError("Complaint has already been accepted by another coordinator or is not available.")
+
+        complaint = self.get_complaint(complaint_id)
+        if complaint:
+            complaint.add_history(f"Accepted by coordinator {coord_user.name} ({coordinator_id}).")
+            self.save_complaint(complaint)
         return complaint
 
     def start_work(self, complaint_id, coordinator_id):
         complaint = self.get_complaint(complaint_id)
         if not complaint:
             raise ValueError("Complaint not found.")
-        if complaint.status not in (Complaint.ASSIGNED, Complaint.REOPENED):
-            raise ValueError(
-                "Complaint must be Accepted (Assigned) or Reopened before starting work."
-            )
-        if complaint.assigned_to != coordinator_id:
+        if complaint.status not in (Complaint.ASSIGNED, Complaint.REOPENED, Complaint.SUBMITTED):
+            raise ValueError("Complaint must be Assigned, Submitted, or Reopened before starting work.")
+        if complaint.assigned_to and complaint.assigned_to != coordinator_id:
             raise ValueError("You can only work on complaints assigned to you.")
 
         complaint.status = Complaint.IN_PROGRESS
-        complaint.add_history("Work started by Coordinator.")
+        complaint.assigned_to = coordinator_id
+        complaint.started_at = complaint.started_at or now_string()
+        complaint.add_history(f"Work started by Coordinator {coordinator_id}.")
         self.save_complaint(complaint)
+        return complaint
+
+    def record_progress(self, complaint_id, coordinator_id, note, photo_url=None):
+        complaint = self.get_complaint(complaint_id)
+        if not complaint:
+            raise ValueError("Complaint not found.")
+        if complaint.assigned_to != coordinator_id:
+            raise ValueError("You can only update complaints assigned to you.")
+        if not note or not note.strip():
+            raise ValueError("Progress note is required.")
+
+        msg = f"Progress update: {note.strip()}"
+        if photo_url:
+            msg += " (photo attached)"
+        complaint.add_history(msg)
+        self.save_complaint(complaint)
+
+        self.notification_service.notify(
+            complaint.created_by,
+            f"Update on your complaint {complaint.complaint_id}: {note.strip()}",
+            complaint_id=complaint.complaint_id,
+            title="Complaint Progress Update",
+        )
+        return complaint
+
+    def block_complaint(self, complaint_id, coordinator_id, reason, expected_date=None):
+        complaint = self.get_complaint(complaint_id)
+        if not complaint:
+            raise ValueError("Complaint not found.")
+        if complaint.assigned_to != coordinator_id:
+            raise ValueError("You can only block complaints assigned to you.")
+        if not reason or not reason.strip():
+            raise ValueError("Block reason is required.")
+
+        complaint.status = STATUS_BLOCKED
+        complaint.blocked_reason = reason.strip()
+        complaint.blocked_until = expected_date
+        complaint.blocked_at = now_string()
+        complaint.add_history(f"Work paused: {reason.strip()} (Expected: {expected_date or 'TBD'})")
+        self.save_complaint(complaint)
+
+        loc = self.auth_service.get_location(complaint.location_id)
+        warden_id = getattr(loc, "in_charge_id", None)
+        if warden_id:
+            self.notification_service.notify(
+                warden_id,
+                f"Complaint {complaint.complaint_id} blocked: {reason.strip()}",
+                complaint_id=complaint.complaint_id,
+                title="Complaint Work Paused",
+            )
+        self.notification_service.notify(
+            complaint.created_by,
+            f"Work on your complaint {complaint.complaint_id} is temporarily paused: {reason.strip()}",
+            complaint_id=complaint.complaint_id,
+            title="Complaint Work Paused",
+        )
+        return complaint
+
+    def unblock_complaint(self, complaint_id, coordinator_id):
+        complaint = self.get_complaint(complaint_id)
+        if not complaint:
+            raise ValueError("Complaint not found.")
+        if complaint.assigned_to != coordinator_id:
+            raise ValueError("You can only resume complaints assigned to you.")
+        if complaint.status != STATUS_BLOCKED:
+            raise ValueError("Complaint is not currently blocked.")
+
+        complaint.status = STATUS_IN_PROGRESS
+        complaint.blocked_reason = None
+        complaint.blocked_until = None
+        complaint.add_history("Work resumed by coordinator.")
+        self.save_complaint(complaint)
+
+        self.notification_service.notify(
+            complaint.created_by,
+            f"Work on your complaint {complaint.complaint_id} has resumed.",
+            complaint_id=complaint.complaint_id,
+            title="Complaint Resumed",
+        )
+        return complaint
+
+    def change_priority(self, complaint_id, user, new_priority, reason=None):
+        complaint = self.get_complaint(complaint_id)
+        if not complaint:
+            raise ValueError("Complaint not found.")
+        old_priority = complaint.priority
+        norm_priority = normalize_priority(new_priority)
+        if norm_priority == old_priority:
+            return complaint
+
+        complaint.priority = norm_priority
+        created_dt = parse_date(complaint.created_at) or now()
+        hours = SLA_HOURS.get(norm_priority, 48)
+        complaint.sla_deadline = (created_dt + timedelta(hours=hours)).isoformat()
+
+        msg = f"Priority changed from {old_priority} to {norm_priority} by {user.name}."
+        if reason:
+            msg += f" Reason: {reason.strip()}"
+        complaint.add_history(msg)
+        self.save_complaint(complaint)
+
+        p_order = {"Critical": 4, "High": 3, "Medium": 2, "Low": 1}
+        if p_order.get(norm_priority, 0) < p_order.get(old_priority, 0):
+            loc = self.auth_service.get_location(complaint.location_id)
+            warden_id = getattr(loc, "in_charge_id", None)
+            app_mgr_id = getattr(loc, "app_manager_id", None)
+            alert_msg = f"Complaint {complaint.complaint_id} downgraded from {old_priority} to {norm_priority}. Reason: {reason or 'None'}"
+            if warden_id:
+                self.notification_service.notify(
+                    warden_id, alert_msg, complaint_id=complaint.complaint_id, title="Priority Downgrade Alert"
+                )
+            if app_mgr_id:
+                self.notification_service.notify(
+                    app_mgr_id, alert_msg, complaint_id=complaint.complaint_id, title="Priority Downgrade Alert"
+                )
         return complaint
 
     def escalate_complaint(self, complaint_id, user, reason):
