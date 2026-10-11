@@ -534,6 +534,9 @@ class AuthService:
             "staff_department": data.get("staff_department") or data.get("department"),
             "assigned_locations": data.get("assigned_locations", []),
             "assigned_categories": data.get("assigned_categories", []),
+            "photo_skip_streak": int(data.get("photo_skip_streak", 0) or 0),
+            "force_next_warden_check": int(data.get("force_next_warden_check", 0) or 0),
+            "language": data.get("language") or "en",
         }
 
         role_classes = {
@@ -873,8 +876,9 @@ class AuthService:
                         user_id, name, email, password, role, phone_number, status, profile_photo,
                         first_login, active, department_id, location_id, created_at, updated_at,
                         last_login, last_logout, created_by, is_deleted, deleted_at, deleted_by,
-                        deactivated_by_user_id, deactivated_by_role, deactivated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        deactivated_by_user_id, deactivated_by_role, deactivated_at,
+                        photo_skip_streak, force_next_warden_check, language
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(user_id) DO UPDATE SET
                         name=excluded.name,
                         email=excluded.email,
@@ -895,7 +899,10 @@ class AuthService:
                         deleted_by=excluded.deleted_by,
                         deactivated_by_user_id=excluded.deactivated_by_user_id,
                         deactivated_by_role=excluded.deactivated_by_role,
-                        deactivated_at=excluded.deactivated_at
+                        deactivated_at=excluded.deactivated_at,
+                        photo_skip_streak=excluded.photo_skip_streak,
+                        force_next_warden_check=excluded.force_next_warden_check,
+                        language=excluded.language
                     """,
                     (
                         user_id,
@@ -924,6 +931,9 @@ class AuthService:
                         user_dict.get("deactivated_by_user_id"),
                         user_dict.get("deactivated_by_role"),
                         user_dict.get("deactivated_at"),
+                        int(user_dict.get("photo_skip_streak", 0) or 0),
+                        int(user_dict.get("force_next_warden_check", 0) or 0),
+                        user_dict.get("language") or "en",
                     ),
                 )
 

@@ -887,7 +887,7 @@ def test_security_lost_found_delete_ownership_strict():
     res_mgr = client.delete(f"/lost-found/items/{item_id}", headers=mgr_headers)
     assert res_mgr.status_code == 403
 
-    # 5. Administrator -> 403
+    # 5. Administrator -> 403 on hard delete
     res_admin = client.delete(f"/lost-found/items/{item_id}", headers=admin_headers)
     assert res_admin.status_code == 403
 
@@ -900,7 +900,15 @@ def test_security_lost_found_delete_ownership_strict():
     assert item_check.status_code == 200
     assert item_check.json()["item_id"] == item_id
 
-    # 7. Creator can delete own item -> 200 OK
+    # 7. App Manager / Admin can moderate (soft-hide) with mandatory reason
+    mod_fail = client.post(f"/lost-found/items/{item_id}/moderate", json={"reason": ""}, headers=mgr_headers)
+    assert mod_fail.status_code == 400
+
+    mod_ok = client.post(f"/lost-found/items/{item_id}/moderate", json={"reason": "Contains duplicate personal item", "action": "hide"}, headers=mgr_headers)
+    assert mod_ok.status_code == 200
+    assert mod_ok.json()["is_hidden"] is True
+
+    # 8. Creator can delete own item -> 200 OK
     res_creator = client.delete(f"/lost-found/items/{item_id}", headers=creator_headers)
     assert res_creator.status_code == 200
     assert "deleted" in res_creator.json()["message"].lower()

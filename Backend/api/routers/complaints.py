@@ -3,6 +3,13 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
+from core.constants import (
+    INACTIVE_STATUSES,
+    STATUS_CLOSED,
+    STATUS_AUTO_CLOSED,
+    STATUS_REJECTED,
+    STATUS_CANCELLED,
+)
 from services.complaint_service import ComplaintConflictError
 
 from api.dependencies import (
@@ -652,6 +659,65 @@ def search_duplicate_complaints(
     )
 
 
+@router.get("/similar", response_model=list[dict])
+@router.get("/suggestions/list", response_model=list[dict])
+def get_complaint_suggestions(
+    location_id: Optional[str] = None,
+    category: Optional[str] = None,
+    q: Optional[str] = None,
+    current_user=Depends(get_current_user),
+    complaint_service=Depends(get_complaint_service),
+):
+    all_complaints = complaint_service.list_all()
+    suggestions = []
+
+    inactive_statuses = set(INACTIVE_STATUSES) | {
+        Complaint.CLOSED,
+        Complaint.AUTO_CLOSED,
+        STATUS_CLOSED,
+        STATUS_AUTO_CLOSED,
+        STATUS_REJECTED,
+        STATUS_CANCELLED,
+    }
+
+    user_loc_id = getattr(current_user, "location_id", None)
+
+    for c in all_complaints:
+        if c.status in inactive_statuses:
+            continue
+        if c.visibility_type not in ("Community", "Public", "public", "community"):
+            continue
+        if location_id and c.location_id != location_id:
+            continue
+        if category and (c.category or "").lower() != category.lower():
+            continue
+        if not location_id and current_user.role == Student.ROLE and user_loc_id and c.location_id != user_loc_id:
+            continue
+        match = True
+        if q and q.strip():
+            query_lower = q.strip().lower()
+            match = (query_lower in (c.title or "").lower()) or (
+                query_lower in (c.description or "").lower()
+            )
+        if match:
+            suggestions.append(
+                {
+                    "complaint_id": c.complaint_id,
+                    "title": c.title,
+                    "status": c.status,
+                    "priority": c.priority,
+                    "category": c.category,
+                    "location_id": c.location_id,
+                    "description": c.description,
+                    "affected_count": complaint_service.get_affected_count(
+                        c.complaint_id
+                    ),
+                    "created_at": c.created_at,
+                }
+            )
+    return suggestions
+
+
 @router.get("/{complaint_id}", response_model=ComplaintResponse)
 def get_complaint(
     complaint_id: str,
@@ -1116,7 +1182,13 @@ def resolve_complaint(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
         )
-    if complaint.status not in (Complaint.IN_PROGRESS, Complaint.ASSIGNED):
+    if complaint.status not in (
+        Complaint.IN_PROGRESS,
+        Complaint.ASSIGNED,
+        "In Progress",
+        "Assigned",
+        "Reopened",
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Complaint must be In Progress or Assigned before it can be resolved.",
@@ -1131,12 +1203,21 @@ def resolve_complaint(
             detail="You can only resolve complaints assigned to you.",
         )
     try:
-        complaint = complaint_service.mark_resolved(complaint_id, current_user.user_id, payload.notes)
+        complaint = complaint_service.mark_resolved(
+            complaint_id,
+            current_user.user_id,
+            notes=payload.notes or "",
+            preset_code=payload.preset_code,
+            proof_url=payload.proof_url,
+            skip_photo=bool(payload.skip_photo or payload.photo_skipped),
+            photo_skip_reason=payload.photo_skip_reason,
+        )
         return _format_complaint(complaint, complaint_service)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
 
+@router.put("/{complaint_id}/warden-verify", response_model=ComplaintResponse)
 @router.post("/{complaint_id}/warden-verify", response_model=ComplaintResponse)
 def warden_verify_complaint(
     complaint_id: str,
@@ -1154,7 +1235,12 @@ def warden_verify_complaint(
     _ensure_visible(complaint, current_user, complaint_service)
     try:
         complaint = complaint_service.warden_verify(
-            complaint_id, current_user, payload.verdict, payload.notes
+            complaint_id,
+            current_user,
+            verdict=payload.verdict,
+            notes=payload.notes or "",
+            approved=payload.approved,
+            photo_mismatch=bool(payload.photo_mismatch),
         )
         return _format_complaint(complaint, complaint_service)
     except PermissionError as p_err:
@@ -1163,6 +1249,7 @@ def warden_verify_complaint(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
 
+@router.put("/{complaint_id}/verify", response_model=ComplaintResponse)
 @router.post("/{complaint_id}/verify", response_model=ComplaintResponse)
 def verify_complaint(
     complaint_id: str,
@@ -1209,8 +1296,9 @@ def admin_decision_on_complaint(
             status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
         )
     try:
+        reassign_target = payload.reassign_to or payload.assign_to
         complaint = complaint_service.admin_decision(
-            complaint_id, current_user, payload.decision, payload.notes, payload.reassign_to
+            complaint_id, current_user, payload.decision, payload.notes, reassign_target
         )
         return _format_complaint(complaint, complaint_service)
     except ValueError as error:
@@ -1710,56 +1798,6 @@ def add_comment(
     return res
 
 
-@router.get("/suggestions/list", response_model=list[dict])
-def get_complaint_suggestions(
-    location_id: str,
-    q: str | None = None,
-    current_user=Depends(get_current_user),
-    complaint_service=Depends(get_complaint_service),
-):
-    if not location_id:
-        raise HTTPException(status_code=400, detail="location_id is required.")
-
-    # User can only view suggestions for their own location block
-    if current_user.role == Student.ROLE and current_user.location_id != location_id:
-        raise HTTPException(
-            status_code=403,
-            detail="You can only view suggestions for your own location block.",
-        )
-
-    all_complaints = complaint_service.list_all()
-    suggestions = []
-
-    # Inactive statuses
-    inactive_statuses = {Complaint.CLOSED, Complaint.AUTO_CLOSED}
-
-    for c in all_complaints:
-        if (
-            c.location_id == location_id
-            and c.visibility_type == "Community"
-            and c.status not in inactive_statuses
-        ):
-            match = True
-            if q and q.strip():
-                match = (q.lower() in (c.title or "").lower()) or (
-                    q.lower() in (c.description or "").lower()
-                )
-            if match:
-                suggestions.append(
-                    {
-                        "complaint_id": c.complaint_id,
-                        "title": c.title,
-                        "status": c.status,
-                        "category": c.category,
-                        "description": c.description,
-                        "affected_count": complaint_service.get_affected_count(
-                            c.complaint_id
-                        ),
-                    }
-                )
-    return suggestions
-
-
 @router.post("/{complaint_id}/affected", response_model=ComplaintResponse)
 def mark_affected(
     complaint_id: str,
@@ -1771,14 +1809,32 @@ def mark_affected(
         raise HTTPException(status_code=404, detail="Complaint not found.")
     _ensure_visible(complaint, current_user, complaint_service)
 
-    if complaint.location_id != current_user.location_id:
+    if current_user.role == Student.ROLE and current_user.location_id and complaint.location_id != current_user.location_id:
         raise HTTPException(
             status_code=403,
             detail="You can only mark yourself as affected for community complaints in your own location block.",
         )
 
     try:
-        complaint_service.add_affected_student(complaint_id, current_user.user_id)
+        complaint = complaint_service.add_affected_student(complaint_id, current_user.user_id)
+        return _format_complaint(complaint, complaint_service)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/{complaint_id}/affected", response_model=ComplaintResponse)
+def unmark_affected(
+    complaint_id: str,
+    current_user=Depends(require_roles(Student.ROLE, LocationInCharge.ROLE)),
+    complaint_service=Depends(get_complaint_service),
+):
+    complaint = complaint_service.get_complaint(complaint_id)
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Complaint not found.")
+    _ensure_visible(complaint, current_user, complaint_service)
+
+    try:
+        complaint = complaint_service.remove_affected_student(complaint_id, current_user.user_id)
         return _format_complaint(complaint, complaint_service)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

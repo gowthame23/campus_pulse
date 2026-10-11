@@ -319,17 +319,30 @@ class ComplaintWrongLocationRequest(BaseModel):
 
 class ComplaintResolveRequest(BaseModel):
     notes: Optional[str] = ""
+    preset_code: Optional[str] = None
+    proof_url: Optional[str] = None
+    skip_photo: Optional[bool] = False
+    photo_skipped: Optional[bool] = False
+    photo_skip_reason: Optional[str] = None
 
 
 class WardenVerifyRequest(BaseModel):
-    verdict: str
+    approved: Optional[bool] = None
+    verdict: Optional[str] = None
     notes: Optional[str] = ""
+    photo_mismatch: Optional[bool] = False
 
 
 class AdminDecisionRequest(BaseModel):
     decision: str
     notes: Optional[str] = ""
     reassign_to: Optional[str] = None
+    assign_to: Optional[str] = None
+
+
+class LostFoundModerateRequest(BaseModel):
+    reason: str
+    action: Optional[str] = "hide"
 
 
 class ComplaintReopenRequest(BaseModel):
@@ -415,6 +428,7 @@ class ComplaintResponse(BaseModel):
     is_spot_check: Optional[bool] = False
     is_urgent: Optional[bool] = False
     urgent_reason: Optional[str] = None
+    affected_upgraded: Optional[bool] = False
     auto_assigned: Optional[bool] = False
     blocked_reason: Optional[str] = None
     blocked_until: Optional[str] = None
@@ -644,3 +658,8 @@ class AttachmentResponse(BaseModel):
     file_path: str
     file_size: int
     uploaded_at: str
+    source: Optional[str] = "gallery"
+    sha256: Optional[str] = None
+    exif_taken_at: Optional[str] = None
+    kind: Optional[str] = None
+    flags: Optional[Any] = None

@@ -79,7 +79,7 @@ def _upload_after_repair(cid, headers):
 def test_resolve_high_critical_requires_photo(admin_headers, coord_headers):
     student_headers = _create_test_student(admin_headers)
 
-    # 1. Create a High priority complaint
+    # 1. Create a complaint where student included a photo
     res = client.post("/complaints", json={
         "location_id": "LOC_HOSTEL_A",
         "department_id": "DEPT_HOSTEL_ELECTRICAL",
@@ -87,35 +87,35 @@ def test_resolve_high_critical_requires_photo(admin_headers, coord_headers):
         "title": "Exposed high voltage wire",
         "description": f"Dangerous live wire hanging in corridor {uuid.uuid4().hex[:6]}",
         "visibility_type": "Private",
-        "priority": "High",
+        "priority": "Medium",
+        "attachment_url": "/static/uploads/hazard.jpg",
     }, headers=student_headers)
     assert res.status_code == 201
     cid = res.json()["complaint_id"]
-    assert res.json()["priority"] == "High"
 
     # Start work
     client.post(f"/complaints/{cid}/start-work", headers=coord_headers)
 
-    # 2. Attempt resolve without After Repair photo -> MUST FAIL WITH 400
+    # 2. Attempt resolve without After Repair photo or skip -> MUST FAIL WITH 400
     fail_res = client.put(f"/complaints/{cid}/resolve", json={"notes": "Wire taped."}, headers=coord_headers)
     assert fail_res.status_code == 400
-    assert "require a photo attachment" in fail_res.json()["detail"].lower()
+    assert "after photo" in fail_res.json()["detail"].lower() or "skip_photo" in fail_res.json()["detail"].lower()
 
     # 3. Upload 'After Repair' attachment
     _upload_after_repair(cid, coord_headers)
 
-    # 4. Resolve now succeeds -> status must be 'Pending Warden Verification'
+    # 4. Resolve now succeeds
     ok_res = client.put(f"/complaints/{cid}/resolve", json={"notes": "Replaced wiring and insulated conduit."}, headers=coord_headers)
     assert ok_res.status_code == 200
     data = ok_res.json()
-    assert data["status"] == "Pending Warden Verification"
-    assert data["requires_warden_check"] is True
     assert data["fixed_at"] is not None
     assert data["fixed_by"] is not None
 
 
 def test_warden_verify_self_verification_guard(admin_headers, coord_headers, warden_headers):
-    # Warden files a complaint at their assigned hostel location
+    student_headers = _create_test_student(admin_headers)
+
+    # Student files a High priority complaint
     res = client.post("/complaints", json={
         "location_id": "LOC_HOSTEL_A",
         "department_id": "DEPT_HOSTEL_ELECTRICAL",
@@ -124,7 +124,7 @@ def test_warden_verify_self_verification_guard(admin_headers, coord_headers, war
         "description": f"Testing self-verification guard {uuid.uuid4().hex[:6]}",
         "visibility_type": "Private",
         "priority": "High",
-    }, headers=warden_headers)
+    }, headers=student_headers)
     assert res.status_code == 201
     cid = res.json()["complaint_id"]
 
@@ -135,15 +135,18 @@ def test_warden_verify_self_verification_guard(admin_headers, coord_headers, war
     assert res_ok.status_code == 200
     assert res_ok.json()["status"] == "Pending Warden Verification"
 
-    # Warden who filed ticket attempts to verify it -> MUST BE REJECTED WITH 403
-    v_res = client.post(f"/complaints/{cid}/warden-verify", json={"verdict": "Verified", "notes": "Approved by filer"}, headers=warden_headers)
-    assert v_res.status_code == 403
-    assert "cannot verify a complaint you worked on or filed" in v_res.json()["detail"].lower()
+    # Assignee (coordinator) attempts to verify -> MUST BE REJECTED WITH 403
+    coord_v = client.post(f"/complaints/{cid}/warden-verify", json={"verdict": "Verified", "notes": "Coordinator approved"}, headers=coord_headers)
+    assert coord_v.status_code == 403
 
-    # Admin verification bypasses self-check guard
-    admin_v = client.post(f"/complaints/{cid}/warden-verify", json={"verdict": "Verified", "notes": "Admin verified"}, headers=admin_headers)
-    assert admin_v.status_code == 200
-    assert admin_v.json()["status"] == "Waiting for Verification"
+    # Student verify is rejected while Pending Warden Verification
+    stud_v = client.post(f"/complaints/{cid}/verify", headers=student_headers)
+    assert stud_v.status_code == 400
+
+    # Warden of LOC_HOSTEL_A verifies -> succeeds -> Waiting for Verification
+    w_res = client.post(f"/complaints/{cid}/warden-verify", json={"verdict": "Verified", "notes": "Approved by warden"}, headers=warden_headers)
+    assert w_res.status_code == 200
+    assert w_res.json()["status"] == "Waiting for Verification"
 
 
 def test_warden_verify_flow_verified_and_not_fixed(admin_headers, coord_headers, warden_headers):
@@ -238,14 +241,14 @@ def test_reopen_escalation_to_admin_review_on_third_reopen(admin_headers, coord_
     _resolve_and_verify()
     r1 = client.post(f"/complaints/{cid}/reopen", json={"reason": "Still sparking at night"}, headers=student_headers)
     assert r1.status_code == 200
-    assert r1.json()["status"] == "In Progress"
+    assert r1.json()["status"] == "Reopened"
     assert r1.json()["reopen_count"] == 1
 
     # Second cycle
     _resolve_and_verify()
     r2 = client.post(f"/complaints/{cid}/reopen", json={"reason": "Sparked again after heavy rain"}, headers=student_headers)
     assert r2.status_code == 200
-    assert r2.json()["status"] == "In Progress"
+    assert r2.json()["status"] == "Reopened"
     assert r2.json()["reopen_count"] == 2
 
     # Third cycle -> Exceeds max reopens -> ESCALATES TO ADMIN REVIEW

@@ -4,16 +4,27 @@ from datetime import datetime, timedelta
 
 from core.constants import (
     ACCEPT_DEADLINE_HOURS,
+    AFFECTED_CONFIRM_AFTER_HOURS,
+    AFFECTED_PRIORITY_THRESHOLD,
+    AUTO_CLOSE_HOURS,
+    AUTO_CLOSE_REMINDER_HOURS,
     CATEGORY_PRIORITY_MAP,
     INACTIVE_STATUSES,
+    MAX_REOPENS,
+    PHOTO_SKIP_STREAK_LIMIT,
     PRESET_PROGRESS_NOTES,
     PRIORITIES,
     SLA_ACTIVE_STATUSES,
     SLA_HOURS,
+    SPOT_CHECK_RATE,
+    STATUS_ADMIN_REVIEW,
     STATUS_ASSIGNED,
+    STATUS_AUTO_CLOSED,
     STATUS_BLOCKED,
+    STATUS_CLOSED,
     STATUS_IN_PROGRESS,
     STATUS_PENDING_WARDEN,
+    STATUS_REOPENED,
     STATUS_SUBMITTED,
     STATUS_WAITING_STUDENT,
     get_sla_hours,
@@ -493,55 +504,160 @@ class ComplaintService:
             raise err
         return complaint
 
-    def mark_resolved(self, complaint_id, user_id=None, notes=""):
+    def mark_resolved(
+        self,
+        complaint_id,
+        user_id=None,
+        notes="",
+        preset_code=None,
+        proof_url=None,
+        skip_photo=False,
+        photo_skip_reason=None,
+    ):
         complaint = self.get_complaint(complaint_id)
         if not complaint:
             raise ValueError("Complaint not found.")
 
-        # Allow resolving from In Progress (or Assigned with implicit transition)
+        # Blocked complaints cannot be resolved
+        if complaint.status in (STATUS_BLOCKED, Complaint.BLOCKED, "Waiting for Parts"):
+            raise ValueError("Cannot resolve complaint while waiting for parts.")
+
+        # Allow resolving from In Progress or Reopened (or Assigned with implicit start)
         if complaint.status == Complaint.ASSIGNED:
             complaint.status = Complaint.IN_PROGRESS
             complaint.started_at = complaint.started_at or now_string()
             complaint.add_history("Work implicitly started upon resolution.")
-        elif complaint.status != Complaint.IN_PROGRESS:
-            raise ValueError("Complaint must be In Progress or Assigned before it can be resolved.")
+        elif complaint.status not in (
+            Complaint.IN_PROGRESS,
+            STATUS_IN_PROGRESS,
+            Complaint.REOPENED,
+            STATUS_REOPENED,
+            "Reopened",
+        ):
+            raise ValueError("Complaint must be In Progress or Reopened before it can be resolved.")
 
         uid = getattr(user_id, "user_id", str(user_id)) if user_id else (complaint.assigned_to or "system")
+        coord = self.auth_service.get_user(uid)
 
         # Resolution photo & notes validation
         attachments = self.attachment_service.list_attachments(complaint_id)
-        has_after_repair = any(a.get("category", "").lower() in ("after repair", "after_repair") for a in attachments)
+        has_student_photo = bool(
+            complaint.attachment_url
+            or any(
+                a.get("kind") == "before"
+                or a.get("category", "").lower() in ("before", "before repair", "initial", "student")
+                or a.get("uploaded_by") == complaint.created_by
+                for a in attachments
+            )
+        )
+        has_after_repair = bool(
+            proof_url
+            or getattr(complaint, "resolution_proof_url", None)
+            or any(
+                a.get("kind") == "after"
+                or a.get("category", "").lower() in ("after repair", "after_repair", "after")
+                for a in attachments
+            )
+        )
 
         p = normalize_priority(complaint.priority)
         is_high_or_crit = p in ("High", "Critical")
+        forced_check_on_this_job = bool(coord and getattr(coord, "force_next_warden_check", 0))
 
-        if is_high_or_crit:
-            if not has_after_repair:
-                raise ValueError("High and Critical priority complaints require a photo attachment of the completed work before resolving.")
+        if has_student_photo:
+            if has_after_repair:
+                complaint.photo_skipped = False
+                complaint.photo_skip_reason = None
+                if proof_url:
+                    complaint.resolution_proof_url = proof_url
+                if coord:
+                    coord.photo_skip_streak = 0
+                    self.auth_service.save_user(coord)
+            elif skip_photo:
+                curr_streak = getattr(coord, "photo_skip_streak", 0) if coord else 0
+                if curr_streak >= PHOTO_SKIP_STREAK_LIMIT:
+                    if not (photo_skip_reason or "").strip():
+                        raise ValueError(
+                            f"Photo skip limit reached (streak of {curr_streak}). A typed reason is required to skip."
+                        )
+                complaint.photo_skipped = True
+                complaint.photo_skip_reason = photo_skip_reason or "Student photo not relevant"
+                complaint.add_history(f"After photo skipped by coordinator {uid}: {complaint.photo_skip_reason}")
+                if coord:
+                    coord.photo_skip_streak = curr_streak + 1
+                    if coord.photo_skip_streak >= PHOTO_SKIP_STREAK_LIMIT:
+                        coord.force_next_warden_check = 1
+                        loc = self.auth_service.get_location(complaint.location_id)
+                        warden_id = getattr(loc, "in_charge_id", None)
+                        if warden_id:
+                            c_name = getattr(coord, "name", "Coordinator")
+                            self.notification_service.notify(
+                                warden_id,
+                                f"{c_name} skipped the after photo on his last {coord.photo_skip_streak} jobs where students added photos.",
+                                complaint_id=complaint_id,
+                                title="Photo Skip Alert",
+                            )
+                    self.auth_service.save_user(coord)
+            else:
+                # If student had photo, and coordinator provided neither after photo nor skip
+                if not is_high_or_crit:
+                    raise ValueError("An after photo or skip_photo=true is required when the student provided a photo.")
         else:
-            if not has_after_repair and not (notes or "").strip():
-                raise ValueError("Resolution Notes are mandatory when no 'After Repair' image is provided.")
+            # No student photo: note or preset code required
+            note_content = (notes or "").strip()
+            if preset_code:
+                preset_text = PRESET_PROGRESS_NOTES.get(preset_code, preset_code)
+                note_content = f"{preset_text}: {note_content}" if note_content else preset_text
+            if not note_content and not has_after_repair and not is_high_or_crit:
+                raise ValueError("Resolution Notes or preset code are mandatory when no image is provided.")
+            if has_after_repair and coord:
+                coord.photo_skip_streak = 0
+                self.auth_service.save_user(coord)
 
-        # High/Critical always requires warden in-person check; Normal/Low has ~10% spot check
-        if is_high_or_crit:
+        # Check next stage
+        warden_filed = getattr(complaint, "creator_role", "").lower() in ("warden", "location_in_charge")
+        if warden_filed:
+            # Warden-filed complaints skip the separate warden check; warden confirms at the end
+            requires_warden = False
+            is_spot = False
+        elif is_high_or_crit:
             requires_warden = True
             is_spot = False
         else:
-            spot_rate_env = os.getenv("SPOT_CHECK_RATE")
-            if spot_rate_env is not None:
-                spot_rate = float(spot_rate_env)
-            elif os.getenv("PYTEST_CURRENT_TEST"):
-                spot_rate = 0.0
+            forced = forced_check_on_this_job
+            if forced:
+                requires_warden = True
+                is_spot = False
+                coord.force_next_warden_check = 0
+                self.auth_service.save_user(coord)
             else:
-                spot_rate = 0.10
-            is_spot = (getattr(self, "_spot_check_fn", None) or (lambda: random.random() < spot_rate))()
-            requires_warden = is_spot
+                spot_fn = getattr(self, "_spot_check_fn", None)
+                if spot_fn:
+                    val = spot_fn()
+                    if isinstance(val, bool):
+                        is_spot = val
+                    elif isinstance(val, (int, float)):
+                        is_spot = (val < SPOT_CHECK_RATE)
+                    else:
+                        is_spot = bool(val)
+                else:
+                    spot_rate_env = os.getenv("SPOT_CHECK_RATE")
+                    if spot_rate_env is not None:
+                        spot_rate = float(spot_rate_env)
+                    elif os.getenv("PYTEST_CURRENT_TEST"):
+                        spot_rate = 0.0
+                    else:
+                        spot_rate = SPOT_CHECK_RATE
+                    is_spot = (random.random() < spot_rate)
+                requires_warden = bool(is_spot)
 
         now_ts = now_string()
         complaint.fixed_at = now_ts
         complaint.fixed_by = uid
         complaint.resolved_at = now_ts
         complaint.resolution_notes = (notes or "").strip()
+        if preset_code:
+            complaint.last_progress_code = preset_code
 
         loc = self.auth_service.get_location(complaint.location_id)
         warden_id = getattr(loc, "in_charge_id", None)
@@ -549,7 +665,7 @@ class ComplaintService:
         if requires_warden:
             complaint.requires_warden_check = True
             complaint.is_spot_check = is_spot
-            complaint.status = Complaint.PENDING_WARDEN_VERIFICATION
+            complaint.status = STATUS_PENDING_WARDEN
             hist_msg = f"Marked fixed by {uid}."
             if is_spot:
                 hist_msg += " Randomly selected for warden spot check."
@@ -572,10 +688,20 @@ class ComplaintService:
                     complaint_id=complaint_id,
                     title="Warden Verification Required",
                 )
+            else:
+                # Setup gap: Alert App Manager
+                app_mgr_id = self.get_active_app_manager()
+                if app_mgr_id:
+                    self.notification_service.notify(
+                        app_mgr_id,
+                        f"SETUP GAP: Complaint {complaint_id} at {complaint.location_id} requires warden verification, but no warden is assigned.",
+                        complaint_id=complaint_id,
+                        title="Setup Gap: No Warden Assigned",
+                    )
         else:
             complaint.requires_warden_check = False
             complaint.is_spot_check = False
-            complaint.status = Complaint.WAITING_VERIFICATION
+            complaint.status = STATUS_WAITING_STUDENT
             complaint.student_stage_at = now_ts
             # 48 hours for student confirmation
             complaint.verification_due_at = (now() + timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S")
@@ -588,6 +714,16 @@ class ComplaintService:
                 complaint_id=complaint_id,
                 title="Complaint Resolved",
             )
+            # Notify affected students on public complaints
+            if complaint.visibility_type in ("Public", "Community", "public", "community"):
+                for aff_id in self.get_affected_student_ids(complaint_id):
+                    if aff_id != complaint.created_by:
+                        self.notification_service.notify(
+                            aff_id,
+                            f"Community complaint {complaint_id} at your location has been marked resolved.",
+                            complaint_id=complaint_id,
+                            title="Complaint Resolved",
+                        )
 
         try:
             from utils.websocket_manager import manager
@@ -607,7 +743,15 @@ class ComplaintService:
 
         return complaint
 
-    def warden_verify(self, complaint_id, warden_user, verdict, notes=""):
+    def warden_verify(
+        self,
+        complaint_id,
+        warden_user,
+        verdict=None,
+        notes="",
+        approved=None,
+        photo_mismatch=False,
+    ):
         complaint = self.get_complaint(complaint_id)
         if not complaint:
             raise ValueError("Complaint not found.")
@@ -616,11 +760,11 @@ class ComplaintService:
         warden_role = getattr(warden_user, "role", "").lower()
         warden_name = getattr(warden_user, "name", warden_id)
 
-        # Self-verification guard
+        # Self-verification guard: assignee or creator can never verify
         if warden_id == complaint.assigned_to or warden_id == complaint.created_by:
             raise PermissionError("You cannot verify a complaint you worked on or filed.")
 
-        # Permission check
+        # Permission check: must be warden of this location or administrator
         if warden_role != "administrator":
             loc = self.auth_service.get_location(complaint.location_id)
             loc_in_charge = getattr(loc, "in_charge_id", None)
@@ -628,17 +772,21 @@ class ComplaintService:
             if warden_id != loc_in_charge and user_loc != complaint.location_id:
                 raise PermissionError("Only the warden of this location or an administrator can verify.")
 
-        if complaint.status not in (Complaint.PENDING_WARDEN_VERIFICATION, "Pending Warden Verification"):
+        if complaint.status not in (STATUS_PENDING_WARDEN, Complaint.PENDING_WARDEN_VERIFICATION, "Pending Warden Verification"):
             raise ValueError("Complaint is not pending warden verification.")
 
-        v_norm = (verdict or "").strip()
+        is_approved = (
+            approved is True
+            or (verdict and str(verdict).strip().lower() in ("verified", "fixed", "approved"))
+        ) and not photo_mismatch
+
         now_ts = now_string()
-        if v_norm.lower() in ("verified", "fixed"):
+        if is_approved:
             complaint.warden_verified_at = now_ts
             complaint.warden_verified_by = warden_id
             complaint.warden_verdict = "Verified"
             complaint.warden_notes = (notes or "").strip()
-            complaint.status = Complaint.WAITING_VERIFICATION
+            complaint.status = STATUS_WAITING_STUDENT
             complaint.student_stage_at = now_ts
             complaint.verification_due_at = (now() + timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S")
             complaint.add_history(f"Verified in person by Warden {warden_name}: {notes or 'No notes'}")
@@ -650,24 +798,38 @@ class ComplaintService:
                 complaint_id=complaint_id,
                 title="Warden Verified Fix",
             )
-        elif v_norm.lower() in ("not fixed", "not_fixed", "rejected"):
+            if complaint.visibility_type in ("Public", "Community", "public", "community"):
+                for aff_id in self.get_affected_student_ids(complaint_id):
+                    if aff_id != complaint.created_by:
+                        self.notification_service.notify(
+                            aff_id,
+                            f"Warden verified fix on community complaint {complaint_id}.",
+                            complaint_id=complaint_id,
+                            title="Warden Verified Fix",
+                        )
+        else:
             complaint.warden_verified_at = now_ts
             complaint.warden_verified_by = warden_id
             complaint.warden_verdict = "Not Fixed"
-            complaint.warden_notes = (notes or "").strip()
-            complaint.status = Complaint.IN_PROGRESS
-            complaint.add_history(f"Warden {warden_name} inspected in person and found issue NOT fixed: {notes or 'No notes'}")
+            note_txt = (notes or "").strip()
+            if photo_mismatch:
+                note_txt = f"Photo doesn't match: {note_txt}" if note_txt else "Photo doesn't match"
+            if not note_txt:
+                raise ValueError("Notes are mandatory when reporting complaint not fixed.")
+
+            complaint.warden_notes = note_txt
+            complaint.status = STATUS_IN_PROGRESS
+            complaint.add_history(f"Warden {warden_name} inspected in person and found issue NOT fixed: {note_txt}")
+            # SLA deadline is NOT reset
             self.save_complaint(complaint)
 
             if complaint.assigned_to:
                 self.notification_service.notify(
                     complaint.assigned_to,
-                    f"RE-WORK REQUIRED: Warden {warden_name} inspected complaint {complaint_id} and reported it not fixed: {notes or 'No notes'}",
+                    f"RE-WORK REQUIRED: Warden {warden_name} inspected complaint {complaint_id} and reported it not fixed: {note_txt}",
                     complaint_id=complaint_id,
                     title="Re-work Required",
                 )
-        else:
-            raise ValueError("Verdict must be 'Verified' or 'Not Fixed'.")
 
         try:
             from utils.websocket_manager import manager
@@ -719,8 +881,15 @@ class ComplaintService:
             allowed_creators = {complaint.created_by}
             if getattr(user, "email", None):
                 allowed_creators.add(user.email)
-            if uid not in allowed_creators:
-                raise PermissionError("Only the student who filed the complaint or an administrator can close it.")
+
+            is_affected_allowed = False
+            stage_start = parse_date(getattr(complaint, "student_stage_at", None) or complaint.resolved_at or complaint.updated_at)
+            if stage_start and (now() - stage_start).total_seconds() >= AFFECTED_CONFIRM_AFTER_HOURS * 3600:
+                if self.is_student_affected(complaint_id, uid):
+                    is_affected_allowed = True
+
+            if uid not in allowed_creators and not is_affected_allowed:
+                raise PermissionError("Only the student who filed the complaint, an affected student after 24h, or an administrator can close it.")
 
         now_ts = now_string()
         complaint.status = Complaint.CLOSED
@@ -768,6 +937,9 @@ class ComplaintService:
         if not complaint:
             raise ValueError("Complaint not found.")
 
+        if not (reason or "").strip():
+            raise ValueError("Reopen reason is mandatory.")
+
         uid = getattr(user, "user_id", str(user))
         u_role = getattr(user, "role", "").lower()
         u_name = getattr(user, "name", uid)
@@ -776,18 +948,25 @@ class ComplaintService:
             allowed_creators = {complaint.created_by}
             if getattr(user, "email", None):
                 allowed_creators.add(user.email)
-            if uid not in allowed_creators:
-                raise PermissionError("Only the student who filed the complaint can reopen it.")
+
+            is_affected = False
+            if complaint.visibility_type in ("Public", "Community", "public", "community"):
+                if self.is_student_affected(complaint_id, uid):
+                    is_affected = True
+
+            if uid not in allowed_creators and not is_affected:
+                raise PermissionError("Only the student who filed the complaint or an affected student can reopen it.")
 
         valid_status = False
         if complaint.status in (
+            STATUS_WAITING_STUDENT,
             Complaint.WAITING_VERIFICATION,
             "Waiting for Verification",
             "Waiting For Verification",
             "Resolved",
         ):
             valid_status = True
-        elif complaint.status in (Complaint.CLOSED, Complaint.AUTO_CLOSED):
+        elif complaint.status in (STATUS_CLOSED, STATUS_AUTO_CLOSED, Complaint.CLOSED, Complaint.AUTO_CLOSED):
             closed_dt = parse_date(complaint.closed_at)
             if closed_dt and (now() - closed_dt).total_seconds() <= 48 * 3600:
                 valid_status = True
@@ -805,8 +984,8 @@ class ComplaintService:
         loc = self.auth_service.get_location(complaint.location_id)
         warden_id = getattr(loc, "in_charge_id", None)
 
-        if complaint.reopen_count < 3:
-            complaint.status = Complaint.IN_PROGRESS
+        if complaint.reopen_count < MAX_REOPENS:
+            complaint.status = STATUS_REOPENED
             complaint.add_history(f"Reopened by student {u_name} (reopen #{complaint.reopen_count}): {reason}")
             self.save_complaint(complaint)
 
@@ -826,16 +1005,16 @@ class ComplaintService:
                 )
             event_name = "complaint_reopened"
         else:
-            complaint.status = "Admin Review"
-            complaint.admin_review_reason = f"Exceeded maximum reopens (3). Disputed between student and coordinator: {reason}"
-            complaint.add_history("Complaint escalated to Admin Review after 3 reopens.")
+            complaint.status = STATUS_ADMIN_REVIEW
+            complaint.admin_review_reason = f"Exceeded maximum reopens ({MAX_REOPENS}). Disputed between student and coordinator: {reason}"
+            complaint.add_history(f"Complaint escalated to Admin Review after {MAX_REOPENS} reopens.")
             self.save_complaint(complaint)
 
             for admin_u in self.auth_service.list_users(role="administrator"):
                 if admin_u.active and not getattr(admin_u, "is_deleted", False):
                     self.notification_service.notify(
                         admin_u.user_id,
-                        f"DISPUTED TICKET: Complaint {complaint_id} has been reopened 3 times. Requires administrator intervention.",
+                        f"DISPUTED TICKET: Complaint {complaint_id} has been reopened {complaint.reopen_count} times. Requires administrator intervention.",
                         complaint_id=complaint_id,
                         title="Disputed Ticket (Admin Review)",
                     )
@@ -848,7 +1027,7 @@ class ComplaintService:
             if complaint.assigned_to:
                 self.notification_service.notify(
                     complaint.assigned_to,
-                    f"Complaint {complaint_id} reached 3 reopens and escalated to Admin Review.",
+                    f"Complaint {complaint_id} reached {MAX_REOPENS} reopens and escalated to Admin Review.",
                     complaint_id=complaint_id,
                     title="Escalated to Admin Review",
                 )
@@ -887,16 +1066,16 @@ class ComplaintService:
         admin_id = getattr(admin_user, "user_id", str(admin_user))
         admin_name = getattr(admin_user, "name", admin_id)
 
-        if complaint.status != "Admin Review":
+        if complaint.status not in (STATUS_ADMIN_REVIEW, "Admin Review"):
             raise ValueError("Complaint is not in Admin Review status.")
 
-        d_norm = (decision or "").strip()
+        d_norm = (decision or "").strip().lower()
         loc = self.auth_service.get_location(complaint.location_id)
         warden_id = getattr(loc, "in_charge_id", None)
         now_ts = now_string()
 
-        if d_norm.lower() == "close":
-            complaint.status = Complaint.CLOSED
+        if d_norm == "close":
+            complaint.status = STATUS_CLOSED
             complaint.closed_at = now_ts
             complaint.closed_by = admin_id
             complaint.admin_decision = f"Closed: {notes}"
@@ -925,43 +1104,49 @@ class ComplaintService:
                     complaint_id=complaint_id,
                     title="Admin Decision: Closed",
                 )
-        elif d_norm.lower() == "reopen":
-            complaint.status = Complaint.IN_PROGRESS
-            if reassign_to:
+        elif d_norm in ("reopen", "reassign"):
+            if d_norm == "reassign" or reassign_to:
+                if not reassign_to:
+                    raise ValueError("Target coordinator is required when reassigning.")
                 new_coord = self.auth_service.get_user(reassign_to)
                 if not new_coord or (new_coord.role or "").lower() != "coordinator":
                     raise ValueError("Reassign target must be a valid coordinator.")
                 complaint.assigned_to = reassign_to
                 complaint.assigned_at = now_ts
+                complaint.status = STATUS_ASSIGNED
+                action_text = f"Reassigned to {new_coord.name}"
+            else:
+                complaint.status = STATUS_IN_PROGRESS
+                action_text = "Reopened"
 
-            complaint.admin_decision = f"Reopened: {notes}"
+            complaint.admin_decision = f"{action_text}: {notes}"
             complaint.admin_decided_by = admin_id
             complaint.admin_decided_at = now_ts
-            complaint.add_history(f"Admin Review decision by {admin_name}: Reopened. Assigned to: {complaint.assigned_to}. Notes: {notes}")
+            complaint.add_history(f"Admin Review decision by {admin_name}: {action_text}. Notes: {notes}")
             self.save_complaint(complaint)
 
             self.notification_service.notify(
                 complaint.created_by,
-                f"Your complaint {complaint_id} has been reopened following Administrator review.",
+                f"Your complaint {complaint_id} has been {action_text.lower()} following Administrator review.",
                 complaint_id=complaint_id,
-                title="Admin Decision: Reopened",
+                title=f"Admin Decision: {action_text}",
             )
             if complaint.assigned_to:
                 self.notification_service.notify(
                     complaint.assigned_to,
-                    f"Complaint {complaint_id} reopened and assigned to you by Administrator: {notes}",
+                    f"Complaint {complaint_id} {action_text.lower()} by Administrator: {notes}",
                     complaint_id=complaint_id,
-                    title="Admin Decision: Reopened",
+                    title=f"Admin Decision: {action_text}",
                 )
             if warden_id:
                 self.notification_service.notify(
                     warden_id,
-                    f"Complaint {complaint_id} reopened by Administrator.",
+                    f"Complaint {complaint_id} {action_text.lower()} by Administrator.",
                     complaint_id=complaint_id,
-                    title="Admin Decision: Reopened",
+                    title=f"Admin Decision: {action_text}",
                 )
         else:
-            raise ValueError("Decision must be 'Close' or 'Reopen'.")
+            raise ValueError("Decision must be 'close', 'reopen', or 'reassign'.")
 
         try:
             from utils.websocket_manager import manager
@@ -976,58 +1161,176 @@ class ComplaintService:
 
         return complaint
 
-    def get_coordinator_stats(self):
-        coordinators = self.auth_service.list_users(role="coordinator")
-        all_complaints = self.list_all(include_archived=True)
+    def get_coordinator_stats(
+        self,
+        location_id=None,
+        department_id=None,
+        from_date=None,
+        to_date=None,
+        current_user=None,
+    ):
         current_time = now()
-        thirty_days_ago = current_time - timedelta(days=30)
+        all_coordinators = self.auth_service.list_users(role="coordinator")
+        user_role = (getattr(current_user, "role", "") or "").lower() if current_user else "administrator"
+
+        # Scope filter based on caller role
+        if user_role == "coordinator":
+            target_coordinators = [c for c in all_coordinators if c.user_id == current_user.user_id]
+        elif user_role in ("location_in_charge", "warden"):
+            w_loc = getattr(current_user, "location_id", None) or location_id
+            coord_ids = set()
+            if w_loc:
+                assignments = self.auth_service.list_coordinator_assignments(location_id=w_loc) or []
+                all_assignments = self.auth_service.list_coordinator_assignments(location_id="ALL") or []
+                coord_ids = {a.get("coordinator_id") for a in assignments + all_assignments if a.get("is_active", 1)}
+            target_coordinators = [c for c in all_coordinators if c.user_id in coord_ids]
+        else:
+            target_coordinators = all_coordinators
+
+        # Filter complaints
+        all_complaints = self.list_all(include_archived=True)
+        if location_id:
+            all_complaints = [comp for comp in all_complaints if comp.location_id == location_id]
+        if department_id:
+            all_complaints = [comp for comp in all_complaints if comp.department_id == department_id]
+        if from_date:
+            from_dt = parse_date(from_date)
+            if from_dt:
+                all_complaints = [comp for comp in all_complaints if parse_date(comp.created_at) and parse_date(comp.created_at) >= from_dt]
+        if to_date:
+            to_dt = parse_date(to_date)
+            if to_dt:
+                all_complaints = [comp for comp in all_complaints if parse_date(comp.created_at) and parse_date(comp.created_at) <= to_dt]
 
         stats = []
-        for c in coordinators:
+        for c in target_coordinators:
             cid = c.user_id
             c_complaints = [comp for comp in all_complaints if comp.assigned_to == cid]
 
-            assigned_count = sum(1 for comp in c_complaints if comp.status == Complaint.ASSIGNED)
-            in_prog_count = sum(1 for comp in c_complaints if comp.status == Complaint.IN_PROGRESS)
+            accepted_count = sum(1 for comp in c_complaints if not getattr(comp, "auto_assigned", False))
+            auto_assigned_count = sum(1 for comp in c_complaints if getattr(comp, "auto_assigned", False))
+            in_prog_count = sum(1 for comp in c_complaints if comp.status in (STATUS_IN_PROGRESS, Complaint.IN_PROGRESS))
+            waiting_parts_count = sum(1 for comp in c_complaints if comp.status in (STATUS_BLOCKED, Complaint.BLOCKED, "Waiting for Parts"))
 
-            resolved_30d = 0
-            res_hours_list = []
-            reopen_count_total = 0
+            completed_statuses = (
+                STATUS_CLOSED,
+                STATUS_AUTO_CLOSED,
+                STATUS_WAITING_STUDENT,
+                STATUS_PENDING_WARDEN,
+                Complaint.CLOSED,
+                Complaint.AUTO_CLOSED,
+                "Waiting for Verification",
+                "Pending Warden Verification",
+            )
+            completed_complaints = [
+                comp for comp in c_complaints
+                if comp.status in completed_statuses or getattr(comp, "fixed_at", None) or comp.resolved_at
+            ]
+            completed_count = len(completed_complaints)
 
-            for comp in c_complaints:
-                if comp.reopen_count and comp.reopen_count > 0:
-                    reopen_count_total += 1
-
+            on_time_count = 0
+            late_count = 0
+            for comp in completed_complaints:
                 res_ts = parse_date(getattr(comp, "fixed_at", None) or comp.resolved_at)
-                if res_ts and res_ts >= thirty_days_ago:
-                    resolved_30d += 1
+                sla_dt = parse_date(getattr(comp, "sla_deadline", None))
+                if res_ts and sla_dt:
+                    if res_ts <= sla_dt:
+                        on_time_count += 1
+                    else:
+                        late_count += 1
+                else:
+                    on_time_count += 1
 
-                created_ts = parse_date(comp.created_at)
-                if created_ts and res_ts and res_ts >= created_ts:
-                    res_hours = (res_ts - created_ts).total_seconds() / 3600.0
-                    res_hours_list.append(res_hours)
-
-            avg_res_hrs = round(sum(res_hours_list) / len(res_hours_list), 1) if res_hours_list else 0.0
-            reopen_rate = round(reopen_count_total / len(c_complaints), 2) if c_complaints else 0.0
-
-            overdue_count = 0
+            # Count open overdue jobs as late as well
             for comp in c_complaints:
-                if comp.status in (Complaint.ASSIGNED, Complaint.IN_PROGRESS, STATUS_BLOCKED):
-                    sla_deadline_dt = parse_date(getattr(comp, "sla_deadline", None))
-                    if sla_deadline_dt and current_time > sla_deadline_dt:
-                        overdue_count += 1
+                if comp.status in (STATUS_ASSIGNED, STATUS_IN_PROGRESS, STATUS_BLOCKED, STATUS_REOPENED):
+                    sla_dt = parse_date(getattr(comp, "sla_deadline", None))
+                    if sla_dt and current_time > sla_dt:
+                        late_count += 1
+
+            # Times to accept and fix
+            accept_times = []
+            fix_times = []
+            for comp in c_complaints:
+                c_dt = parse_date(comp.created_at)
+                start_dt = parse_date(getattr(comp, "started_at", None) or getattr(comp, "assigned_at", None))
+                fixed_dt = parse_date(getattr(comp, "fixed_at", None) or comp.resolved_at)
+
+                if c_dt and start_dt and start_dt >= c_dt:
+                    accept_times.append((start_dt - c_dt).total_seconds() / 3600.0)
+                if start_dt and fixed_dt and fixed_dt >= start_dt:
+                    fix_times.append((fixed_dt - start_dt).total_seconds() / 3600.0)
+                elif c_dt and fixed_dt and fixed_dt >= c_dt:
+                    fix_times.append((fixed_dt - c_dt).total_seconds() / 3600.0)
+
+            avg_time_to_accept = round(sum(accept_times) / len(accept_times), 1) if accept_times else 0.0
+            avg_time_to_fix = round(sum(fix_times) / len(fix_times), 1) if fix_times else 0.0
+
+            total_reopens = sum(int(getattr(comp, "reopen_count", 0) or 0) for comp in c_complaints)
+            warden_not_fixed_count = sum(
+                1 for comp in c_complaints if getattr(comp, "warden_verdict", "") in ("Not Fixed", "not_fixed", "rejected")
+            )
+            photo_skips = sum(1 for comp in c_complaints if getattr(comp, "photo_skipped", False))
+
+            # Photo %: fixes with after photo among jobs where student had a photo
+            jobs_with_student_photo = [
+                comp for comp in c_complaints
+                if comp.attachment_url
+                or getattr(comp, "photo_skipped", False)
+                or getattr(comp, "resolution_proof_url", None)
+            ]
+            fixes_with_after = [comp for comp in jobs_with_student_photo if not getattr(comp, "photo_skipped", False)]
+            photo_pct = (
+                round(100.0 * len(fixes_with_after) / len(jobs_with_student_photo), 1)
+                if jobs_with_student_photo
+                else 100.0
+            )
 
             stats.append({
                 "coordinator_id": cid,
                 "name": c.name,
                 "email": c.email,
-                "assigned_count": assigned_count,
+                "accepted": accepted_count,
+                "auto_assigned": auto_assigned_count,
+                "in_progress": in_prog_count,
+                "waiting_for_parts": waiting_parts_count,
+                "completed": completed_count,
+                "on_time": on_time_count,
+                "late": late_count,
+                "avg_time_to_accept": avg_time_to_accept,
+                "avg_time_to_fix": avg_time_to_fix,
+                "reopens": total_reopens,
+                "warden_not_fixed": warden_not_fixed_count,
+                "photo_skip_count": photo_skips,
+                "photo_percent": photo_pct,
+                "avg_rating": 0.0,
+                "thank_you_count": 0,
+                # Legacy compatibility keys
+                "assigned_count": accepted_count + auto_assigned_count,
                 "in_progress_count": in_prog_count,
-                "resolved_last_30_days": resolved_30d,
-                "avg_resolution_hours": avg_res_hrs,
-                "reopen_rate": reopen_rate,
-                "overdue_count": overdue_count,
+                "resolved_last_30_days": completed_count,
+                "avg_resolution_hours": avg_time_to_fix,
+                "reopen_rate": round(total_reopens / len(c_complaints), 2) if c_complaints else 0.0,
+                "overdue_count": late_count,
             })
+
+        if user_role == "coordinator":
+            # Include team totals
+            team_totals = {
+                "accepted": sum(s["accepted"] for s in stats),
+                "auto_assigned": sum(s["auto_assigned"] for s in stats),
+                "in_progress": sum(s["in_progress"] for s in stats),
+                "waiting_for_parts": sum(s["waiting_for_parts"] for s in stats),
+                "completed": sum(s["completed"] for s in stats),
+                "on_time": sum(s["on_time"] for s in stats),
+                "late": sum(s["late"] for s in stats),
+            }
+            return {
+                "coordinator": stats[0] if stats else None,
+                "team_totals": team_totals,
+                "coordinators": stats,
+            }
+
         return stats
 
 
@@ -1304,11 +1607,21 @@ class ComplaintService:
                             changed = True
 
             # 4. Auto-close background check for Waiting for Verification tickets
-            if complaint.status in (Complaint.WAITING_VERIFICATION, "Waiting for Verification", "Waiting For Verification"):
+            if complaint.status in (Complaint.WAITING_VERIFICATION, STATUS_WAITING_STUDENT, "Waiting for Verification", "Waiting For Verification"):
                 due_dt = parse_date(complaint.verification_due_at)
+                if not due_dt:
+                    stage_dt = (
+                        parse_date(getattr(complaint, "student_stage_at", None))
+                        or parse_date(getattr(complaint, "fixed_at", None))
+                        or parse_date(complaint.resolved_at)
+                        or parse_date(complaint.updated_at)
+                    )
+                    if stage_dt:
+                        due_dt = stage_dt + timedelta(hours=AUTO_CLOSE_HOURS)
+
                 if due_dt:
                     # 24h reminder before auto-close
-                    if current_time > (due_dt - timedelta(hours=24)) and not getattr(complaint, "auto_close_reminded", False):
+                    if current_time > (due_dt - timedelta(hours=AUTO_CLOSE_REMINDER_HOURS)) and not getattr(complaint, "auto_close_reminded", False):
                         complaint.auto_close_reminded = True
                         self.notification_service.notify(
                             complaint.created_by,
@@ -1316,11 +1629,20 @@ class ComplaintService:
                             complaint_id=complaint.complaint_id,
                             title="Auto-Close Reminder",
                         )
+                        if complaint.visibility_type in ("Public", "Community", "public", "community"):
+                            for aff_id in self.get_affected_student_ids(complaint.complaint_id):
+                                if aff_id != complaint.created_by:
+                                    self.notification_service.notify(
+                                        aff_id,
+                                        f"Reminder: Community complaint {complaint.complaint_id} will auto-close in 24 hours.",
+                                        complaint_id=complaint.complaint_id,
+                                        title="Auto-Close Reminder",
+                                    )
                         changed = True
 
                     # Expired -> Auto close
                     if current_time > due_dt:
-                        complaint.status = Complaint.AUTO_CLOSED
+                        complaint.status = STATUS_AUTO_CLOSED
                         complaint.auto_closed = True
                         complaint.closed_at = current_time.strftime("%Y-%m-%d %H:%M:%S")
                         complaint.closed_by = "system"
@@ -1331,6 +1653,22 @@ class ComplaintService:
                             complaint_id=complaint.complaint_id,
                             title="Complaint Auto-Closed",
                         )
+                        if complaint.visibility_type in ("Public", "Community", "public", "community"):
+                            for aff_id in self.get_affected_student_ids(complaint.complaint_id):
+                                if aff_id != complaint.created_by:
+                                    self.notification_service.notify(
+                                        aff_id,
+                                        f"Community complaint {complaint.complaint_id} was automatically closed after 48h of inactivity.",
+                                        complaint_id=complaint.complaint_id,
+                                        title="Complaint Auto-Closed",
+                                    )
+                        if complaint.assigned_to:
+                            self.notification_service.notify(
+                                complaint.assigned_to,
+                                f"Complaint {complaint.complaint_id} was automatically closed as the student did not respond within 48 hours.",
+                                complaint_id=complaint.complaint_id,
+                                title="Complaint Auto-Closed",
+                            )
                         changed = True
 
         if changed:
@@ -1472,8 +1810,55 @@ class ComplaintService:
 
         note_str = f" ({room_note})" if room_note else ""
         complaint.add_history(f"Student {student_id} marked themselves as affected{note_str}.")
+
+        new_count = self.get_affected_count(complaint_id)
+        if new_count >= AFFECTED_PRIORITY_THRESHOLD:
+            priority_ladder = {"Low": "Medium", "Medium": "High", "High": "Critical"}
+            current_p = normalize_priority(complaint.priority)
+            if current_p in priority_ladder and not getattr(complaint, "affected_upgraded", False):
+                next_p = priority_ladder[current_p]
+                complaint.priority = next_p
+                complaint.affected_upgraded = True
+                created_dt = parse_date(complaint.created_at) or now()
+                sla_hrs = get_sla_hours(next_p, category=complaint.category)
+                complaint.sla_deadline = (created_dt + timedelta(hours=sla_hrs)).isoformat()
+                complaint.add_history(
+                    f"Priority automatically raised from {current_p} to {next_p} due to {new_count} affected students reaching threshold ({AFFECTED_PRIORITY_THRESHOLD})."
+                )
+
+                loc = self.auth_service.get_location(complaint.location_id)
+                warden_id = getattr(loc, "in_charge_id", None)
+                if warden_id:
+                    self.notification_service.notify(
+                        warden_id,
+                        f"Complaint {complaint_id} priority raised to {next_p} due to {new_count} affected students.",
+                        complaint_id=complaint_id,
+                        title="Complaint Priority Raised",
+                    )
+
         self.save_complaint(complaint)
         return complaint
+
+    def remove_affected_student(self, complaint_id, student_id):
+        complaint = self.get_complaint(complaint_id)
+        if not complaint:
+            raise ValueError("Complaint not found.")
+        with self._db_conn() as conn:
+            conn.execute(
+                "DELETE FROM affected_students WHERE complaint_id = ? AND student_id = ?",
+                (complaint_id, student_id),
+            )
+        complaint.add_history(f"Student {student_id} removed themselves as affected.")
+        self.save_complaint(complaint)
+        return complaint
+
+    def get_affected_student_ids(self, complaint_id):
+        with self._db_conn() as conn:
+            rows = conn.execute(
+                "SELECT student_id FROM affected_students WHERE complaint_id = ?",
+                (complaint_id,),
+            ).fetchall()
+            return [r["student_id"] for r in rows]
 
     def clear_affected_records(self, complaint_id):
         with self._db_conn() as conn:
