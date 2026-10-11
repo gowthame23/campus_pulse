@@ -100,6 +100,14 @@ def get_unassigned_combinations(
     return combos
 
 
+@router.get("/coverage-gaps")
+def get_coverage_gaps(
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
+    auth_service=Depends(get_auth_service),
+):
+    return auth_service.get_coverage_gaps()
+
+
 @router.get("", response_model=list[DepartmentResponse])
 def list_departments(
     include_archived: bool = False,

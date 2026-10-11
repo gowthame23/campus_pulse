@@ -17,4 +17,7 @@ export const COMPLAINT_STATUS = {
   AUTO_CLOSED: "Closed (Auto Closed)",
   REOPENED: "Reopened",
   AWAITING_ASSIGNMENT: "Awaiting Coordinator Assignment",
+  WAITING_FOR_PARTS: "Waiting for Parts",
+  PENDING_WARDEN_VERIFICATION: "Pending Warden Verification",
+  ADMIN_REVIEW: "Admin Review",
 };

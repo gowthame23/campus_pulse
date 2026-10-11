@@ -261,10 +261,13 @@ export default function CreateComplaintPage() {
   const onSubmit = async (values) => {
     setError("");
     try {
+      const isUrgent = !!values.is_urgent;
       const payload = {
         ...values,
         category: values.complaint_type,
         visibility_type: values.visibility_type || "Public",
+        priority: isUrgent ? "High" : (values.priority || "Normal"),
+        is_urgent: isUrgent,
       };
       const response = await complaintService.create(payload);
       const complaintId = response.data.complaint_id;
@@ -481,6 +484,22 @@ export default function CreateComplaintPage() {
                 required: "Description is required.",
               })}
             />
+
+            {/* Urgent Priority Flag */}
+            <div className="flex items-start gap-3 p-3.5 rounded-xl border border-rose-200/80 dark:border-rose-900/40 bg-rose-50/50 dark:bg-rose-950/20">
+              <input
+                type="checkbox"
+                id="is_urgent"
+                className="mt-0.5 h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                {...register("is_urgent")}
+              />
+              <label htmlFor="is_urgent" className="text-xs text-rose-900 dark:text-rose-200 cursor-pointer select-none">
+                <span className="font-bold block">Mark as Urgent (High Priority)</span>
+                <span className="text-[11px] text-rose-700/80 dark:text-rose-300/80">
+                  Sets priority to High. Check this if the issue poses an immediate safety hazard, power failure, or campus outage.
+                </span>
+              </label>
+            </div>
 
             {/* Step 6 — Photo Upload (Gallery / Camera / URL) */}
             <div>
