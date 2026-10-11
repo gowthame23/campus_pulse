@@ -38,12 +38,12 @@ graph TD
    - **Restrictions:** Cannot alter system-wide root configurations or perform destructive database resets.
 4. **Warden / Location In-Charge (`location_in_charge`):**
    - **Scope:** Assigned physical facility (Hostel, Mess, or Complex).
-   - **Permissions:** Full oversight of complaints arising within their designated facility; complaint assignment and priority escalation; publishing location-scoped announcements (e.g., hostel roll call, maintenance notices); direct chat with residents.
-   - **Restrictions:** Cannot modify departmental definitions, create administrator accounts, or view complaints from unrelated facilities.
+   - **Permissions:** Supervises facility complaints; in-person verification of High/Critical resolutions and 10% random spot checks; publishes location-scoped announcements (hostel circulars); can submit complaints on behalf of residents.
+   - **Restrictions:** **Never assigned complaints to fix; cannot mark complaints resolved; cannot verify complaints they filed themselves**; cannot modify departmental definitions or create administrator accounts.
 5. **Coordinator (`coordinator`):**
-   - **Scope:** Departmental service delivery (Plumbing, Electrical, Internet/IT, Mess, Civil).
-   - **Permissions:** Access assigned complaint queues; update complaint progress; upload proof of resolution; add internal/public comments; direct chat with complainants.
-   - **Restrictions:** **Cannot publish campus announcements** (strictly rejected with 403 Forbidden); cannot manage user accounts or modify campus infrastructure.
+   - **Scope:** Multi-department and multi-location service delivery (e.g. Carpentry + Electrical across Block A and Block B).
+   - **Permissions:** Accept tickets from pooled queues; update complaint progress; mark resolved and upload photo proof; add internal/public comments; direct chat with complainants.
+   - **Restrictions:** **Cannot verify complaints; cannot publish campus announcements** (strictly rejected with 403 Forbidden); cannot manage user accounts or modify campus infrastructure.
 6. **Student (`student`):**
    - **Scope:** Personal student complaints and public campus announcements.
    - **Permissions:** Submit facility complaints (restricted to their assigned hostel for residential issues); upvote peer public complaints; verify resolutions or reopen within 48 hours; submit feedback; report lost/found items; view announcements.
@@ -102,29 +102,30 @@ graph TD
 
 ---
 
-### 2.4 In-App Notification Pipeline
+### 2.4 In-App & Web Push Notification Pipeline
 - **Trigger Points:** Complaint creation, coordinator assignment, status transition, SLA escalation, announcement publication, feedback requests.
 - **Recipient Resolution:**
-  - For new complaints: Assigned coordinator + Location Warden.
-  - For resolutions: Complainant student.
-  - For escalations: App Manager + College Administrator.
+  - For new complaints: Eligible coordinator(s) + Location Warden.
+  - For resolutions requiring warden check: Location Warden.
+  - For student verification: Complainant student.
+  - For escalations: Location Warden first, then App Manager, then Administrator.
 - **Storage:** Persisted to `notifications` table (`notification_id`, `user_id`, `title`, `message`, `reference_type`, `reference_id`, `is_read`).
-- **Real-Time Dispatch:** Handled via `WebSocketManager`. If the recipient has an active WebSocket connection, the payload is transmitted immediately to the browser client; otherwise, it is retrieved upon the next HTTP page load or unread count polling.
+- **Real-Time Dispatch:** Handled via `WebSocketManager`. WebSocket connections require a single-use ticket (`POST /auth/ws-ticket`), verifying that the caller's authenticated user ID matches the connection path.
+- **Web Push Notifications:** Asynchronous background delivery via Web Push protocol (VAPID) to registered client service workers (`push_subscriptions` table).
 
 ---
 
 ### 2.5 Routing, Assignment & Escalation Engine
 - **Resolution Matrix:**
-  1. Primary Match: Matches `location_id` and `department_id` against `coordinator_assignments`. If a primary coordinator is assigned, sets `assigned_to` and status `'Assigned'`.
-  2. Fallback 1 (Location In-Charge): If no coordinator exists for that department at that location, checks `locations.warden_id` (Hostel Warden / Supervisor).
-  3. Fallback 2 (App Manager): If no warden exists, flags to `locations.app_manager_id`.
-  4. Fallback 3 (Unassigned): Leaves complaint in `'Submitted'` status and alerts Administrator.
+  1. **Direct Assignment:** If exactly 1 coordinator is mapped to the complaint's department and location, sets `assigned_to` immediately and status `'Assigned'`.
+  2. **Coordinator Pool Queue:** If >1 coordinators are mapped, leaves `assigned_to = None` in status `'Submitted'`, and notifies all eligible coordinators. The first coordinator to accept claims it atomically (`POST /complaints/{id}/accept`) and transitions it to `'In Progress'`.
+  3. **Coverage Gap Alert:** If 0 coordinators are mapped, leaves `assigned_to = None` in `'Submitted'` and immediately alerts App Manager and Administrator to map staff. **Wardens are never assigned complaints.**
 - **SLA Deadlines:**
   - `Critical`: 4 hours.
   - `High`: 24 hours.
   - `Normal`: 48 hours.
   - `Low`: 72 hours.
-- **Escalation Trigger:** The background scheduler runs every 5 minutes (`services/scheduler_service.py`), identifies complaints where `datetime.utcnow() > sla_deadline` and `status NOT IN ('Resolved', 'Closed')`, flags `is_escalated = 1`, and notifies App Manager and Administrator.
+- **Escalation Trigger:** The background scheduler runs every 5 minutes (`services/scheduler_service.py`), identifies complaints where `datetime.utcnow() > sla_deadline` and `status NOT IN ('Resolved', 'Closed', 'Closed (Auto Closed)', 'Rejected')`, flags `is_escalated = 1`, and escalates tier-by-tier: Warden first, then App Manager, then Administrator.
 
 ---
 
@@ -133,17 +134,21 @@ graph TD
 ```mermaid
 stateDiagram-v2
     [*] --> Submitted : Student Submits
-    Submitted --> Assigned : System Routes or Admin Assigns
+    Submitted --> Assigned : System Direct-Routes (Single Coordinator)
+    Submitted --> In_Progress : Coordinator Accepts from Pool
     Assigned --> In_Progress : Coordinator Starts Work
-    In_Progress --> Resolved : Coordinator Completes Work
-    Resolved --> Waiting_for_Verification : System Initiates 48h Window
-    Waiting_for_Verification --> Closed : Student Approves Resolution
-    Waiting_for_Verification --> Closed : Auto-Close Timer Expires (48h)
-    Waiting_for_Verification --> Reopened : Student Rejects Resolution
-    Reopened --> In_Progress : Staff Re-evaluates
-    Submitted --> Rejected : Admin / Warden Rejects Invalid Issue
+    In_Progress --> Waiting_for_Verification : Coordinator Resolves (High/Critical or 10% Spot-Check)
+    In_Progress --> Resolved : Coordinator Resolves (Normal/Low)
+    Waiting_for_Verification --> Resolved : Warden Approves Verification
+    Waiting_for_Verification --> In_Progress : Warden Rejects Verification
+    Resolved --> Closed : Student Confirms Resolution
+    Resolved --> Closed_Auto : Auto-Close Timer Expires (48h)
+    Resolved --> Reopened : Student Reopens (Max 3 Times)
+    Reopened --> In_Progress : Coordinator Re-evaluates
+    Submitted --> Rejected : Admin / Manager Rejects Invalid Issue
     Assigned --> Rejected : Coordinator Rejects Invalid Issue
     Closed --> [*]
+    Closed_Auto --> [*]
     Rejected --> [*]
 ```
 

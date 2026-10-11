@@ -80,55 +80,61 @@ class GlobalSearchService:
                     ),
                 )
 
-            # Reindex Work Orders
-            wos = conn.execute(
-                "SELECT work_order_id, work_order_number, title, description, priority, status FROM work_orders WHERE is_deleted = 0"
-            ).fetchall()
-            for w in wos:
-                conn.execute(
-                    """
-                    INSERT INTO search_index
-                    (index_id, entity_type, entity_id, title, description, keywords, visibility, last_indexed, created_at, updated_at)
-                    VALUES (?, 'WorkOrder', ?, ?, ?, ?, 'Public', ?, ?, ?)
-                    ON CONFLICT(entity_type, entity_id) DO UPDATE SET
-                        title=excluded.title, description=excluded.description, keywords=excluded.keywords, last_indexed=excluded.last_indexed
-                    """,
-                    (
-                        generate_id("IDX"),
-                        w["work_order_id"],
-                        f"{w['work_order_number']} - {w['title']}",
-                        w["description"],
-                        f"{w['work_order_number']} {w['priority']} {w['status']}",
-                        now,
-                        now,
-                        now,
-                    ),
-                )
+            # Reindex Work Orders (Legacy optional scaffold)
+            try:
+                wos = conn.execute(
+                    "SELECT work_order_id, work_order_number, title, description, priority, status FROM work_orders WHERE is_deleted = 0"
+                ).fetchall()
+                for w in wos:
+                    conn.execute(
+                        """
+                        INSERT INTO search_index
+                        (index_id, entity_type, entity_id, title, description, keywords, visibility, last_indexed, created_at, updated_at)
+                        VALUES (?, 'WorkOrder', ?, ?, ?, ?, 'Public', ?, ?, ?)
+                        ON CONFLICT(entity_type, entity_id) DO UPDATE SET
+                            title=excluded.title, description=excluded.description, keywords=excluded.keywords, last_indexed=excluded.last_indexed
+                        """,
+                        (
+                            generate_id("IDX"),
+                            w["work_order_id"],
+                            f"{w['work_order_number']} - {w['title']}",
+                            w["description"],
+                            f"{w['work_order_number']} {w['priority']} {w['status']}",
+                            now,
+                            now,
+                            now,
+                        ),
+                    )
+            except sqlite3.OperationalError:
+                pass
 
-            # Reindex Assets
-            asts = conn.execute(
-                "SELECT asset_id, asset_code, asset_name, brand, model, serial_number, current_condition FROM assets WHERE is_deleted = 0"
-            ).fetchall()
-            for a in asts:
-                conn.execute(
-                    """
-                    INSERT INTO search_index
-                    (index_id, entity_type, entity_id, title, description, keywords, visibility, last_indexed, created_at, updated_at)
-                    VALUES (?, 'Asset', ?, ?, ?, ?, 'Public', ?, ?, ?)
-                    ON CONFLICT(entity_type, entity_id) DO UPDATE SET
-                        title=excluded.title, description=excluded.description, keywords=excluded.keywords, last_indexed=excluded.last_indexed
-                    """,
-                    (
-                        generate_id("IDX"),
-                        a["asset_id"],
-                        f"{a['asset_code']} - {a['asset_name']}",
-                        f"Brand: {a['brand']} Model: {a['model']}",
-                        f"{a['asset_code']} {a['serial_number']} {a['current_condition']}",
-                        now,
-                        now,
-                        now,
-                    ),
-                )
+            # Reindex Assets (Legacy optional scaffold)
+            try:
+                asts = conn.execute(
+                    "SELECT asset_id, asset_code, asset_name, brand, model, serial_number, current_condition FROM assets WHERE is_deleted = 0"
+                ).fetchall()
+                for a in asts:
+                    conn.execute(
+                        """
+                        INSERT INTO search_index
+                        (index_id, entity_type, entity_id, title, description, keywords, visibility, last_indexed, created_at, updated_at)
+                        VALUES (?, 'Asset', ?, ?, ?, ?, 'Public', ?, ?, ?)
+                        ON CONFLICT(entity_type, entity_id) DO UPDATE SET
+                            title=excluded.title, description=excluded.description, keywords=excluded.keywords, last_indexed=excluded.last_indexed
+                        """,
+                        (
+                            generate_id("IDX"),
+                            a["asset_id"],
+                            f"{a['asset_code']} - {a['asset_name']}",
+                            f"Brand: {a['brand']} Model: {a['model']}",
+                            f"{a['asset_code']} {a['serial_number']} {a['current_condition']}",
+                            now,
+                            now,
+                            now,
+                        ),
+                    )
+            except sqlite3.OperationalError:
+                pass
 
             # Reindex Announcements
             anns = conn.execute(
@@ -155,30 +161,33 @@ class GlobalSearchService:
                     ),
                 )
 
-            # Reindex Visitors
-            viss = conn.execute(
-                "SELECT r.request_id, v.full_name, v.phone_number, r.purpose, r.visit_date FROM visitor_requests r JOIN visitors v ON r.visitor_id = v.visitor_id"
-            ).fetchall()
-            for v in viss:
-                conn.execute(
-                    """
-                    INSERT INTO search_index
-                    (index_id, entity_type, entity_id, title, description, keywords, visibility, last_indexed, created_at, updated_at)
-                    VALUES (?, 'Visitor', ?, ?, ?, ?, 'Public', ?, ?, ?)
-                    ON CONFLICT(entity_type, entity_id) DO UPDATE SET
-                        title=excluded.title, description=excluded.description, keywords=excluded.keywords, last_indexed=excluded.last_indexed
-                    """,
-                    (
-                        generate_id("IDX"),
-                        v["request_id"],
-                        f"Visitor: {v['full_name']}",
-                        v["purpose"],
-                        f"{v['phone_number']} {v['visit_date']}",
-                        now,
-                        now,
-                        now,
-                    ),
-                )
+            # Reindex Visitors (Legacy optional scaffold)
+            try:
+                viss = conn.execute(
+                    "SELECT r.request_id, v.full_name, v.phone_number, r.purpose, r.visit_date FROM visitor_requests r JOIN visitors v ON r.visitor_id = v.visitor_id"
+                ).fetchall()
+                for v in viss:
+                    conn.execute(
+                        """
+                        INSERT INTO search_index
+                        (index_id, entity_type, entity_id, title, description, keywords, visibility, last_indexed, created_at, updated_at)
+                        VALUES (?, 'Visitor', ?, ?, ?, ?, 'Public', ?, ?, ?)
+                        ON CONFLICT(entity_type, entity_id) DO UPDATE SET
+                            title=excluded.title, description=excluded.description, keywords=excluded.keywords, last_indexed=excluded.last_indexed
+                        """,
+                        (
+                            generate_id("IDX"),
+                            v["request_id"],
+                            f"Visitor: {v['full_name']}",
+                            v["purpose"],
+                            f"{v['phone_number']} {v['visit_date']}",
+                            now,
+                            now,
+                            now,
+                        ),
+                    )
+            except sqlite3.OperationalError:
+                pass
 
             # Reindex Audit Logs (Admin Only)
             auds = conn.execute(

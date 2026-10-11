@@ -303,13 +303,19 @@ Coordinator Work Completion & Proof Submission.
 Allows maintenance staff to mark an issue resolved, document corrective action, and upload verification photos before the complaint can be closed.
 
 #### C. Authorized Users
-`coordinator`, `location_in_charge`, `app_manager`, `administrator`.
+`coordinator` (assigned coordinator), `app_manager`, `administrator`. **Wardens cannot resolve complaints.**
 
 #### D. User Journey
-1. Staff opens complaint on `/complaints/:id`.
-2. Enters resolution remarks and attaches completion photo.
+1. Assigned coordinator opens complaint on `/complaints/:id`.
+2. Enters resolution remarks and attaches completion photo (`resolution_proof_url`).
 3. Clicks "Mark as Resolved".
-4. Complaint status transitions to `'Waiting for Verification'`; 48-hour student verification timer begins.
+4. Two-tier verification routing:
+   - If priority is **High** or **Critical**, or randomly selected for spot-check (~10% of Normal/Low): status transitions to `'Waiting for Verification'` awaiting Warden inspection.
+   - If **Normal** or **Low** (and not spot-checked): skips warden tier and moves directly to student confirmation window.
+5. If in Warden tier: The facility Warden verifies in person and either:
+   - **Approves:** advances complaint to student confirmation window.
+   - **Rejects:** returns complaint to `'In Progress'` with notes for the coordinator.
+6. Student receives 48-hour window to confirm closure or reopen (up to 3 times).
 
 #### E. Frontend Implementation
 - **Component:** [`Frontend/src/pages/complaints/ComplaintDetailsPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/complaints/ComplaintDetailsPage.jsx).
@@ -320,25 +326,25 @@ Allows maintenance staff to mark an issue resolved, document corrective action, 
 - **Service:** `ComplaintService.resolve_complaint()`.
 
 #### G. Data Flow
-`ComplaintDetailsPage.jsx` → `complaintService.resolve()` → `PUT /complaints/:id/resolve` → updates SQLite `complaints.status = 'Waiting for Verification'` → dispatches student notification → returns updated complaint.
+`ComplaintDetailsPage.jsx` → `complaintService.resolve()` → `PUT /complaints/:id/resolve` → evaluates two-tier rules → updates SQLite `complaints` status → dispatches warden or student notification → returns updated complaint.
 
 #### H. Technologies Used
 Python 3, FastAPI, SQLite, React 19.
 
 #### I. Why This Implementation Was Chosen
-The 48-hour student verification window ensures staff cannot prematurely close complaints without student satisfaction.
+The two-tier verification workflow (in-person inspection for severe issues plus random spot checks, followed by student confirmation) prevents rubber-stamping and guarantees work quality.
 
 #### J. Why Not Other Methods?
-Immediate closure without student sign-off leads to unresolved issues being falsely reported as complete.
+Allowing staff to self-verify or unilaterally close tickets leads to unresolved grievances being prematurely marked complete.
 
 #### K. Security and Edge Cases
-Only staff assigned to the complaint or administrators can mark it resolved.
+Only the assigned coordinator or administrators can mark an issue resolved. Wardens cannot resolve tickets, nor can wardens verify tickets that they submitted themselves.
 
 #### L. Tests and Verification
-Verified in [`Backend/tests/test_workflow4_complaint_management.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/tests/test_workflow4_complaint_management.py).
+Verified in [`Backend/tests/test_workflow4_complaint_management.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/tests/test_workflow4_complaint_management.py) and [`Backend/tests/test_two_tier_verification.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/tests/test_two_tier_verification.py).
 
 #### M. Limitations and Status
-Fully implemented and verified.
+Fully implemented, verified, and operational.
 
 #### N. Source References
 - Backend: [`Backend/services/complaint_service.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/services/complaint_service.py).
@@ -352,15 +358,16 @@ Fully implemented and verified.
 Background Auto-Close & SLA Breach Escalation Engine.
 
 #### B. Problem it Solves
-Prevents complaints from remaining indefinitely in `'Waiting for Verification'` if the student forgets to approve, and automatically escalates neglected issues to supervisors.
+Prevents complaints from remaining indefinitely in verification if the student forgets to approve, and automatically escalates neglected issues up the supervisory chain.
 
 #### C. Authorized Users
 Automated background daemon (`SchedulerService`).
 
 #### D. User Journey
 1. Background scheduler fires every 300 seconds (5 minutes).
-2. Evaluates complaints where `status == 'Waiting for Verification'` and `resolved_at` is older than 48 hours. Transitions them to `'Closed (Auto Closed)'`.
-3. Evaluates uncompleted complaints where `datetime.utcnow() > sla_deadline`. Flags `is_escalated = 1` and alerts App Manager and Administrator.
+2. Evaluates complaints awaiting verification where resolution timestamp is older than 48 hours. Transitions them to `'Closed (Auto Closed)'`.
+3. Evaluates uncompleted complaints (`status NOT IN ('Resolved', 'Closed', 'Closed (Auto Closed)', 'Rejected')`) where `datetime.utcnow() > sla_deadline`.
+4. Escalates tier-by-tier: alerts location Warden first, then App Manager, then Administrator, and marks `is_escalated = 1`.
 
 #### E. Frontend Implementation
 Automated backend process. Reflected on frontend via StatCards and status badges (`Closed (Auto Closed)`).

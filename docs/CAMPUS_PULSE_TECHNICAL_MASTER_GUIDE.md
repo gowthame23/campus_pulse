@@ -28,15 +28,15 @@ Campus Pulse replaces this with an automated, SLA-driven state machine with proo
 
 Campus Pulse serves six distinct campus roles:
 - **Students:** Report grievances, track status, verify or reopen resolutions, view official announcements, and report lost & found items.
-- **Coordinators:** Department-level staff (Plumbing, Electrical, IT, Mess) who receive routed issues, update progress, and upload resolution proof.
-- **Wardens / Location In-Charges:** Facility supervisors (Hostels, Messes, Sports) overseeing physical buildings and broadcasting hostel circulars.
-- **App Managers:** Operational supervisors managing multiple campus facilities, reallocating workloads, and reviewing compliance.
+- **Coordinators:** Department-level staff (Plumbing, Electrical, IT, Mess) who do the actual repair work. A single coordinator can cover multiple departments and multiple locations.
+- **Wardens / Location In-Charges:** Facility supervisors (Hostels, Messes, Sports) overseeing physical buildings. The warden supervises their location(s), verifies High/Critical fixes and spot checks, and can file complaints on behalf of students. The warden never fixes complaints and is never assigned complaints.
+- **App Managers:** Operational supervisors managing multiple campus facilities, mapping coordinator coverage, reallocating workloads, and reviewing compliance.
 - **Administrators:** Institutional authorities controlling user accounts, facilities, departments, database backups, and institutional settings.
-- **Super Admins:** Multi-tenant platform administrators managing institution onboarding and cross-platform health.
+- **Super Admins:** Platform administrators for optional multi-tenant institutional onboarding (standard Campus Pulse is a self-contained single-institution deployment).
 
 **Core Operating Philosophy:**
-- **Zero-Drop Routing:** No complaint can be orphaned; automatic fallbacks escalate unassigned issues to facility wardens or managers.
-- **Student-First Verification:** Staff cannot unilaterally close a complaint. A 48-hour student verification window ensures genuine satisfaction.
+- **Zero-Drop Routing:** No complaint can be orphaned; automatic routing matches eligible coordinators. If exactly 1, assigns immediately; if >1, places in coordinator accept pool; if 0, raises an immediate coverage gap alert to App Manager and Admin. Wardens are never assigned.
+- **Two-Tier Verification:** Coordinator marks work resolved -> Warden verifies High/Critical resolutions and 10% random spot checks -> Student confirms resolution within 48 hours (or auto-closes).
 - **Transparent Governance:** Every administrative action is logged to an immutable audit trail.
 
 ---
@@ -162,12 +162,12 @@ To ensure deep technical rigor without overwhelming a single file, this document
 
 | Role | Database Value | Scope | Key Capabilities | Prohibited Capabilities |
 | :--- | :--- | :--- | :--- | :--- |
-| **Super Admin** | `super_admin` | Multi-Tenant Platform | Onboard institutions, monitor platform health | Campus daily operations |
-| **Administrator** | `administrator` | College / Campus | User management, settings, backups, notices | Cross-tenant access |
-| **App Manager** | `app_manager` | Multi-Facility | Reassign complaints, facility oversight, notices | System root config |
-| **Location In-Charge** | `location_in_charge` | Single Building (Hostel) | Manage facility issues, post hostel notices | Modify depts/users |
-| **Coordinator** | `coordinator` | Single Department | Resolve complaints, upload proof, internal notes | **Cannot post notices** |
-| **Student** | `student` | Personal Complaints | Report issues, verify/reopen, Lost & Found | **Cannot post notices** |
+| **Super Admin** | `super_admin` | Multi-Tenant Platform | Onboard institutions, monitor platform health (optional platform mode) | Campus daily operations |
+| **Administrator** | `administrator` | College / Campus | User management, settings, backups, notices, offline restore | Multi-campus data |
+| **App Manager** | `app_manager` | Multi-Facility | Reassign complaints, facility oversight, coordinator mappings, notices | System root config |
+| **Location In-Charge** | `location_in_charge` | Assigned Building(s) | Supervise location, verify High/Critical & spot-checks, post hostel notices | **Never assigned complaints; cannot fix** |
+| **Coordinator** | `coordinator` | Assigned Dept(s) & Location(s) | Accept tickets from pool, execute repairs, upload proof | **Cannot post notices** |
+| **Student** | `student` | Personal Complaints | Report issues, verify/reopen (max 3), Lost & Found | **Cannot post notices** |
 
 ---
 
