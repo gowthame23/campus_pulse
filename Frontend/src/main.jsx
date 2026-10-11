@@ -5,6 +5,12 @@ import App from "./App.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import "./index.css";
+import { registerSW } from "virtual:pwa-register";
+
+// Register PWA Service Worker automatically
+if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+  registerSW({ immediate: true });
+}
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

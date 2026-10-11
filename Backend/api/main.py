@@ -236,6 +236,7 @@ from api.routers import (
     platform,
     programs,
     public_complaints,
+    push,
     reports,
     search,
     settings,
@@ -268,5 +269,6 @@ app.include_router(chat.router)
 app.include_router(supervisor.router)
 app.include_router(master.router)
 app.include_router(programs.router)
+app.include_router(push.router)
 
 app.include_router(platform.router)

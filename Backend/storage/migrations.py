@@ -40,6 +40,7 @@ def run_migrations(db_path: str = "storage/campus_pulse.db"):
         _migrate_coordinator_assignments_table(conn)
         _migrate_locations_table(conn)
         _migrate_operational_tables(conn)
+        _migrate_push_subscriptions_table(conn)
         _normalize_priorities_and_deadlines(conn)
         _reroute_warden_assigned_open_complaints(conn)
 
@@ -321,3 +322,20 @@ def _reroute_warden_assigned_open_complaints(conn: sqlite3.Connection):
                 WHERE complaint_id = ?;
             """, (STATUS_SUBMITTED, loc_id, dept_id, cid))
         logger.info(f"Re-routed warden-assigned complaint {cid} away from warden.")
+
+
+def _migrate_push_subscriptions_table(conn: sqlite3.Connection):
+    """Ensure push_subscriptions table exists."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+            user_id TEXT NOT NULL,
+            endpoint TEXT PRIMARY KEY,
+            p256dh TEXT NOT NULL,
+            auth TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_push_sub_user ON push_subscriptions(user_id);
+    """)
+    logger.info("push_subscriptions table migration verified.")
