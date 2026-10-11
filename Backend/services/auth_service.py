@@ -230,8 +230,8 @@ class AuthService:
                 "id": "USR_SUPER_ADMIN",
                 "class": User,
                 "name": "Platform Super Admin",
-                "email": "superadmin@campuspulse.edu",
-                "password": "Superadmin@123",
+                "email": os.environ.get("SUPER_ADMIN_EMAIL", "superadmin@campuspulse.edu"),
+                "password": os.environ.get("SUPER_ADMIN_PASSWORD", "Superadmin@123"),
                 "first_login": False,
                 "kwargs": {"role": "super_admin"},
             },
@@ -239,8 +239,8 @@ class AuthService:
                 "id": "USR_ADMIN",
                 "class": Administrator,
                 "name": "Administrator",
-                "email": "gowthamejjurothu@gmail.com",
-                "password": "Admin@123",
+                "email": os.environ.get("ADMIN_EMAIL", "admin@example.com"),
+                "password": os.environ.get("ADMIN_PASSWORD", "Admin@123"),
                 "first_login": False,
                 "kwargs": {},
             },
@@ -248,8 +248,8 @@ class AuthService:
                 "id": "USR_MANAGER",
                 "class": AppManager,
                 "name": "App Manager 1",
-                "email": "ejjurothugowtham@gmail.com",
-                "password": "Manager@123",
+                "email": os.environ.get("MANAGER_EMAIL", "manager@example.com"),
+                "password": os.environ.get("MANAGER_PASSWORD", "Manager@123"),
                 "first_login": False,
                 "kwargs": {
                     "location_id": "LOC_HOSTEL_1",
@@ -260,8 +260,8 @@ class AuthService:
                 "id": "USR_MANAGER_2",
                 "class": AppManager,
                 "name": "App Manager 2",
-                "email": "appmanager2@campus.edu",
-                "password": "Manager@123",
+                "email": os.environ.get("MANAGER_2_EMAIL", "appmanager2@campus.edu"),
+                "password": os.environ.get("MANAGER_2_PASSWORD", "Manager@123"),
                 "first_login": False,
                 "kwargs": {
                     "location_id": "LOC_HOSTEL_2",
@@ -272,8 +272,8 @@ class AuthService:
                 "id": "USR_WARDEN",
                 "class": LocationInCharge,
                 "name": "Warden 1",
-                "email": "naveen@campus.edu",
-                "password": "warden@123",
+                "email": os.environ.get("WARDEN_EMAIL", "warden@example.com"),
+                "password": os.environ.get("WARDEN_PASSWORD", "warden@123"),
                 "first_login": False,
                 "kwargs": {
                     "location_id": "LOC_HOSTEL_1",
@@ -284,8 +284,8 @@ class AuthService:
                 "id": "USR_WARDEN_2",
                 "class": LocationInCharge,
                 "name": "Warden 2",
-                "email": "warden2@campus.edu",
-                "password": "warden@123",
+                "email": os.environ.get("WARDEN_2_EMAIL", "warden2@campus.edu"),
+                "password": os.environ.get("WARDEN_2_PASSWORD", "warden@123"),
                 "first_login": False,
                 "kwargs": {
                     "location_id": "LOC_HOSTEL_2",
@@ -296,8 +296,8 @@ class AuthService:
                 "id": "USR_COORDINATOR",
                 "class": Coordinator,
                 "name": "Coordinator 1",
-                "email": "gowthamejjurothu15@gmail.com",
-                "password": "Coordinator@123",
+                "email": os.environ.get("COORDINATOR_EMAIL", "coordinator@example.com"),
+                "password": os.environ.get("COORDINATOR_PASSWORD", "Coordinator@123"),
                 "first_login": False,
                 "kwargs": {"department_id": "DEPT_HOSTEL_ELECTRICAL"},
             },
@@ -305,8 +305,8 @@ class AuthService:
                 "id": "USR_COORDINATOR_2",
                 "class": Coordinator,
                 "name": "Coordinator 2",
-                "email": "coordinator2@campus.edu",
-                "password": "Coordinator@123",
+                "email": os.environ.get("COORDINATOR_2_EMAIL", "coordinator2@campus.edu"),
+                "password": os.environ.get("COORDINATOR_2_PASSWORD", "Coordinator@123"),
                 "first_login": False,
                 "kwargs": {"department_id": "DEPT_HOSTEL_PLUMBING"},
             },
@@ -314,8 +314,8 @@ class AuthService:
                 "id": "USR_STUDENT",
                 "class": Student,
                 "name": "Student 1",
-                "email": "gowtham.e23@iiits.in",
-                "password": "Student@123",
+                "email": os.environ.get("STUDENT_EMAIL", "student@example.com"),
+                "password": os.environ.get("STUDENT_PASSWORD", "Student@123"),
                 "first_login": False,
                 "kwargs": {"location_id": "LOC_HOSTEL_1"},
             },
@@ -624,6 +624,8 @@ class AuthService:
 
     def get_user_by_email(self, email):
         clean_email = (email or "").strip().lower()
+        if not clean_email:
+            return None
         with self._connect() as conn:
             row = conn.execute(
                 "SELECT user_id FROM users WHERE LOWER(email) = ? AND (is_deleted = 0 OR is_deleted IS NULL)",
@@ -631,6 +633,24 @@ class AuthService:
             ).fetchone()
             if row:
                 return self.get_user(row["user_id"])
+
+        # Backwards compatibility and standard demo alias resolution
+        legacy_aliases = {
+            "admin@example.com": "USR_ADMIN",
+            "manager@example.com": "USR_MANAGER",
+            "coordinator@example.com": "USR_COORDINATOR",
+            "student@example.com": "USR_STUDENT",
+            "warden@example.com": "USR_WARDEN",
+            "gowthamejjurothu@gmail.com": "USR_ADMIN",
+            "ejjurothugowtham@gmail.com": "USR_MANAGER",
+            "gowthamejjurothu15@gmail.com": "USR_COORDINATOR",
+            "gowtham.e23@iiits.in": "USR_STUDENT",
+            "gowthamejjuorthu1@gmail.com": "USR_STUDENT",
+            "naveen@campus.edu": "USR_WARDEN",
+        }
+        if clean_email in legacy_aliases:
+            return self.get_user(legacy_aliases[clean_email])
+
         return None
 
     def get_user_by_roll_number(self, roll_number):

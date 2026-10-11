@@ -6,6 +6,7 @@ from core.constants import (
     ACCEPT_DEADLINE_HOURS,
     CATEGORY_PRIORITY_MAP,
     INACTIVE_STATUSES,
+    PRESET_PROGRESS_NOTES,
     PRIORITIES,
     SLA_ACTIVE_STATUSES,
     SLA_HOURS,
@@ -15,6 +16,7 @@ from core.constants import (
     STATUS_PENDING_WARDEN,
     STATUS_SUBMITTED,
     STATUS_WAITING_STUDENT,
+    get_sla_hours,
     normalize_priority,
     normalize_role,
 )
@@ -288,7 +290,7 @@ class ComplaintService:
                     )
 
         # 6. Compute initial SLA deadline
-        sla_hours = SLA_HOURS.get(final_priority, 48)
+        sla_hours = get_sla_hours(final_priority, category=category)
         sla_deadline = (current_time + timedelta(hours=sla_hours)).isoformat()
 
         # 7. Create Complaint instance
@@ -310,33 +312,7 @@ class ComplaintService:
         complaint.urgent_reason = urgent_reason if is_urgent else None
 
         # 8. Auto-routing: Check active coordinators for (location, department)
-        assignments = (
-            self.auth_service.list_coordinator_assignments(
-                location_id=location_id, department_id=department_id
-            )
-            or []
-        )
-        all_loc_assignments = (
-            self.auth_service.list_coordinator_assignments(
-                location_id="ALL", department_id=department_id
-            )
-            or []
-        )
-
-        candidate_coords = []
-        seen_coords = set()
-        for a in assignments + all_loc_assignments:
-            cid = a.get("coordinator_id")
-            if cid and cid not in seen_coords:
-                seen_coords.add(cid)
-                u = self.auth_service.get_user(cid)
-                if (
-                    u
-                    and getattr(u, "active", False)
-                    and not getattr(u, "is_deleted", False)
-                    and getattr(u, "status", "Active") == "Active"
-                ):
-                    candidate_coords.append(cid)
+        candidate_coords = self._get_mapped_coordinators(location_id, department_id)
 
         if len(candidate_coords) == 1:
             coord_id = candidate_coords[0]
@@ -441,7 +417,36 @@ class ComplaintService:
             if not item.assigned_to
         ]
 
-    def assign_work(self, complaint_id, coordinator_id):
+    def _get_mapped_coordinators(self, location_id, department_id):
+        assignments = (
+            self.auth_service.list_coordinator_assignments(
+                location_id=location_id, department_id=department_id
+            )
+            or []
+        )
+        all_loc_assignments = (
+            self.auth_service.list_coordinator_assignments(
+                location_id="ALL", department_id=department_id
+            )
+            or []
+        )
+        candidate_coords = []
+        seen_coords = set()
+        for a in assignments + all_loc_assignments:
+            cid = a.get("coordinator_id")
+            if cid and cid not in seen_coords:
+                seen_coords.add(cid)
+                u = self.auth_service.get_user(cid)
+                if (
+                    u
+                    and getattr(u, "active", False)
+                    and not getattr(u, "is_deleted", False)
+                    and getattr(u, "status", "Active") == "Active"
+                ):
+                    candidate_coords.append(cid)
+        return candidate_coords
+
+    def assign_work(self, complaint_id, coordinator_id, reason=None, actor_id=None):
         complaint = self.get_complaint(complaint_id)
         if not complaint:
             raise ValueError("Complaint not found.")
@@ -452,13 +457,35 @@ class ComplaintService:
             raise ValueError("Complaints can only be assigned to coordinators.")
         if not target_user.active or getattr(target_user, "is_deleted", False) or getattr(target_user, "status", "Active") != "Active":
             raise ValueError("Coordinator is inactive.")
+        if not self.auth_service.is_coordinator_assigned(coordinator_id, complaint.location_id, complaint.department_id):
+            raise ValueError(f"Coordinator {target_user.name} is not mapped to this location and department.")
+
         old_status = complaint.status
         old_assigned = complaint.assigned_to
-        complaint.assign(coordinator_id)
-        complaint.assigned_at = complaint.assigned_at or now_string()
+        is_reassign = bool(old_assigned and old_assigned != coordinator_id)
+
+        complaint.assigned_to = coordinator_id
+        complaint.assigned_at = now_string()
+        if complaint.status in (Complaint.SUBMITTED, Complaint.ASSIGNED):
+            complaint.status = Complaint.ASSIGNED
+
+        hist_msg = f"Assigned to coordinator {target_user.name} ({coordinator_id})."
+        if is_reassign:
+            hist_msg = f"Reassigned to coordinator {target_user.name} ({coordinator_id}) by {actor_id or 'admin'}."
+            if reason:
+                hist_msg += f" Reason: {reason}"
+        complaint.add_history(hist_msg)
+
         try:
             self.save_complaint(complaint)
             self.notification_service.assigned(complaint_id, coordinator_id)
+            if is_reassign and old_assigned:
+                self.notification_service.notify(
+                    old_assigned,
+                    f"Complaint {complaint_id} has been reassigned to {target_user.name}." + (f" Reason: {reason}" if reason else ""),
+                    complaint_id=complaint_id,
+                    title="Complaint Reassigned",
+                )
         except Exception as err:
             complaint.status = old_status
             complaint.assigned_to = old_assigned
@@ -1090,6 +1117,34 @@ class ComplaintService:
                     complaint.sla_deadline = sla_deadline_dt.isoformat()
                     changed = True
 
+                # 50% and 90% SLA Reminders to coordinator
+                created_dt = parse_date(complaint.created_at) or current_time
+                total_seconds = (sla_deadline_dt - created_dt).total_seconds()
+                if total_seconds > 0 and current_time < sla_deadline_dt:
+                    ratio = (current_time - created_dt).total_seconds() / total_seconds
+                    if ratio >= 0.50 and int(getattr(complaint, "sla_reminders_sent", 0) or 0) < 1:
+                        complaint.sla_reminders_sent = 1
+                        complaint.add_history("50% of SLA time elapsed. Reminder sent.")
+                        if complaint.assigned_to:
+                            self.notification_service.notify(
+                                complaint.assigned_to,
+                                f"SLA 50% Reminder: Complaint {complaint.complaint_id} ({complaint.priority}) is halfway through its SLA window.",
+                                complaint_id=complaint.complaint_id,
+                                title="SLA 50% Reminder",
+                            )
+                        changed = True
+                    if ratio >= 0.90 and int(getattr(complaint, "sla_reminders_sent", 0) or 0) < 2:
+                        complaint.sla_reminders_sent = 2
+                        complaint.add_history("90% of SLA time elapsed. Urgency reminder sent.")
+                        if complaint.assigned_to:
+                            self.notification_service.notify(
+                                complaint.assigned_to,
+                                f"SLA 90% Warning: Complaint {complaint.complaint_id} ({complaint.priority}) is approaching its deadline ({complaint.sla_deadline}).",
+                                complaint_id=complaint.complaint_id,
+                                title="SLA 90% Urgency Warning",
+                            )
+                        changed = True
+
                 if current_time > sla_deadline_dt:
                     loc = _get_loc(complaint.location_id)
                     warden_id = getattr(loc, "in_charge_id", None)
@@ -1167,16 +1222,61 @@ class ComplaintService:
                                 complaint_id=complaint.complaint_id,
                                 title="Complaint Auto-Assigned",
                             )
+                            loc = _get_loc(complaint.location_id)
+                            warden_id = getattr(loc, "in_charge_id", None)
+                            if warden_id:
+                                self.notification_service.notify(
+                                    warden_id,
+                                    f"Complaint {complaint.complaint_id} went unclaimed after {accept_hours}h; auto-assigned to coordinator {least_loaded}.",
+                                    complaint_id=complaint.complaint_id,
+                                    title="Unclaimed Complaint Auto-Assigned",
+                                )
                             changed = True
+
+            # Blocked status monitoring: if blocked >72h or past blocked_until without update
+            if complaint.status == STATUS_BLOCKED:
+                blocked_dt = parse_date(getattr(complaint, "blocked_at", None) or complaint.updated_at)
+                until_dt = parse_date(getattr(complaint, "blocked_until", None))
+                is_past_72h = bool(blocked_dt and current_time > blocked_dt + timedelta(hours=72))
+                is_past_until = bool(until_dt and current_time > until_dt)
+                if (is_past_72h or is_past_until) and not getattr(complaint, "blocked_alerted", False):
+                    complaint.blocked_alerted = True
+                    loc = _get_loc(complaint.location_id)
+                    warden_id = getattr(loc, "in_charge_id", None)
+                    app_mgr_id = getattr(loc, "app_manager_id", None) or self.get_active_app_manager()
+                    reason = getattr(complaint, "blocked_reason", "None specified")
+                    alert_text = f"BLOCKED DELAY: Complaint {complaint.complaint_id} has been blocked for >72h or past expected date. Reason: {reason}"
+                    if warden_id:
+                        self.notification_service.notify(
+                            warden_id, alert_text, complaint_id=complaint.complaint_id, title="Blocked Delay Alert"
+                        )
+                    if app_mgr_id:
+                        self.notification_service.notify(
+                            app_mgr_id, alert_text, complaint_id=complaint.complaint_id, title="Blocked Delay Alert"
+                        )
+                    complaint.add_history("Blocked duration exceeded threshold. Alerted Warden and App Manager.")
+                    changed = True
 
             # 3. Complaints pending warden verification (>24h reminder to warden, >48h to App Manager)
             if complaint.status in (Complaint.PENDING_WARDEN_VERIFICATION, "Pending Warden Verification"):
                 fixed_dt = parse_date(getattr(complaint, "fixed_at", None) or complaint.resolved_at or complaint.updated_at)
-                if fixed_dt:
-                    loc = _get_loc(complaint.location_id)
-                    warden_id = getattr(loc, "in_charge_id", None)
-                    app_mgr_id = getattr(loc, "app_manager_id", None)
+                loc = _get_loc(complaint.location_id)
+                warden_id = getattr(loc, "in_charge_id", None)
+                app_mgr_id = getattr(loc, "app_manager_id", None) or self.get_active_app_manager()
 
+                if not warden_id and not getattr(complaint, "no_warden_alerted", False):
+                    complaint.no_warden_alerted = True
+                    loc_name = loc.name if loc else complaint.location_id
+                    self.notification_service.notify(
+                        app_mgr_id,
+                        f"SETUP GAP: Location {loc_name} has no warden assigned. Complaint {complaint.complaint_id} is pending verification. Please assign a warden.",
+                        complaint_id=complaint.complaint_id,
+                        title="Setup Gap: No Warden Assigned",
+                    )
+                    complaint.add_history(f"Setup gap: Location {loc_name} has no warden. Alerted App Manager.")
+                    changed = True
+
+                if fixed_dt:
                     if current_time > fixed_dt + timedelta(hours=24):
                         if int(getattr(complaint, "warden_escalation_level", 0)) < 1:
                             complaint.warden_escalation_level = 1
@@ -1410,25 +1510,52 @@ class ComplaintService:
         if not coord_user.active or getattr(coord_user, "is_deleted", False) or getattr(coord_user, "status", "Active") != "Active":
             raise ValueError("Coordinator is inactive.")
 
+        complaint = self.get_complaint(complaint_id)
+        if not complaint:
+            raise ValueError("Complaint not found.")
+
+        if (coord_user.role or "").lower() == "coordinator":
+            if not self.auth_service.is_coordinator_assigned(
+                coordinator_id, complaint.location_id, complaint.department_id
+            ):
+                raise PermissionError("You are not mapped to handle complaints for this location and department.")
+
         now_str = now_string()
         with self.repository._connect() as conn:
+            # Case 1: unassigned ticket in queue
             cursor = conn.execute(
                 """
                 UPDATE complaints
-                SET assigned_to = ?, status = 'Assigned', assigned_at = ?, updated_at = ?
-                WHERE complaint_id = ? AND (assigned_to IS NULL OR status = 'Submitted')
+                SET assigned_to = ?, status = 'In Progress', assigned_at = ?, started_at = ?, updated_at = ?
+                WHERE complaint_id = ? AND (assigned_to IS NULL OR assigned_to = '')
                 """,
-                (coordinator_id, now_str, now_str, complaint_id),
+                (coordinator_id, now_str, now_str, now_str, complaint_id),
             )
             if cursor.rowcount == 0:
-                row = conn.execute("SELECT status, assigned_to FROM complaints WHERE complaint_id = ?", (complaint_id,)).fetchone()
-                if not row:
-                    raise ValueError("Complaint not found.")
-                raise ComplaintConflictError("Complaint has already been accepted by another coordinator or is not available.")
+                # Case 2: ticket was already assigned directly to this coordinator (status Assigned)
+                cursor = conn.execute(
+                    """
+                    UPDATE complaints
+                    SET status = 'In Progress', started_at = CASE WHEN started_at IS NULL THEN ? ELSE started_at END, updated_at = ?
+                    WHERE complaint_id = ? AND assigned_to = ? AND status IN ('Assigned', 'Submitted')
+                    """,
+                    (now_str, now_str, complaint_id, coordinator_id),
+                )
+                if cursor.rowcount == 0:
+                    row = conn.execute("SELECT status, assigned_to FROM complaints WHERE complaint_id = ?", (complaint_id,)).fetchone()
+                    if not row:
+                        raise ValueError("Complaint not found.")
+                    current_assignee = row["assigned_to"]
+                    if current_assignee == coordinator_id and row["status"] == "In Progress":
+                        pass
+                    else:
+                        other_user = self.auth_service.get_user(current_assignee) if current_assignee else None
+                        name = other_user.name if other_user else (current_assignee or "another coordinator")
+                        raise ComplaintConflictError(f"Complaint has already been accepted by {name}.")
 
         complaint = self.get_complaint(complaint_id)
         if complaint:
-            complaint.add_history(f"Accepted by coordinator {coord_user.name} ({coordinator_id}).")
+            complaint.add_history(f"Accepted by coordinator {coord_user.name} ({coordinator_id}). Status is In Progress.")
             self.save_complaint(complaint)
         return complaint
 
@@ -1448,16 +1575,29 @@ class ComplaintService:
         self.save_complaint(complaint)
         return complaint
 
-    def record_progress(self, complaint_id, coordinator_id, note, photo_url=None):
+    def record_progress(self, complaint_id, coordinator_id, note=None, photo_url=None, note_code=None):
         complaint = self.get_complaint(complaint_id)
         if not complaint:
             raise ValueError("Complaint not found.")
         if complaint.assigned_to != coordinator_id:
             raise ValueError("You can only update complaints assigned to you.")
-        if not note or not note.strip():
-            raise ValueError("Progress note is required.")
 
-        msg = f"Progress update: {note.strip()}"
+        final_note = (note or "").strip()
+        if note_code:
+            code_upper = note_code.strip().upper()
+            if code_upper in PRESET_PROGRESS_NOTES:
+                complaint.last_progress_code = code_upper
+                if not final_note:
+                    final_note = PRESET_PROGRESS_NOTES[code_upper]
+            else:
+                complaint.last_progress_code = note_code
+
+        if not final_note:
+            raise ValueError("Progress note or preset note code is required.")
+
+        msg = f"Progress update: {final_note}"
+        if note_code:
+            msg += f" [{note_code}]"
         if photo_url:
             msg += " (photo attached)"
         complaint.add_history(msg)
@@ -1465,10 +1605,112 @@ class ComplaintService:
 
         self.notification_service.notify(
             complaint.created_by,
-            f"Update on your complaint {complaint.complaint_id}: {note.strip()}",
+            f"Update on your complaint {complaint.complaint_id}: {final_note}",
             complaint_id=complaint.complaint_id,
             title="Complaint Progress Update",
         )
+        return complaint
+
+    def correct_location(self, complaint_id, correct_location_id, user, note=None):
+        complaint = self.get_complaint(complaint_id)
+        if not complaint:
+            raise ValueError("Complaint not found.")
+        new_loc = self.auth_service.get_location(correct_location_id)
+        if not new_loc:
+            raise ValueError("Target location not found.")
+        if not getattr(new_loc, "active", True):
+            raise ValueError("Target location is inactive.")
+
+        old_loc_id = complaint.location_id
+        old_loc = self.auth_service.get_location(old_loc_id)
+        old_loc_name = old_loc.name if old_loc else old_loc_id
+        new_loc_name = new_loc.name or correct_location_id
+
+        complaint.location_id = correct_location_id
+        complaint.wrong_location_corrected_at = now_string()
+        complaint.wrong_location_corrections = int(getattr(complaint, "wrong_location_corrections", 0) or 0) + 1
+
+        u_name = getattr(user, "name", str(getattr(user, "user_id", user)))
+        hist_msg = f"Location corrected from {old_loc_name} to {new_loc_name} by {u_name}."
+        if note and note.strip():
+            hist_msg += f" Note: {note.strip()}"
+        complaint.add_history(hist_msg)
+
+        # Re-route according to new location & department
+        candidate_coords = self._get_mapped_coordinators(correct_location_id, complaint.department_id)
+        if len(candidate_coords) == 1:
+            coord_id = candidate_coords[0]
+            complaint.assigned_to = coord_id
+            complaint.status = Complaint.ASSIGNED
+            complaint.assigned_at = now_string()
+            complaint.auto_assigned = True
+            complaint.team_location_id = None
+            complaint.team_department_id = None
+            complaint.add_history(f"Auto-assigned to coordinator {coord_id} for new location.")
+            self.notification_service.notify(
+                coord_id,
+                f"Complaint {complaint.complaint_id} relocated to {new_loc_name} assigned to you.",
+                complaint_id=complaint.complaint_id,
+                title="Complaint Relocated & Assigned",
+            )
+        elif len(candidate_coords) >= 2:
+            complaint.assigned_to = None
+            complaint.status = Complaint.SUBMITTED
+            complaint.team_location_id = correct_location_id
+            complaint.team_department_id = complaint.department_id
+            complaint.add_history("Multiple coordinators available for new location. Placed in accept queue.")
+            for cid in candidate_coords:
+                self.notification_service.notify(
+                    cid,
+                    f"Work available in {new_loc_name}: {complaint.title or complaint.category} ({complaint.priority}).",
+                    complaint_id=complaint.complaint_id,
+                    title="Work Available in Queue",
+                )
+        else:
+            complaint.assigned_to = None
+            complaint.status = Complaint.SUBMITTED
+            complaint.team_location_id = None
+            complaint.team_department_id = None
+            complaint.add_history("No coordinator assigned for new location/department. Placed in queue.")
+            dept_obj = self.auth_service.get_department(complaint.department_id)
+            dept_label = dept_obj.name if dept_obj else complaint.department_id
+            alert_msg = f"Complaint {complaint.complaint_id} moved to {new_loc_name}/{dept_label} has no coordinator assigned."
+            warden_id = getattr(new_loc, "in_charge_id", None)
+            if warden_id:
+                self.notification_service.notify(
+                    warden_id, alert_msg, complaint_id=complaint.complaint_id, title="Coverage Gap Alert"
+                )
+            app_mgr_id = getattr(new_loc, "app_manager_id", None)
+            if app_mgr_id:
+                self.notification_service.notify(
+                    app_mgr_id, alert_msg, complaint_id=complaint.complaint_id, title="Coverage Gap Alert"
+                )
+            for admin_u in self.auth_service.list_users(role="administrator"):
+                if admin_u.active and not getattr(admin_u, "is_deleted", False):
+                    self.notification_service.notify(
+                        admin_u.user_id, alert_msg, complaint_id=complaint.complaint_id, title="Coverage Gap Alert"
+                    )
+
+        # Notify new location warden
+        new_warden_id = getattr(new_loc, "in_charge_id", None)
+        if new_warden_id:
+            self.notification_service.notify(
+                new_warden_id,
+                f"Complaint {complaint.complaint_id} was relocated to your location ({new_loc_name}).",
+                complaint_id=complaint.complaint_id,
+                title="Complaint Relocated to Your Location",
+            )
+
+        # Notify student submitter
+        self.notification_service.notify(
+            complaint.created_by,
+            f"The location for your complaint {complaint.complaint_id} was updated to {new_loc_name}.",
+            complaint_id=complaint.complaint_id,
+            title="Complaint Location Updated",
+        )
+
+        self._enrich_sla(complaint)
+        self.save_complaint(complaint)
         return complaint
 
     def block_complaint(self, complaint_id, coordinator_id, reason, expected_date=None):
@@ -1582,7 +1824,6 @@ class ComplaintService:
                 target_id = self.get_active_app_manager()
                 target_role = "App Manager"
 
-            complaint.assigned_to = target_id
             complaint.escalated = True
             complaint.add_history(
                 f"Escalated to {target_role} by Coordinator {user.user_id}. Reason: {reason}"
@@ -1596,7 +1837,6 @@ class ComplaintService:
 
         elif u_role == "location_in_charge":
             app_manager_id = self.get_active_app_manager()
-            complaint.assigned_to = app_manager_id
             complaint.escalated = True
             complaint.add_history(
                 f"Escalated to App Manager by Warden {user.user_id}. Reason: {reason}"
@@ -1615,7 +1855,6 @@ class ComplaintService:
                 ).fetchone()
                 admin_id = row["user_id"] if row else "USR_ADMIN"
 
-            complaint.assigned_to = admin_id
             complaint.escalated = True
             complaint.add_history(
                 f"Escalated to Administrator by App Manager {user.user_id}. Reason: {reason}"

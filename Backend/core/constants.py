@@ -47,9 +47,6 @@ STATUS_LEGACY_RESOLVED = "Resolved"
 
 # Status Categories
 INACTIVE_STATUSES = (
-    STATUS_LEGACY_RESOLVED,
-    STATUS_WAITING_STUDENT,
-    STATUS_PENDING_WARDEN,
     STATUS_CLOSED,
     STATUS_AUTO_CLOSED,
     "Auto-Closed",
@@ -77,8 +74,21 @@ SLA_ACTIVE_STATUSES = (
 # Inactivity and Auto-Close Parameters
 AUTO_CLOSE_HOURS = 48
 AUTO_CLOSE_REMINDER_HOURS = 24
+AFFECTED_CONFIRM_AFTER_HOURS = 24       # after this, any affected student may confirm
+AFFECTED_PRIORITY_THRESHOLD = 10        # "I am affected" count that raises priority one level
 MAX_REOPENS = 3
 SPOT_CHECK_RATE = 0.10
+PHOTO_SKIP_STREAK_LIMIT = 2
+
+# Preset Progress Note Codes (one-tap for coordinator, localized per viewer language)
+PRESET_PROGRESS_NOTES = {
+    "PART_ORDERED": "Parts ordered / Waiting for spare parts",
+    "COME_BACK_TOMORROW": "Work in progress; will return tomorrow",
+    "ROOM_LOCKED": "Room was locked / Student unavailable",
+    "NEED_SPECIALIST": "Requires external specialist or tools",
+    "INSPECTION_DONE": "Initial inspection completed; repair underway",
+    "CLEANUP_PENDING": "Repair finished; testing and cleanup pending",
+}
 
 # Roles
 ROLE_STUDENT = "student"
@@ -122,6 +132,25 @@ CATEGORY_PRIORITY_MAP = {
     "civil": "Medium",
     "general": "Medium",
 }
+
+# Optional category-level SLA hour overrides
+CATEGORY_SLA_OVERRIDES = {}
+
+
+def get_sla_hours(priority: str, category: str = None) -> float:
+    """Returns SLA resolution window in hours for a given priority and optional category override.
+    For Critical priority, always uses the shorter of the priority SLA or category override.
+    """
+    p = normalize_priority(priority)
+    base_hours = SLA_HOURS.get(p, 48)
+    if category:
+        cat_clean = str(category).strip().lower()
+        if cat_clean in CATEGORY_SLA_OVERRIDES:
+            cat_hours = float(CATEGORY_SLA_OVERRIDES[cat_clean])
+            if p == "Critical":
+                return min(cat_hours, float(SLA_HOURS["Critical"]))
+            return cat_hours
+    return float(base_hours)
 
 
 def normalize_role(role_name: str) -> str:
