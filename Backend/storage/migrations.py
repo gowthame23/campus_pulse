@@ -37,6 +37,8 @@ def run_migrations(db_path: str = "storage/campus_pulse.db"):
         conn.execute("PRAGMA foreign_keys = OFF;")  # Disable during DDL modifications
 
         _migrate_complaints_table(conn)
+        _migrate_users_table(conn)
+        _migrate_attachments_table(conn)
         _migrate_coordinator_assignments_table(conn)
         _migrate_locations_table(conn)
         _migrate_operational_tables(conn)
@@ -134,12 +136,49 @@ def _migrate_complaints_table(conn: sqlite3.Connection):
         "deletion_requested_role": "TEXT",
         "deletion_reason": "TEXT",
         "deletion_requested_at": "TEXT",
+        "wrong_location_corrected_at": "TEXT",
+        "wrong_location_corrections": "INTEGER DEFAULT 0",
+        "last_progress_code": "TEXT",
+        "photo_skipped": "INTEGER DEFAULT 0",
+        "photo_skip_reason": "TEXT",
+        "reopen_notes": "TEXT",
+        "resolution_proof_url": "TEXT",
     }
 
     for col_name, col_type in new_columns.items():
         if col_name not in existing_cols:
             conn.execute(f"ALTER TABLE complaints ADD COLUMN {col_name} {col_type};")
             logger.info(f"Added column {col_name} to complaints table.")
+
+
+def _migrate_users_table(conn: sqlite3.Connection):
+    """Ensure users table has photo_skip_streak, force_next_warden_check, and language columns."""
+    existing_cols = _get_existing_columns(conn, "users")
+    user_cols = {
+        "photo_skip_streak": "INTEGER DEFAULT 0",
+        "force_next_warden_check": "INTEGER DEFAULT 0",
+        "language": "TEXT DEFAULT 'en'",
+    }
+    for col_name, col_type in user_cols.items():
+        if col_name not in existing_cols:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type};")
+            logger.info(f"Added column {col_name} to users table.")
+
+
+def _migrate_attachments_table(conn: sqlite3.Connection):
+    """Ensure attachments table has source, sha256, exif_taken_at, kind, flags columns."""
+    existing_cols = _get_existing_columns(conn, "attachments")
+    att_cols = {
+        "source": "TEXT DEFAULT 'gallery'",
+        "sha256": "TEXT",
+        "exif_taken_at": "TEXT",
+        "kind": "TEXT DEFAULT 'attachment'",
+        "flags": "TEXT",
+    }
+    for col_name, col_type in att_cols.items():
+        if col_name not in existing_cols:
+            conn.execute(f"ALTER TABLE attachments ADD COLUMN {col_name} {col_type};")
+            logger.info(f"Added column {col_name} to attachments table.")
 
 
 def _migrate_coordinator_assignments_table(conn: sqlite3.Connection):

@@ -309,6 +309,12 @@ class ComplaintStatusRequest(BaseModel):
 
 class ComplaintAssignRequest(BaseModel):
     coordinator_id: str
+    reason: Optional[str] = None
+
+
+class ComplaintWrongLocationRequest(BaseModel):
+    correct_location_id: str
+    note: Optional[str] = None
 
 
 class ComplaintResolveRequest(BaseModel):

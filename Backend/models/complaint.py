@@ -97,6 +97,13 @@ class Complaint:
         deletion_requested_role=None,
         deletion_reason=None,
         deletion_requested_at=None,
+        wrong_location_corrected_at=None,
+        wrong_location_corrections=0,
+        last_progress_code=None,
+        photo_skipped=False,
+        photo_skip_reason=None,
+        reopen_notes=None,
+        resolution_proof_url=None,
     ):
         self.complaint_id = complaint_id or generate_id("CMP")
         self.archived = bool(archived)
@@ -162,6 +169,13 @@ class Complaint:
         self.deletion_requested_role = deletion_requested_role
         self.deletion_reason = deletion_reason
         self.deletion_requested_at = deletion_requested_at
+        self.wrong_location_corrected_at = wrong_location_corrected_at
+        self.wrong_location_corrections = int(wrong_location_corrections or 0)
+        self.last_progress_code = last_progress_code
+        self.photo_skipped = bool(photo_skipped)
+        self.photo_skip_reason = photo_skip_reason
+        self.reopen_notes = reopen_notes
+        self.resolution_proof_url = resolution_proof_url
 
     def add_history(self, message):
         self.updated_at = now_string()
@@ -292,5 +306,12 @@ class Complaint:
             deletion_requested_role=data.get("deletion_requested_role"),
             deletion_reason=data.get("deletion_reason"),
             deletion_requested_at=data.get("deletion_requested_at"),
+            wrong_location_corrected_at=data.get("wrong_location_corrected_at"),
+            wrong_location_corrections=data.get("wrong_location_corrections", 0),
+            last_progress_code=data.get("last_progress_code"),
+            photo_skipped=data.get("photo_skipped", False),
+            photo_skip_reason=data.get("photo_skip_reason"),
+            reopen_notes=data.get("reopen_notes"),
+            resolution_proof_url=data.get("resolution_proof_url"),
         )
         return c

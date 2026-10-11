@@ -24,6 +24,7 @@ from api.schemas import (
     ComplaintResponse,
     ComplaintStatusRequest,
     ComplaintUpdateRequest,
+    ComplaintWrongLocationRequest,
     EscalateRequest,
     WardenVerifyRequest,
     AdminDecisionRequest,
@@ -736,7 +737,8 @@ def create_complaint(
 
 
 class ComplaintProgressRequest(BaseModel):
-    note: str
+    note_code: Optional[str] = None
+    note: Optional[str] = None
     photo_url: Optional[str] = None
 
 
@@ -761,6 +763,16 @@ def accept_complaint(
         )
     _ensure_visible(complaint, current_user, complaint_service)
 
+    # Coordinators can only accept complaints for their assigned location + department pairs
+    if (current_user.role or "").lower() == "coordinator":
+        if not complaint_service.auth_service.is_coordinator_assigned(
+            current_user.user_id, complaint.location_id, complaint.department_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not mapped to handle complaints for this location and department.",
+            )
+
     try:
         complaint = complaint_service.accept_complaint(complaint_id, current_user.user_id)
         try:
@@ -769,7 +781,7 @@ def accept_complaint(
                 "event": "complaint_accepted",
                 "complaint_id": complaint_id,
                 "assigned_to": current_user.user_id,
-                "status": "Assigned",
+                "status": "In Progress",
             }
             manager.push_sync("coordinator", event)
             manager.push_sync(complaint.created_by, event)
@@ -833,7 +845,11 @@ def record_complaint_progress(
     _ensure_visible(complaint, current_user, complaint_service)
     try:
         complaint = complaint_service.record_progress(
-            complaint_id, current_user.user_id, payload.note, payload.photo_url
+            complaint_id,
+            current_user.user_id,
+            note=payload.note,
+            photo_url=payload.photo_url,
+            note_code=payload.note_code,
         )
         return _format_complaint(complaint, complaint_service)
     except ValueError as error:
@@ -902,6 +918,7 @@ def close_complaint(
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
+@router.post("/{complaint_id}/reassign", response_model=ComplaintResponse)
 @router.post("/{complaint_id}/assign", response_model=ComplaintResponse)
 def assign_complaint(
     complaint_id: str,
@@ -910,6 +927,7 @@ def assign_complaint(
         require_roles(AppManager.ROLE, Administrator.ROLE)
     ),
     complaint_service=Depends(get_complaint_service),
+    audit_service=Depends(get_audit_service),
 ):
     complaint = complaint_service.get_complaint(complaint_id)
     if not complaint:
@@ -926,63 +944,87 @@ def assign_complaint(
             detail="Target assignee must be a Coordinator.",
         )
 
+    # Check if target coordinator is mapped to this location and department
+    if not complaint_service.auth_service.is_coordinator_assigned(
+        payload.coordinator_id, complaint.location_id, complaint.department_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Coordinator {target_user.name} is not mapped to this location and department.",
+        )
+
+    # Reassign check: if already assigned, reason is mandatory
+    is_reassign = bool(complaint.assigned_to and complaint.assigned_to != payload.coordinator_id)
+    if is_reassign and (not payload.reason or not payload.reason.strip()):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A mandatory reason is required when reassigning a complaint.",
+        )
+
+    old_assigned = complaint.assigned_to
     try:
-        complaint = complaint_service.assign_work(complaint_id, payload.coordinator_id)
+        complaint = complaint_service.assign_work(
+            complaint_id, payload.coordinator_id, reason=payload.reason, actor_id=current_user.user_id
+        )
+        action_name = "REASSIGN_COMPLAINT" if is_reassign else "ASSIGN_COMPLAINT"
+        audit_service.log(
+            current_user.user_id,
+            action_name,
+            complaint_id,
+            old_value={"assigned_to": old_assigned},
+            new_value={"assigned_to": payload.coordinator_id, "reason": payload.reason},
+        )
         return _format_complaint(complaint, complaint_service)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
 
-@router.post("/{complaint_id}/take", response_model=ComplaintResponse)
-def take_complaint(
+@router.post("/{complaint_id}/wrong-location", response_model=ComplaintResponse)
+def report_wrong_location(
     complaint_id: str,
+    payload: ComplaintWrongLocationRequest,
     current_user=Depends(get_current_user),
     complaint_service=Depends(get_complaint_service),
     audit_service=Depends(get_audit_service),
 ):
-    u_role = (current_user.role or "").lower()
-    if u_role not in ("coordinator", "location_in_charge"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Coordinators or Wardens can take complaints.",
-        )
-
     complaint = complaint_service.get_complaint(complaint_id)
     if not complaint:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
         )
 
-    _ensure_visible(complaint, current_user, complaint_service)
+    u_role = (current_user.role or "").lower()
+    is_assignee = complaint.assigned_to == current_user.user_id
+    is_warden = (
+        u_role in ("location_in_charge", "warden")
+        and complaint_service.auth_service.is_warden_assigned(current_user.user_id, complaint.location_id)
+    )
+    is_mgr_or_admin = u_role in ("app_manager", "administrator")
 
-    if complaint.status != Complaint.SUBMITTED:
+    if not (is_assignee or is_warden or is_mgr_or_admin):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only Submitted complaints can be taken.",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the assigned coordinator, location warden, App Manager, or Administrator can report a wrong location.",
         )
 
-    if complaint.assigned_to:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Complaint is already assigned to a staff member.",
-        )
-
-    old_status = complaint.status
-    old_assigned = complaint.assigned_to
-
+    old_location_id = complaint.location_id
     try:
-        complaint = complaint_service.take_complaint(complaint_id, current_user.user_id)
+        complaint = complaint_service.correct_location(
+            complaint_id,
+            payload.correct_location_id,
+            user=current_user,
+            note=payload.note,
+        )
         audit_service.log(
             current_user.user_id,
-            "Take Complaint",
+            "CORRECT_LOCATION",
             complaint_id,
-            old_value={"status": old_status, "assigned_to": old_assigned},
-            new_value={"status": Complaint.ASSIGNED, "assigned_to": current_user.user_id},
+            old_value={"location_id": old_location_id},
+            new_value={"location_id": payload.correct_location_id, "note": payload.note},
         )
+        return _format_complaint(complaint, complaint_service)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-    return _format_complaint(complaint, complaint_service)
 
 
 @router.patch("/{complaint_id}/status", response_model=ComplaintResponse)

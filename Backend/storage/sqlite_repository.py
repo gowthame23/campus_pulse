@@ -1438,11 +1438,14 @@ class SQLiteRepository:
                         auto_close_reminded, admin_review_reason, admin_decision,
                         admin_decided_by, admin_decided_at, deletion_requested,
                         deletion_requested_by, deletion_requested_name, deletion_requested_role,
-                        deletion_reason, deletion_requested_at
+                        deletion_reason, deletion_requested_at,
+                        wrong_location_corrected_at, wrong_location_corrections,
+                        last_progress_code, photo_skipped, photo_skip_reason,
+                        reopen_notes, resolution_proof_url
                     ) VALUES (
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                     )
                     """,
                     [
@@ -1654,6 +1657,13 @@ class SQLiteRepository:
             item.get("deletion_requested_role"),
             item.get("deletion_reason"),
             item.get("deletion_requested_at"),
+            item.get("wrong_location_corrected_at"),
+            int(item.get("wrong_location_corrections", 0) or 0),
+            item.get("last_progress_code"),
+            int(bool(item.get("photo_skipped", False))),
+            item.get("photo_skip_reason"),
+            item.get("reopen_notes"),
+            item.get("resolution_proof_url"),
         )
 
     def _row_to_user(self, row):
@@ -1784,4 +1794,11 @@ class SQLiteRepository:
             "deletion_requested_role": row["deletion_requested_role"] if "deletion_requested_role" in row.keys() else None,
             "deletion_reason": row["deletion_reason"] if "deletion_reason" in row.keys() else None,
             "deletion_requested_at": row["deletion_requested_at"] if "deletion_requested_at" in row.keys() else None,
+            "wrong_location_corrected_at": row["wrong_location_corrected_at"] if "wrong_location_corrected_at" in row.keys() else None,
+            "wrong_location_corrections": int(row["wrong_location_corrections"]) if "wrong_location_corrections" in row.keys() and row["wrong_location_corrections"] is not None else 0,
+            "last_progress_code": row["last_progress_code"] if "last_progress_code" in row.keys() else None,
+            "photo_skipped": bool(row["photo_skipped"]) if "photo_skipped" in row.keys() and row["photo_skipped"] is not None else False,
+            "photo_skip_reason": row["photo_skip_reason"] if "photo_skip_reason" in row.keys() else None,
+            "reopen_notes": row["reopen_notes"] if "reopen_notes" in row.keys() else None,
+            "resolution_proof_url": row["resolution_proof_url"] if "resolution_proof_url" in row.keys() else None,
         }
