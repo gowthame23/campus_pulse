@@ -1,0 +1,23 @@
+# Matches the two-process local dev stack documented in CLAUDE.md
+# ("Running Locally"): uvicorn on :8000, vite on :5173. No other services —
+# storage is the same file-based SQLite database the app already uses,
+# just persisted via a volume instead of living inside the container.
+services:
+  backend:
+    build:
+      context: ./Backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./Backend/storage:/app/storage
+      - ./Backend/logs:/app/logs
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./Frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    restart: unless-stopped

@@ -1,0 +1,22 @@
+# Runtime data — persisted via the docker-compose volume mount instead
+storage/campus_pulse.db
+storage/*.db
+storage/*.db-journal
+storage/attachments/
+storage/backups/
+storage/repository.json
+logs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# VCS / editor
+.git/
+.gitignore
+.vscode/
+.idea/
