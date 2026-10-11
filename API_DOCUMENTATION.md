@@ -1,156 +1,101 @@
-# Campus Pulse - API Documentation
+# Campus Pulse — API Reference & Route Documentation
 
-Base URL: `http://localhost:8000`
+Base URL: `http://localhost:8000`  
+Interactive OpenAPI UI: `http://localhost:8000/docs`  
+ReDoc UI: `http://localhost:8000/redoc`
 
----
-
-## 🔑 Authentication Endpoints (`/auth`)
-
-### `POST /auth/login`
-- **Description:** Authenticate user credentials and return Bearer token.
-- **Request Body:**
-  ```json
-  {
-    "email": "user@campus.com",
-    "password": "Password@123"
-  }
-  ```
-- **Response (200 OK):**
-  ```json
-  {
-    "access_token": "<token_string>",
-    "token_type": "bearer",
-    "user": {
-      "user_id": "USR-123456",
-      "name": "John Doe",
-      "email": "user@campus.com",
-      "role": "student",
-      "first_login": false,
-      "active": true
-    }
-  }
-  ```
-
-### `POST /auth/change-password`
-- **Description:** Password change for authenticated users.
-- **Headers:** `Authorization: Bearer <token>`
-- **Request Body:** `{"old_password": "OldPassword@123", "new_password": "NewPassword@123"}`
-
-### `POST /auth/password-reset/request`
-- **Description:** Request an OTP for password reset.
-- **Request Body:** `{"email": "user@campus.edu"}`
-- **Response (200 OK):** `{"reset_id": "<reset_id>", "message": "OTP sent to registered email."}`
-
-### `POST /auth/password-reset/verify`
-- **Description:** Verify OTP code received via email.
-- **Request Body:** `{"reset_id": "<reset_id>", "otp": "123456"}`
-- **Response (200 OK):** `{"reset_token": "<reset_token>", "message": "OTP verified successfully."}`
-
-### `POST /auth/password-reset/complete`
-- **Description:** Complete password reset using verified `reset_token`.
-- **Request Body:** `{"reset_token": "<reset_token>", "new_password": "NewPassword@123"}`
-- **Response (200 OK):** `{"message": "Password reset successful.", "user_id": "<user_id>"}`
-
-### `POST /auth/reset-password` (Deprecated)
-- **Response (410 GONE):** Use `/auth/password-reset/request`, `/verify`, and `/complete`.
+**Verified Endpoint Count:** **296 Total Routes** (290 application endpoints across 23 routers + 2 WebSockets + 4 OpenAPI/docs routes).
 
 ---
 
-## 👥 User Management (`/users`)
+## 1. Authentication & Security (`/auth`)
 
-### `GET /users`
-- **Roles Required:** `administrator`, `app_manager`
-- **Query Params:** `role` (optional)
-- **Response:** List of user profiles.
-
-### `POST /users`
-- **Roles Required:** `administrator`, `app_manager`
-- **Description:** Create new user account enforcing creation role hierarchy.
-
-### `PATCH /users/{user_id}`
-- **Description:** Update user status (`active`), name, email, department, or location mapping.
-
-### `DELETE /users/{user_id}`
-- **Description:** Delete user account if no active complaint dependencies exist.
-
-### `POST /users/transfer-coordinator`
-- **Description:** Transfer active complaints from an old coordinator to a new coordinator before account deactivation.
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/auth/login` | Public | Authenticate with email/roll/employee ID and password; enforces rate limiting (5 failed attempts per 15 min triggers lockout). |
+| `POST` | `/auth/logout` | Authenticated | Revoke user session and invalidate token. |
+| `POST` | `/auth/change-password` | Authenticated | Change current user password with old password verification. |
+| `POST` | `/auth/password-reset/request` | Public | Request an OTP for password reset (delivered via async SMTP or console log). |
+| `POST` | `/auth/password-reset/verify` | Public | Verify OTP code and receive a short-lived reset token. |
+| `POST` | `/auth/password-reset/complete` | Public | Complete password reset using verified reset token. |
+| `POST` | `/auth/ws-ticket` | Authenticated | Generate a single-use, 60-second WebSocket connection ticket (tokens never pass in WS query strings). |
 
 ---
 
-## 📋 Complaint Endpoints (`/complaints`)
+## 2. Complaint Management & Lifecycle (`/complaints`)
 
-### `GET /complaints`
-- **Query Params:** `status_filter`, `department_id`, `location_id`, `include_archived`
-- **Description:** Returns complaints visible to current role, enriched with dynamic `due_date` and `sla_status` (`🟢 On Time`, `🟡 Due Today`, `🔴 Overdue`).
-
-### `POST /complaints`
-- **Roles Required:** `student`, `location_in_charge`
-- **Request Body:**
-  ```json
-  {
-    "location_id": "LOC_1",
-    "department_id": "DEPT_1",
-    "complaint_type": "Fan",
-    "description": "Fan speed regulator broken.",
-    "attachment_url": "https://example.com/photo.jpg"
-  }
-  ```
-- **Response (201 Created):** Newly created complaint object.
-
-### `POST /complaints/{complaint_id}/assign`
-- **Roles Required:** `coordinator`, `app_manager`, `administrator`
-- **Request Body:** `{"coordinator_id": "USR_COORD_1"}`
-
-### `POST /complaints/{complaint_id}/resolve`
-- **Request Body:** `{"notes": "Replaced regulator knob."}`
-
-### `POST /complaints/{complaint_id}/reopen`
-- **Request Body:** `{"reason": "Fan is still making noise."}`
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/complaints` | Authenticated | Fetch complaints filtered by role, location, department, status, and SLA timeline. |
+| `POST` | `/complaints` | Student, Warden | File a new complaint with location, department, description, and optional attachments. |
+| `GET` | `/complaints/{id}` | Authenticated | Retrieve full complaint details, history timeline, resolution notes, and attachments. |
+| `POST` | `/complaints/{id}/accept` | Coordinator | Atomically accept an unassigned complaint from the department/location queue (409 Conflict if already claimed). |
+| `POST` | `/complaints/{id}/start-work` | Coordinator | Transition status to `In Progress` and log start timestamp. |
+| `POST` | `/complaints/{id}/progress-note` | Coordinator | Append progress notes visible to the student and warden. |
+| `POST` | `/complaints/{id}/waiting-for-parts`| Coordinator | Set status to `Waiting for Parts` with mandatory reason and expected resume date. |
+| `POST` | `/complaints/{id}/resume-work` | Coordinator | Resume work from waiting state, setting status back to `In Progress`. |
+| `POST` | `/complaints/{id}/resolve` | Coordinator | Mark complaint as `Fixed`. Photo upload required for `High` and `Critical` priorities. |
+| `POST` | `/complaints/{id}/warden-verify` | Warden | In-person verification for High/Critical tickets (or random spot check). Options: `Verified` (moves to Fixed) or `Not Fixed` (returns to In Progress). Self-verification blocked. |
+| `POST` | `/complaints/{id}/confirm-close` | Student | Student confirms resolution and transitions ticket to `Closed`. |
+| `POST` | `/complaints/{id}/reopen` | Student | Reopen a resolved ticket (max 3 times). On 3rd reopen, escalates automatically to `Admin Review` (`Disputed`). |
+| `POST` | `/complaints/{id}/admin-decision` | Administrator | Final administrative decision on a disputed ticket (`Confirm Resolved` or `Reassign`). |
+| `POST` | `/complaints/{id}/assign` | App Mgr, Admin | Manually reassign a complaint to a specific coordinator. |
+| `POST` | `/complaints/{id}/escalate` | Staff | Manually escalate complaint priority or notify management. |
 
 ---
 
-## 🔔 Notifications (`/notifications`)
+## 3. Web Push Notifications (`/push`)
 
-- `GET /notifications`: List notifications for current user.
-- `POST /notifications/read-all`: Mark all notifications for current user as read.
-- `PUT /notifications/{id}/read`: Mark single notification as read.
-- `DELETE /notifications/{id}`: Delete single notification.
-- `DELETE /notifications`: Clear all notifications.
-
----
-
-## ⚙️ Settings & Data Maintenance (`/settings`)
-
-- `GET /settings/duplicates`: Scan for duplicate department/location records.
-- `POST /settings/resolve-duplicate`: Safely consolidate duplicates by migrating complaints/users before deleting stale records.
-- `GET /settings/backup`: Export full JSON database snapshot.
-- `POST /settings/restore`: Restore database from JSON backup snapshot.
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/push/vapid-public-key` | Public | Retrieve application VAPID public key for browser push subscription. |
+| `POST` | `/push/subscribe` | Authenticated | Register a Web Push subscription endpoint and encryption keys (`p256dh`, `auth`). |
+| `POST` | `/push/unsubscribe` | Authenticated | Remove an active Web Push subscription. |
 
 ---
 
-## 💬 Chat (`/chat`)
+## 4. Location & Organization Coverage (`/locations` & `/departments`)
 
-Notes: Conversations are domain-bound to Lost & Found items. Clients cannot create arbitrary user-to-user chats — conversations for an item are created by the server when an ownership claim is approved.
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/locations` | Authenticated | List all active campus locations with assigned wardens and coordinators. |
+| `POST` | `/locations` | Admin | Create a new campus location (Hostel, Academic Block, Lab, etc.). |
+| `GET` | `/locations/coverage-gaps` | App Mgr, Admin | Scan and report locations missing assigned wardens or coordinators. |
+| `GET` | `/departments` | Authenticated | List departments with default SLA days and active complaint categories. |
+| `POST` | `/departments` | Admin | Create or configure department SLA parameters. |
 
-### `POST /chat/start`
-- **Description:** Request the conversation for a given `item_id`. The endpoint will return the existing conversation linked to the item if one exists; it will NOT create a new conversation from the client.
-- **Request Body:** `{"item_id": "LF_F01"}`
-- **Response (200):** `{"conversation_id": "chat:USER_A:USER_B", "item_id": "LF_F01", "read_only": false}`
+---
 
-### `POST /chat/message`
-- **Description:** Send a message in a conversation. Requires `conversation_id` and `content`. The sender must be a participant and the conversation must not be read-only.
-- **Request Body:** `{"conversation_id": "chat:USER_A:USER_B", "content": "Hello"}`
-- **Response (200):** The saved message object `{message_id, conversation_id, sender_id, content, created_at, is_read}`
+## 5. User Lifecycle & Coordinator Assignment (`/users`)
 
-### `GET /chat/{conversation_id}`
-- **Description:** List messages for a conversation. Caller must be a participant.
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/users` | App Mgr, Admin | List user profiles with multi-role filters. |
+| `POST` | `/users` | App Mgr, Admin | Create a new user account enforcing role hierarchy. |
+| `PATCH` | `/users/{id}` | App Mgr, Admin | Update user name, email, active status, or primary department/location. |
+| `POST` | `/users/bulk-coordinator-assignments`| App Mgr, Admin | Assign a coordinator to multiple departments and physical locations simultaneously. |
+| `POST` | `/users/transfer-coordinator` | App Mgr, Admin | Reassign open complaint queue from an outgoing coordinator before deactivation. |
 
-### `GET /chat/conversations`
-- **Description:** List conversations for current user. Only returns conversations linked to Lost & Found items. Each item includes `item_id` and `read_only` flags so clients can render appropriate UI (disable input when `read_only` is true).
+---
 
-### WebSocket: `/ws/chat/{conversation_id}/{user_id}`
-- **Auth:** Short-term token via query string `?token=<access_token>` is supported for WebSocket authentication. The token must match a server session for the connecting user and the user must be a participant in the conversation.
-- **Events:** `chat_message` (payload = message object), `chat_created` (sent on conversation creation during claim approval).
+## 6. Real-Time Communications & WebSockets
 
-Audit: Conversation creation, message sends, and read-only transitions are logged in the `audit_logs` table under module `Chat`.
+- **Notifications WebSocket**: `ws://localhost:8000/notifications/ws?ticket=<single_use_ticket>`
+  - Real-time in-app alerts for status updates, assignments, verifications, and escalations.
+- **Personal Chat WebSocket**: `ws://localhost:8000/chat/ws?ticket=<single_use_ticket>`
+  - Real-time direct messaging between campus staff and coordinators.
+
+---
+
+## 7. Error Handling Standard
+
+API endpoints return consistent JSON responses with standard HTTP status codes:
+
+- `200 OK`: Request succeeded.
+- `201 Created`: Resource successfully created.
+- `400 Bad Request`: Payload validation failed or required fields missing (`{"detail": "..."}`).
+- `401 Unauthorized`: Missing, expired, or invalid Bearer token.
+- `403 Forbidden`: Authenticated user lacks required role or ownership permission.
+- `404 Not Found`: Target entity does not exist.
+- `409 Conflict`: Concurrency conflict (e.g. ticket already accepted by another coordinator).
+- `429 Too Many Requests`: Rate limit exceeded or account temporarily locked.

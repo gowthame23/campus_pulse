@@ -324,26 +324,35 @@ class ReportService:
                         ).fetchall()
                     ]
             elif report_type == "WorkOrder":
-                rows_dict = [
-                    dict(r)
-                    for r in conn.execute(
-                        "SELECT work_order_number, title, priority, status, assigned_technician_id, created_at FROM work_orders ORDER BY created_at DESC LIMIT 500"
-                    ).fetchall()
-                ]
+                try:
+                    rows_dict = [
+                        dict(r)
+                        for r in conn.execute(
+                            "SELECT work_order_number, title, priority, status, assigned_technician_id, created_at FROM work_orders ORDER BY created_at DESC LIMIT 500"
+                        ).fetchall()
+                    ]
+                except sqlite3.OperationalError:
+                    rows_dict = []
             elif report_type == "Visitor":
-                rows_dict = [
-                    dict(r)
-                    for r in conn.execute(
-                        "SELECT request_id, visitor_id, host_user_id, purpose, visit_date, status FROM visitor_requests ORDER BY created_at DESC LIMIT 500"
-                    ).fetchall()
-                ]
+                try:
+                    rows_dict = [
+                        dict(r)
+                        for r in conn.execute(
+                            "SELECT request_id, visitor_id, host_user_id, purpose, visit_date, status FROM visitor_requests ORDER BY created_at DESC LIMIT 500"
+                        ).fetchall()
+                    ]
+                except sqlite3.OperationalError:
+                    rows_dict = []
             elif report_type == "Asset":
-                rows_dict = [
-                    dict(r)
-                    for r in conn.execute(
-                        "SELECT asset_code, asset_name, current_condition, status, purchase_cost FROM assets ORDER BY created_at DESC LIMIT 500"
-                    ).fetchall()
-                ]
+                try:
+                    rows_dict = [
+                        dict(r)
+                        for r in conn.execute(
+                            "SELECT asset_code, asset_name, current_condition, status, purchase_cost FROM assets ORDER BY created_at DESC LIMIT 500"
+                        ).fetchall()
+                    ]
+                except sqlite3.OperationalError:
+                    rows_dict = []
             elif report_type == "Audit":
                 rows_dict = [
                     dict(r)

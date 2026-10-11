@@ -1,7 +1,7 @@
 # Campus Pulse — Consolidated REST API Reference & Permissions Inventory
 
 > **Document Type:** Complete REST API Specification & Endpoint Directory  
-> **Status:** Verified against FastAPI Route Registry (277 Endpoints)  
+> **Status:** Verified against FastAPI Route Registry (296 Endpoints: 290 application endpoints across 23 routers + 2 WebSockets + 4 OpenAPI/docs routes)  
 > **Repository:** Campus Pulse (`CampusPulse_co`)  
 
 ---
@@ -12,12 +12,13 @@
 - **Protocol:** HTTP/1.1 with TLS / HTTPS support; WebSockets on `/ws`
 - **Data Interchange:** `application/json` (REST endpoints); `multipart/form-data` (file uploads)
 - **Authentication Scheme:** `Authorization: Bearer <session_token>` header
-- **Error Standard:** RFC 7807 compatible JSON payload:
+- **Error Standard:** Standard FastAPI JSON payload (`{"detail": ...}`):
   ```json
   {
     "detail": "Error description string or validation error array"
   }
   ```
+  *(Note: Standard FastAPI JSON payload format with HTTP status codes; not RFC 7807 problem details)*
 
 ---
 
@@ -37,6 +38,7 @@
 | `POST` | `/auth/forgot-password` | Requests password reset email link | Public | No | `ForgotPasswordRequest(email)` | 200, 404 |
 | `POST` | `/auth/reset-password` | Resets password via token | Public | No | `ResetPasswordRequest(token, new_password)` | 200, 400 |
 | `POST` | `/auth/activate` | Activates account & sets initial password | Public | No | `ActivateAccountRequest(token, password)` | 200, 400 |
+| `POST` | `/auth/ws-ticket` | Issues single-use 60s ticket for WebSocket authentication | Any | Yes | None (Bearer Token) | 200, 401 |
 
 ---
 
@@ -92,9 +94,12 @@
 | `GET` | `/complaints/{id}` | Gets full complaint detail & comments | Author, Staff | Yes | Path: `id` | 200, 403, 404 |
 | `PUT` | `/complaints/{id}/status` | Updates complaint status | Staff, Admin | Yes | `StatusUpdateRequest(status)` | 200, 400, 403 |
 | `PUT` | `/complaints/{id}/assign` | Reassigns complaint to coordinator | Admin, Manager, Warden| Yes | `AssignRequest(assigned_to)` | 200, 400, 403 |
-| `PUT` | `/complaints/{id}/resolve`| Marks complaint resolved with proof | Coordinator, Staff | Yes | `ResolveRequest(notes, proof_url)` | 200, 400, 403 |
+| `PUT` | `/complaints/{id}/resolve`| Marks complaint resolved with proof (coordinator only) | Coordinator, Admin, Manager | Yes | `ResolveRequest(notes, proof_url)` | 200, 400, 403 |
+| `POST` | `/complaints/{id}/accept` | Atomically accepts complaint from department pool | Coordinator | Yes | Path: `id` | 200, 400, 409 |
+| `GET` | `/complaints/{id}/two-tier-status` | Retrieves two-tier verification status and timers | Author, Staff | Yes | Path: `id` | 200, 403, 404 |
+| `POST` | `/complaints/{id}/spot-check-decision`| Warden approves or rejects spot-check resolution | Warden | Yes | `SpotCheckDecisionRequest(decision, notes)` | 200, 400, 403 |
 | `PUT` | `/complaints/{id}/verify` | Approves resolution & closes issue | Complainant Student | Yes | `VerifyRequest(rating, comments)` | 200, 400, 403 |
-| `POST` | `/complaints/{id}/reopen` | Reopens unsatisfactory resolution | Complainant Student | Yes | `ReopenRequest(reason)` | 200, 400, 403 |
+| `POST` | `/complaints/{id}/reopen` | Reopens unsatisfactory resolution (max 3 times) | Complainant Student | Yes | `ReopenRequest(reason)` | 200, 400, 403 |
 | `POST` | `/complaints/{id}/comments`| Appends discussion comment | Author, Staff | Yes | `CommentCreateRequest(content)` | 201, 400, 403 |
 | `POST` | `/complaints/{id}/upvote` | Upvotes public complaint | Student | Yes | Path: `id` | 200, 400 |
 
@@ -140,7 +145,11 @@
 | `PUT` | `/notifications/{id}/read`| Marks notification as read | Caller | Yes | Path: `id` | 200, 404 |
 | `PUT` | `/notifications/read-all` | Marks all notifications as read | Caller | Yes | None | 200, 401 |
 | `DELETE`| `/notifications/{id}` | Dismisses notification | Caller | Yes | Path: `id` | 200, 404 |
-| `WS` | `/ws/{user_id}` | WebSocket stream for live alerts | Caller | Token Query | WS Connection | 101, 403 |
+| `GET` | `/notifications/push/vapid-public-key` | Gets public VAPID key for Web Push | Any | Yes | None | 200, 401 |
+| `POST` | `/notifications/push/subscribe` | Registers browser Web Push subscription | Any | Yes | `PushSubscriptionPayload(...)` | 201, 400, 401 |
+| `POST` | `/notifications/push/unsubscribe` | Removes browser Web Push subscription | Any | Yes | `PushUnsubscribePayload(...)` | 200, 400, 401 |
+| `POST` | `/notifications/push/test` | Triggers a test push notification | Admin | Yes | None | 200, 401, 403 |
+| `WS` | `/ws/{user_id}` | WebSocket stream for live alerts (uses single-use ticket) | Caller | Ticket Query (`?ticket=`) | WS Connection | 101, 403 |
 
 ---
 
@@ -151,14 +160,16 @@
 | `GET` | `/audit` | Lists immutable audit log entries | Admin, Manager | Yes | `?action=&entity_type=&limit=` | 200, 403 |
 | `GET` | `/backups` | Lists database backups on disk | Admin, Manager | Yes | None | 200, 403 |
 | `POST` | `/backups` | Triggers immediate SQLite online backup | Admin, Manager | Yes | None | 201, 500 |
-| `POST` | `/backups/{id}/restore`| Restores database snapshot | Admin | Yes | Path: `id` | 200, 403, 500 |
+| `POST` | `/backups/{id}/restore`| Schedules offline restore marker (`restore_pending.json`) | Admin | Yes | Path: `id` | 200, 403, 500 |
+| `GET` | `/superadmin/backups/pending-restore`| Checks if offline restore marker is pending | Admin, Super Admin | Yes | None | 200, 403 |
 | `GET` | `/settings` | Retrieves system configuration keys | Admin | Yes | None | 200, 403 |
 | `PUT` | `/settings` | Updates institutional configurations | Admin | Yes | `SettingsUpdateRequest(...)` | 200, 403 |
 
 ---
 
 ### Module 10: Multi-Tenant Platform Operations (`/platform`, `/superadmin`)
-*Router file:* [`Backend/api/routers/platform.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/api/routers/platform.py)
+*Router file:* [`Backend/api/routers/platform.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/api/routers/platform.py)  
+*(Note: Campus Pulse operates as a self-contained single-institution deployment per SQLite database. Platform endpoints provide optional multi-campus registration scaffolding)*
 
 | Method | Endpoint | Description | Roles | Auth Required | Request Body / Params | Status Codes |
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |

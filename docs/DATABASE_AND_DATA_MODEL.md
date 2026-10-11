@@ -10,6 +10,8 @@
 
 Campus Pulse utilizes **SQLite 3** as its active persistence engine. The runtime database file is located at `Backend/storage/campus_pulse.db`.
 
+Active runtime schema comprises ~39 production tables and active indexes. Speculative enterprise tables (~135 unused tables from earlier architecture drafts) have been cleanly isolated into `Backend/scripts/legacy_scaffold_schema.py` and documented in [`docs/UNUSED_TABLES.md`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/docs/UNUSED_TABLES.md).
+
 ```mermaid
 erDiagram
     users ||--o{ user_sessions : "has active"
@@ -74,7 +76,7 @@ Central user registry for all campus actors.
 | `active` | INTEGER | NO | `1` | Boolean flag (1=Active, 0=Deactivated) |
 | `is_deleted` | INTEGER | NO | `0` | Soft-delete flag (0=Active, 1=Soft Deleted) |
 | `is_temp_password` | INTEGER | NO | `0` | Requires mandatory password change if 1 |
-| `institution_id` | TEXT | YES | `NULL` | Multi-tenant institution reference |
+| `institution_id` | TEXT | YES | `NULL` | Optional institution identifier (single-institution runtime) |
 | `phone_number` | TEXT | YES | `NULL` | Contact phone number |
 | `created_at` | TEXT | NO | `CURRENT_TIMESTAMP` | ISO 8601 creation timestamp |
 | `updated_at` | TEXT | NO | `CURRENT_TIMESTAMP` | Last updated timestamp |
@@ -168,8 +170,15 @@ Central grievance lifecycle entity.
 | `priority` | TEXT | NO | `'Normal'` | Enum: `'Low'`, `'Normal'`, `'High'`, `'Critical'` |
 | `sla_deadline` | TEXT | YES | None | ISO 8601 SLA resolution deadline |
 | `is_escalated` | INTEGER| NO | `0` | 1 if SLA deadline breached |
-| `reopen_count` | INTEGER| NO | `0` | Number of times reopened by student |
-| `resolution_notes`| TEXT| YES | None | Remarks entered by resolving staff |
+| `reopen_count` | INTEGER| NO | `0` | Number of times reopened by student (max 3) |
+| `reopen_notes` | TEXT| YES | None | Notes/reason provided when reopening |
+| `resolution_notes`| TEXT| YES | None | Remarks entered by resolving coordinator |
+| `resolution_proof_url`| TEXT| YES | None | URL / filepath of proof photo |
+| `warden_verified_at`| TEXT| YES | None | Timestamp when warden verified High/Critical or spot check |
+| `warden_verified_by`| TEXT| YES | None | **FOREIGN KEY** → `users(user_id)`. Verifying warden |
+| `warden_decision`| TEXT| YES | None | `'approved'` or `'rejected'` |
+| `student_confirmed_at`| TEXT| YES | None | Timestamp when student confirmed resolution |
+| `is_spot_check` | INTEGER| NO | `0` | 1 if selected for random spot check (10% of Normal/Low) |
 | `resolved_at` | TEXT | YES | None | Timestamp when marked resolved |
 | `closed_at` | TEXT | YES | None | Timestamp when student verified or auto-closed |
 | `created_at` | TEXT | NO | `CURRENT_TIMESTAMP` | Creation timestamp |
@@ -240,6 +249,47 @@ Immutable audit trail for governance, compliance, and security tracking.
 | `details` | TEXT | YES | None | JSON string of state diff or parameters |
 | `ip_address` | TEXT | YES | None | Client IP address |
 | `created_at` | TEXT | NO | `CURRENT_TIMESTAMP` | Immutable timestamp |
+
+---
+
+### 2.12 Table: `coordinator_departments`
+Many-to-many mapping allowing a single coordinator to cover multiple departments.
+
+| Column | Type | Nullable | Default | Constraints & Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `coordinator_id` | TEXT | NO | None | **FOREIGN KEY** → `users(user_id)` ON DELETE CASCADE |
+| `department_id` | TEXT | NO | None | **FOREIGN KEY** → `departments(department_id)` ON DELETE CASCADE |
+| `created_at` | TEXT | NO | `CURRENT_TIMESTAMP` | Assignment timestamp |
+
+*Primary Key:* `(coordinator_id, department_id)`
+
+---
+
+### 2.13 Table: `coordinator_locations`
+Many-to-many mapping allowing a single coordinator to cover multiple campus locations.
+
+| Column | Type | Nullable | Default | Constraints & Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `coordinator_id` | TEXT | NO | None | **FOREIGN KEY** → `users(user_id)` ON DELETE CASCADE |
+| `location_id` | TEXT | NO | None | **FOREIGN KEY** → `locations(location_id)` ON DELETE CASCADE |
+| `created_at` | TEXT | NO | `CURRENT_TIMESTAMP` | Assignment timestamp |
+
+*Primary Key:* `(coordinator_id, location_id)`
+
+---
+
+### 2.14 Table: `push_subscriptions`
+Stores Web Push (VAPID) subscription endpoints and crypto keys for browser push notifications.
+
+| Column | Type | Nullable | Default | Constraints & Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `subscription_id` | TEXT | NO | None | **PRIMARY KEY** (`sub_<UUID>`) |
+| `user_id` | TEXT | NO | None | **FOREIGN KEY** → `users(user_id)` ON DELETE CASCADE |
+| `endpoint` | TEXT | NO | None | Browser push service subscription URL |
+| `p256dh` | TEXT | NO | None | Client public key (Base64url) |
+| `auth` | TEXT | NO | None | Client auth secret (Base64url) |
+| `user_agent` | TEXT | YES | `NULL` | Browser client user-agent string |
+| `created_at` | TEXT | NO | `CURRENT_TIMESTAMP` | Registration timestamp |
 
 ---
 
