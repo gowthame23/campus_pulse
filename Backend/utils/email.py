@@ -1,3 +1,4 @@
+import concurrent.futures
 import os
 import smtplib
 from email.mime.text import MIMEText
@@ -6,8 +7,26 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Small background worker pool so SMTP network latency never blocks the event loop
+_email_executor = concurrent.futures.ThreadPoolExecutor(max_workers=3, thread_name_prefix="email-dispatcher")
 
-def send_notification_email(to_email, title, message):
+
+def _is_sync_mode() -> bool:
+    return (
+        bool(os.environ.get("PYTEST_CURRENT_TEST"))
+        or os.environ.get("TESTING") == "1"
+        or os.environ.get("EMAIL_SYNC") == "true"
+    )
+
+
+def _smtp_configured() -> bool:
+    smtp_server = os.environ.get("SMTP_SERVER")
+    smtp_username = os.environ.get("SMTP_USERNAME")
+    smtp_password = os.environ.get("SMTP_PASSWORD")
+    return bool(smtp_server and smtp_username and smtp_password)
+
+
+def _send_notification_email_sync(to_email, title, message) -> bool:
     smtp_server = os.environ.get("SMTP_SERVER")
     smtp_port = os.environ.get("SMTP_PORT")
     smtp_username = os.environ.get("SMTP_USERNAME")
@@ -32,7 +51,21 @@ def send_notification_email(to_email, title, message):
         return False
 
 
-def send_otp_email(to_email, otp):
+def send_notification_email(to_email, title, message) -> bool:
+    """Non-blocking email delivery. Dispatches to worker thread pool unless in test sync mode."""
+    if not _smtp_configured():
+        return False
+    if _is_sync_mode():
+        return _send_notification_email_sync(to_email, title, message)
+    try:
+        _email_executor.submit(_send_notification_email_sync, to_email, title, message)
+        return True
+    except Exception as e:
+        logger.exception(f"Failed to submit notification email to thread pool: {e}")
+        return False
+
+
+def _send_otp_email_sync(to_email, otp) -> bool:
     smtp_server = os.environ.get("SMTP_SERVER")
     smtp_port = os.environ.get("SMTP_PORT")
     smtp_username = os.environ.get("SMTP_USERNAME")
@@ -63,7 +96,21 @@ def send_otp_email(to_email, otp):
         return False
 
 
-def send_password_changed_email(to_email, user_name):
+def send_otp_email(to_email, otp) -> bool:
+    """Non-blocking OTP email delivery. Dispatches to worker thread pool unless in test sync mode."""
+    if not _smtp_configured():
+        return False
+    if _is_sync_mode():
+        return _send_otp_email_sync(to_email, otp)
+    try:
+        _email_executor.submit(_send_otp_email_sync, to_email, otp)
+        return True
+    except Exception as e:
+        logger.exception(f"Failed to submit OTP email to thread pool: {e}")
+        return False
+
+
+def _send_password_changed_email_sync(to_email, user_name) -> bool:
     smtp_server = os.environ.get("SMTP_SERVER")
     smtp_port = os.environ.get("SMTP_PORT")
     smtp_username = os.environ.get("SMTP_USERNAME")
@@ -77,7 +124,7 @@ def send_password_changed_email(to_email, user_name):
     msg["To"] = to_email
 
     if not smtp_server or not smtp_username or not smtp_password:
-        print(f"[SIMULATION] Password updated notification email sent to {to_email}")
+        logger.info(f"Password updated notification email simulated to {to_email}")
         return True
 
     try:
@@ -87,14 +134,26 @@ def send_password_changed_email(to_email, user_name):
         server.login(smtp_username, smtp_password)
         server.sendmail(msg["From"], [to_email], msg.as_string())
         server.quit()
-        print(f"Successfully sent password updated email to {to_email}")
+        logger.info(f"Successfully sent password updated email to {to_email}")
         return True
     except Exception as e:
-        print(f"[SIMULATION FALLBACK] Password updated notice to {to_email}: {e}")
+        logger.exception(f"Password updated notice failed for {to_email}: {e}")
         return False
 
 
-def send_activation_email(to_email, activation_link, user_name="Student"):
+def send_password_changed_email(to_email, user_name) -> bool:
+    """Non-blocking password change email delivery."""
+    if _is_sync_mode():
+        return _send_password_changed_email_sync(to_email, user_name)
+    try:
+        _email_executor.submit(_send_password_changed_email_sync, to_email, user_name)
+        return True
+    except Exception as e:
+        logger.exception(f"Failed to submit password updated email to thread pool: {e}")
+        return False
+
+
+def _send_activation_email_sync(to_email, activation_link, user_name="Student") -> bool:
     smtp_server = os.environ.get("SMTP_SERVER")
     smtp_port = os.environ.get("SMTP_PORT")
     smtp_username = os.environ.get("SMTP_USERNAME")
@@ -129,7 +188,7 @@ def send_activation_email(to_email, activation_link, user_name="Student"):
     if not smtp_server or not smtp_username or not smtp_password:
         logger.warning(
             "Activation email simulated (SMTP not configured)",
-            extra={"recipient": to_email}
+            extra={"recipient": to_email},
         )
         return False
 
@@ -145,3 +204,18 @@ def send_activation_email(to_email, activation_link, user_name="Student"):
         logger.exception("Activation email delivery failed", extra={"recipient": to_email})
         return False
 
+
+def send_activation_email(to_email, activation_link, user_name="Student") -> bool:
+    """Non-blocking activation email delivery."""
+    if not _smtp_configured():
+        return False
+    if _is_sync_mode():
+        return _send_activation_email_sync(to_email, activation_link, user_name)
+    try:
+        _email_executor.submit(
+            _send_activation_email_sync, to_email, activation_link, user_name
+        )
+        return True
+    except Exception as e:
+        logger.exception(f"Failed to submit activation email to thread pool: {e}")
+        return False

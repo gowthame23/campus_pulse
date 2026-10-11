@@ -108,7 +108,7 @@ def export_backup(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
 
 
-@router.post("/restore")
+@router.post("/restore", status_code=status.HTTP_202_ACCEPTED)
 def restore_backup(
     payload: dict,
     current_user=Depends(require_roles(Administrator.ROLE)),
@@ -128,8 +128,9 @@ def restore_backup(
     try:
         res = backup_service.restore_backup(backup_id, restored_by=current_user.user_id)
         return {
-            "message": "Database backup restored successfully.",
+            "message": "Database backup restore scheduled. Restart the server to apply.",
             "restore_id": res.get("restore_id"),
+            "status": "Scheduled",
             "backup_id": backup_id,
         }
     except ValueError as err:

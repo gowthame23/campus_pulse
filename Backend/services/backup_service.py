@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 import shutil
 import sqlite3
@@ -262,25 +263,38 @@ class BackupService:
             integrity = src_conn.execute("PRAGMA integrity_check").fetchone()[0]
             if integrity != "ok":
                 raise ValueError("Backup database failed integrity check.")
-            with sqlite3.connect(self.db_path) as dst_conn:
-                src_conn.backup(dst_conn)
+
+        # Stage to pending restore file and marker rather than overwriting live DB
+        pending_db = self.db_path.parent / "restore_pending.db"
+        marker_file = self.db_path.parent / "restore_pending.marker"
+
+        shutil.copy2(source_path, pending_db)
+        marker_payload = {
+            "restore_id": rid,
+            "backup_id": backup_id,
+            "backup_name": bkp["backup_name"],
+            "restored_by": restored_by,
+            "scheduled_at": now,
+        }
+        with open(marker_file, "w", encoding="utf-8") as mf:
+            json.dump(marker_payload, mf, indent=2)
 
         with self._connect() as conn:
             conn.execute(
                 """
                 INSERT INTO restore_history (restore_id, backup_id, restored_by, restore_type, started_at, completed_at, status, remarks)
-                VALUES (?, ?, ?, ?, ?, ?, 'Completed', 'System database restored successfully.')
+                VALUES (?, ?, ?, ?, ?, NULL, 'Scheduled', 'Restore scheduled. Restart the server to apply.')
                 """,
-                (rid, backup_id, restored_by, bkp["backup_type"], now, now),
+                (rid, backup_id, restored_by, bkp["backup_type"], now),
             )
 
         if self.notification_service:
             self.notification_service.publish(
                 receiver_id=restored_by,
-                title="Database Restoration Completed",
-                message=f"Database restored from backup '{bkp['backup_name']}'.",
+                title="Database Restoration Scheduled",
+                message=f"Restore scheduled from backup '{bkp['backup_name']}'. Restart the server to apply.",
                 module="Backup & Restore",
-                notification_type="restore_completed",
+                notification_type="restore_scheduled",
                 reference_type="Restore",
                 reference_id=rid,
                 priority="High",
@@ -293,13 +307,14 @@ class BackupService:
                 entity_id=backup_id,
                 action="RESTORE",
                 performed_by=restored_by,
-                description=f"Restored system database from backup '{bkp['backup_name']}'",
+                description=f"Scheduled restore from backup '{bkp['backup_name']}'",
             )
 
         return {
             "restore_id": rid,
-            "status": "Completed",
+            "status": "Scheduled",
             "backup_name": bkp["backup_name"],
+            "message": "Restore scheduled. Restart the server to apply.",
         }
 
     def list_restore_history(self):
@@ -346,3 +361,79 @@ class BackupService:
                 "failed_backups": failed_bkp,
                 "storage_used_mb": round(storage_bytes / (1024 * 1024), 2),
             }
+
+
+def apply_pending_restore(db_path=None):
+    """
+    Checks for pending restore marker and pending db file on startup.
+    If found, backs up current DB to pre_restore_<timestamp>.db, removes WAL/SHM,
+    and moves pending db into place before any connections are opened.
+    """
+    if db_path is None:
+        db_path = os.getenv("DATABASE_PATH", "storage/campus_pulse.db")
+
+    target_path = Path(db_path).resolve()
+    db_dir = target_path.parent
+    marker_file = db_dir / "restore_pending.marker"
+    pending_db = db_dir / "restore_pending.db"
+
+    if not marker_file.exists() or not pending_db.exists():
+        return False
+
+    try:
+        with open(marker_file, "r", encoding="utf-8") as f:
+            metadata = json.load(f)
+    except Exception:
+        metadata = {}
+
+    backups_dir = db_dir / "backups"
+    backups_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    pre_restore_path = backups_dir / f"pre_restore_{ts}.db"
+
+    # Backup current DB
+    if target_path.exists():
+        try:
+            shutil.copy2(target_path, pre_restore_path)
+        except Exception as e:
+            print(f"[Safe Restore] Warning: failed to create pre-restore snapshot: {e}")
+
+    # Remove -wal and -shm files if present
+    for ext in ("-wal", "-shm"):
+        extra_file = Path(str(target_path) + ext)
+        if extra_file.exists():
+            try:
+                os.remove(extra_file)
+            except Exception:
+                pass
+
+    # Move staged pending DB over active DB
+    shutil.move(str(pending_db), str(target_path))
+
+    # Remove marker file
+    try:
+        os.remove(marker_file)
+    except Exception:
+        pass
+
+    # Mark restore as Completed in the newly restored database
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    restore_id = metadata.get("restore_id")
+    try:
+        with sqlite3.connect(target_path) as conn:
+            if restore_id:
+                conn.execute(
+                    "UPDATE restore_history SET status = 'Completed', completed_at = ?, remarks = 'System database restored successfully.' WHERE restore_id = ?",
+                    (now, restore_id),
+                )
+            else:
+                conn.execute(
+                    "UPDATE restore_history SET status = 'Completed', completed_at = ?, remarks = 'System database restored successfully.' WHERE status = 'Scheduled'",
+                    (now,),
+                )
+            conn.commit()
+    except Exception:
+        pass
+
+    print(f"[Safe Restore] Successfully restored database from staged backup (Pre-restore saved to {pre_restore_path.name})")
+    return True

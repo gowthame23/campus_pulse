@@ -907,7 +907,7 @@ def assign_complaint(
     complaint_id: str,
     payload: ComplaintAssignRequest,
     current_user=Depends(
-        require_roles(Coordinator.ROLE, AppManager.ROLE, Administrator.ROLE)
+        require_roles(AppManager.ROLE, Administrator.ROLE)
     ),
     complaint_service=Depends(get_complaint_service),
 ):
@@ -925,16 +925,6 @@ def assign_complaint(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Target assignee must be a Coordinator.",
         )
-
-    # Coordinator specific redirection constraint checks
-    if current_user.role == Coordinator.ROLE:
-        if not complaint_service.auth_service.is_coordinator_assigned(
-            payload.coordinator_id, complaint.location_id, complaint.department_id
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Target Coordinator must be assigned to this department and location scope.",
-            )
 
     try:
         complaint = complaint_service.assign_work(complaint_id, payload.coordinator_id)
@@ -1539,6 +1529,12 @@ def update_priority(
             detail="Students cannot change complaint priority.",
         )
 
+    if current_user.role == Coordinator.ROLE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Coordinators cannot change complaint priority.",
+        )
+
     if (current_user.role or "").lower() == "super_admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1566,11 +1562,10 @@ def update_priority(
             )
 
     if current_user.role == Coordinator.ROLE:
-        if not complaint_service.auth_service.is_coordinator_assigned(current_user.user_id, complaint.location_id, complaint.department_id):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Coordinators can only change priority for complaints in their assigned departments.",
-            )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Coordinators cannot change complaint priority.",
+        )
 
     allowed_priorities = {"Low", "Medium", "High", "Critical"}
     if payload.priority not in allowed_priorities:

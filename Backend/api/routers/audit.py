@@ -5,13 +5,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from api.dependencies import get_audit_service
 from api.security import require_roles
 from models.administrator import Administrator
+from models.app_manager import AppManager
 
 router = APIRouter(prefix="/audit", tags=["audit"])
 
 
 @router.get("/dashboard")
 def get_audit_dashboard_summary(
-    current_user=Depends(require_roles(Administrator.ROLE)),
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
     audit_service=Depends(get_audit_service),
 ):
     return audit_service.get_dashboard_metrics()
@@ -31,7 +32,7 @@ def list_audit_logs(
     ip_address: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
-    current_user=Depends(require_roles(Administrator.ROLE)),
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
     audit_service=Depends(get_audit_service),
 ):
     from utils.pagination import paginate
@@ -57,7 +58,7 @@ def list_audit_logs(
 def get_entity_timeline(
     entity_type: str,
     entity_id: str,
-    current_user=Depends(require_roles(Administrator.ROLE)),
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
     audit_service=Depends(get_audit_service),
 ):
     """Returns chronological entity timeline events for Administrator activity timeline."""
@@ -72,7 +73,7 @@ def export_audit_logs(
     entity_type: Optional[str] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-    current_user=Depends(require_roles(Administrator.ROLE)),
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
     audit_service=Depends(get_audit_service),
 ):
     filters = {
@@ -111,7 +112,7 @@ def archive_audit_logs(
 @router.get("/{audit_id}")
 def get_audit_log(
     audit_id: str,
-    current_user=Depends(require_roles(Administrator.ROLE)),
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
     audit_service=Depends(get_audit_service),
 ):
     log = audit_service.get_log(audit_id)

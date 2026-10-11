@@ -47,6 +47,7 @@ REDIRECT_MAP = {
 
 @router.post("/login", response_model=TokenResponse)
 def login(
+    request: Request,
     payload: LoginRequest,
     response: Response,
     auth_service=Depends(get_auth_service),
@@ -77,6 +78,10 @@ def login(
             max_age=604800,  # 7 days
             path="/",
         )
+        client_ip = request.client.host if request.client else "unknown"
+        from middleware.rate_limiter import record_login_attempt
+        record_login_attempt(client_ip, identity, success=True)
+
         audit_service.log(
             user.user_id,
             "User Login",
@@ -95,6 +100,9 @@ def login(
             "permissions": get_role_permissions(user.role),
         }
     except PermissionError as p_err:
+        client_ip = request.client.host if request.client else "unknown"
+        from middleware.rate_limiter import record_login_attempt
+        record_login_attempt(client_ip, identity, success=False)
         audit_service.log(
             "anonymous",
             "Failed Login Attempt",
@@ -104,6 +112,9 @@ def login(
         )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
     except ValueError as error:
+        client_ip = request.client.host if request.client else "unknown"
+        from middleware.rate_limiter import record_login_attempt
+        record_login_attempt(client_ip, identity, success=False)
         detail_msg = str(error)
         status_code = status.HTTP_400_BAD_REQUEST if "required" in detail_msg.lower() else status.HTTP_401_UNAUTHORIZED
         audit_service.log(
@@ -137,6 +148,14 @@ def logout(
 @router.get("/me")
 def me(current_user=Depends(get_current_user)):
     return user_to_response(current_user)
+
+
+@router.post("/ws-ticket")
+def create_websocket_ticket(current_user=Depends(get_current_user)):
+    from api.security import create_ws_ticket
+
+    ticket = create_ws_ticket(current_user.user_id)
+    return {"ticket": ticket, "expires_in": 60}
 
 
 @router.post("/change-password")

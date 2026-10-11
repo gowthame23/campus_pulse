@@ -21,6 +21,7 @@ class SchedulerService:
         self._running = False
         self._tasks = []
         self._worker_id = f"{os.getpid()}_{uuid.uuid4().hex[:6]}"
+        self.last_run = None
 
     def register_task(self, name: str, func, *args, **kwargs):
         """Register a periodic task."""
@@ -31,6 +32,7 @@ class SchedulerService:
         """Attempt to acquire or renew the master scheduler lease."""
         try:
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.last_run = now_str
             expires_str = (datetime.now() + timedelta(seconds=self.interval * 2)).strftime("%Y-%m-%d %H:%M:%S")
             conn = sqlite3.connect(self.db_path)
             with conn:
@@ -143,5 +145,15 @@ def create_scheduler(complaint_service, config_service):
             logger.error(f"Cleanup failed: {e}")
 
     scheduler.register_task("Cleanup Expired Records", cleanup_expired)
+
+    # Task 3: Prune expired login rate limits
+    def prune_rate_limits():
+        try:
+            from middleware.rate_limiter import prune_login_rate_limits
+            prune_login_rate_limits(db_path=db_path)
+        except Exception as e:
+            logger.error(f"Rate limit pruning failed: {e}")
+
+    scheduler.register_task("Prune Expired Rate Limits", prune_rate_limits)
 
     return scheduler
