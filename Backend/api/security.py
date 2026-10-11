@@ -224,9 +224,24 @@ def get_current_user(
     return user
 
 
+ROLE_ALIASES = {
+    "admin": "administrator",
+    "manager": "app_manager",
+    "warden": "location_in_charge",
+}
+
+
+def canonical_role(role_name: str) -> str:
+    r = (role_name or "").strip().lower()
+    return ROLE_ALIASES.get(r, r)
+
+
 def require_roles(*roles):
+    canonical_allowed = {canonical_role(r) for r in roles}
+
     def dependency(request: Request, current_user=Depends(get_current_user)):
-        if current_user.role not in roles:
+        user_role = canonical_role(current_user.role)
+        if user_role not in canonical_allowed:
             logger.warning(
                 f"403 Forbidden - Reason: Role '{current_user.role}' attempted '{request.method} {request.url.path}', "
                 f"Required: {roles} | User ID: {current_user.user_id}"
@@ -253,14 +268,85 @@ def block_super_admin(current_user=Depends(get_current_user)):
     return current_user
 
 
-def get_ws_user(token):
-    session = _lookup_session(token)
-    user = get_auth_service().get_user(session["user_id"]) if session else None
-    if (
-        not user
-        or user.is_deleted
-        or not user.active
-        or user.status in ("Inactive", "Suspended", "Archived")
-    ):
+def create_ws_ticket(user_id: str, db_path: str = None) -> str:
+    """Generate a single-use random ticket valid for 60 seconds, stored hashed in SQLite."""
+    import uuid
+    ticket = f"WST-{uuid.uuid4().hex}"
+    ticket_hash = hashlib.sha256(ticket.encode("utf-8")).hexdigest()
+    now_ts = time.time()
+    expires_at = now_ts + 60.0
+
+    target_db = db_path or get_db_path()
+    try:
+        with sqlite3.connect(target_db, timeout=5.0) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ws_tickets (
+                    ticket_hash TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    expires_at REAL NOT NULL
+                );
+                """
+            )
+            conn.execute(
+                "INSERT INTO ws_tickets (ticket_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+                (ticket_hash, user_id, now_ts, expires_at),
+            )
+            conn.commit()
+    except Exception as err:
+        logger.error(f"Failed to create WS ticket: {err}")
+    return ticket
+
+
+def consume_ws_ticket(ticket: str, db_path: str = None):
+    """Consume a single-use ticket. Deletes the ticket immediately and returns user if valid and not expired."""
+    if not ticket or not isinstance(ticket, str):
         return None
-    return user
+    ticket_hash = hashlib.sha256(ticket.encode("utf-8")).hexdigest()
+    now_ts = time.time()
+    target_db = db_path or get_db_path()
+
+    try:
+        with sqlite3.connect(target_db, timeout=5.0) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT user_id, expires_at FROM ws_tickets WHERE ticket_hash = ?",
+                (ticket_hash,),
+            )
+            row = cursor.fetchone()
+            if row:
+                # Immediate consumption (single-use)
+                conn.execute("DELETE FROM ws_tickets WHERE ticket_hash = ?", (ticket_hash,))
+                conn.commit()
+                if now_ts <= float(row["expires_at"]):
+                    user = get_auth_service().get_user(row["user_id"])
+                    if (
+                        user
+                        and not user.is_deleted
+                        and user.active
+                        and user.status not in ("Inactive", "Suspended", "Archived")
+                    ):
+                        return user
+    except Exception as err:
+        logger.error(f"Error consuming WS ticket: {err}")
+    return None
+
+
+def get_ws_user(token: Optional[str] = None, ticket: Optional[str] = None):
+    if ticket:
+        return consume_ws_ticket(ticket)
+    if token:
+        if token.startswith("WST-"):
+            return consume_ws_ticket(token)
+        session = _lookup_session(token)
+        user = get_auth_service().get_user(session["user_id"]) if session else None
+        if (
+            not user
+            or user.is_deleted
+            or not user.active
+            or user.status in ("Inactive", "Suspended", "Archived")
+        ):
+            return None
+        return user
+    return None

@@ -123,7 +123,7 @@ def verify_backup(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
 
 
-@router.post("/{backup_id}/restore")
+@router.post("/{backup_id}/restore", status_code=status.HTTP_202_ACCEPTED)
 def restore_backup(
     backup_id: str,
     current_user=Depends(require_roles(Administrator.ROLE)),

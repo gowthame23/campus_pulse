@@ -19,6 +19,10 @@ scheduler = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global scheduler
+    # 0. Check and apply pending safe database restore before opening DB connections
+    from services.backup_service import apply_pending_restore
+    apply_pending_restore()
+
     # Register the running event loop so WebSocket pushes triggered from
     # sync route handlers (which run in a threadpool) can reach it.
     ws_manager.set_loop(asyncio.get_running_loop())
@@ -27,7 +31,11 @@ async def lifespan(app: FastAPI):
     complaint_svc = get_complaint_service()
     config_svc = get_config_service()
     scheduler = create_scheduler(complaint_svc, config_svc)
-    scheduler.start()
+    run_scheduler = os.getenv("RUN_SCHEDULER", "true").lower() in ("true", "1", "yes")
+    if run_scheduler:
+        scheduler.start()
+    else:
+        logger.info("Background scheduler disabled via RUN_SCHEDULER env var.")
     yield
     # Shutdown: Stop scheduler gracefully
     if scheduler:
@@ -45,16 +53,18 @@ import os
 
 env_type = os.getenv("ENVIRONMENT", "development").lower()
 cors_env = os.getenv("CORS_ORIGINS")
-if env_type == "production" and not cors_env:
-    # Previously this only logged a warning and silently fell back to the
-    # localhost dev origins, which means a misconfigured production deploy
-    # would boot "successfully" while actually rejecting the real frontend's
-    # origin (a startup-time failure is far easier to notice and fix than
-    # mysterious CORS errors in the browser console after launch).
-    raise RuntimeError(
-        "CORS_ORIGINS must be explicitly set when ENVIRONMENT=production. "
-        "Refusing to silently fall back to localhost origins in production."
-    )
+reload_env = os.getenv("RELOAD", "false").lower()
+if env_type == "production":
+    if not cors_env:
+        raise RuntimeError(
+            "CORS_ORIGINS must be explicitly set when ENVIRONMENT=production. "
+            "Refusing to silently fall back to localhost origins in production."
+        )
+    if reload_env in ("true", "1", "yes"):
+        raise RuntimeError(
+            "RELOAD must not be enabled when ENVIRONMENT=production. "
+            "Auto-reload in production is unsafe."
+        )
 
 cors_origins = (cors_env or "http://127.0.0.1:5173,http://localhost:5173").split(",")
 
@@ -137,9 +147,45 @@ def root_index():
     }
 
 
+@app.get("/api/health", tags=["health"])
 @app.get("/health", tags=["health"])
 def health_check():
-    return {"status": "ok"}
+    import sqlite3
+    db_path = os.environ.get("DATABASE_PATH", "storage/campus_pulse.db")
+    db_reachable = False
+    scheduler_last_run = None
+    try:
+        with sqlite3.connect(db_path, timeout=3.0) as conn:
+            conn.execute("SELECT 1").fetchone()
+            db_reachable = True
+            try:
+                row = conn.execute("SELECT expires_at FROM scheduler_lock LIMIT 1").fetchone()
+                if row and row[0]:
+                    scheduler_last_run = str(row[0])
+            except Exception:
+                pass
+    except Exception:
+        db_reachable = False
+
+    if not scheduler_last_run and scheduler:
+        scheduler_last_run = getattr(scheduler, "last_run", None)
+
+    return {
+        "status": "ok" if db_reachable else "degraded",
+        "database": "reachable" if db_reachable else "unreachable",
+        "scheduler_last_run": scheduler_last_run,
+        "version": "1.0.0",
+    }
+
+
+from api.security import create_ws_ticket, get_current_user
+from fastapi import Depends
+
+
+@app.post("/api/ws-ticket", tags=["auth"])
+def api_websocket_ticket(current_user=Depends(get_current_user)):
+    ticket = create_ws_ticket(current_user.user_id)
+    return {"ticket": ticket, "expires_in": 60}
 
 
 import traceback

@@ -210,16 +210,18 @@ async def websocket_endpoint(
     notification_service=Depends(get_notification_service),
 ):
     """WebSocket endpoint for real-time notification updates per user or role.
-    This endpoint requires a query parameter token for authentication: /ws/{target_id}?token=ACCESS_TOKEN
+    This endpoint requires a single-use ticket (?ticket=WST-...) or fallback token (?token=...)
     """
-    user = get_ws_user(websocket.query_params.get("token"))
+    ticket = websocket.query_params.get("ticket")
+    token = websocket.query_params.get("token")
+    user = get_ws_user(token=token, ticket=ticket)
     if not user:
-        await websocket.close(code=1008)
+        await websocket.close(code=4001 if ticket else 1008)
         return
 
-    # Ensure token user matches target_id or has role-based target access
+    # Ensure user matches target_id or has role-based target access
     if user.user_id.lower() != target_id.lower() and user.role.lower() != target_id.lower():
-        await websocket.close(code=1008)
+        await websocket.close(code=4001 if ticket else 1008)
         return
 
     await manager.connect(websocket, target_id)

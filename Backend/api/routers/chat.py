@@ -360,11 +360,13 @@ def list_conv(
 
 @router.websocket("/ws/chat/{conversation_id}/{user_id}")
 async def chat_ws(websocket: WebSocket, conversation_id: str, user_id: str):
-    # Token authentication via query param: ?token=ACCESS_TOKEN
-    user = get_ws_user(websocket.query_params.get("token"))
-    # ensure the token user matches the requested user_id and is participant
+    # Support single-use ticket (?ticket=WST-...) or fallback token (?token=...)
+    ticket = websocket.query_params.get("ticket")
+    token = websocket.query_params.get("token")
+    user = get_ws_user(token=token, ticket=ticket)
+    # ensure the user matches the requested user_id and is participant
     if not user or user.user_id != user_id:
-        await websocket.close(code=1008)
+        await websocket.close(code=4001 if ticket else 1008)
         return
 
     # ensure user is participant of the conversation

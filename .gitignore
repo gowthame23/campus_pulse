@@ -11,9 +11,17 @@ Backend/.pytest_tmp/
 # Runtime data and logs
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 *.log
+logs/
+Backend/logs/
 storage/attachments/
 Backend/storage/attachments/
+storage/backups/
+Backend/storage/backups/
+storage/restore_pending.*
+Backend/storage/restore_pending.*
 storage/lost_found_photos/
 Backend/storage/lost_found_photos/
 
