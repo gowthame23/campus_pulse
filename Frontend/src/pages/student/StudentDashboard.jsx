@@ -61,7 +61,7 @@ export const getStudentStageText = (complaint) => {
     return `Ready for your confirmation (closes in ${hoursLeft} if no response)`;
   }
   if (status === "Admin Review" || (complaint.reopen_count >= 3 && status === "Reopened")) {
-    return "This complaint is under Administrator review. An administrator will review and resolve it.";
+    return "This complaint is under Admin review. An Admin will review and resolve it.";
   }
   if (status === "Closed" || status === "Closed (Auto Closed)") {
     return "Resolved & Closed";
@@ -353,7 +353,7 @@ export default function StudentDashboard() {
                     <div className="p-3 rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/30 text-purple-900 dark:text-purple-200 text-xs flex items-center gap-2">
                       <ShieldAlert className="h-4 w-4 text-purple-600 shrink-0" />
                       <span>
-                        This complaint is under Administrator review. An administrator will review and resolve it.
+                        This complaint is under Admin review. An Admin will review and resolve it.
                       </span>
                     </div>
                   ) : (
@@ -638,7 +638,7 @@ export default function StudentDashboard() {
                 Attempt {(reopenTarget.reopen_count || 0) + 1} of 3
               </span>
               <span>
-                Please clearly explain what remains unfinished. If this complaint is reopened 3 times, it will automatically escalate directly to Administrator Review.
+                Please clearly explain what remains unfinished. If this complaint is reopened 3 times, it will automatically escalate directly to Admin Review.
               </span>
             </div>
 

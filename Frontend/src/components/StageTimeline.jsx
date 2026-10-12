@@ -280,15 +280,15 @@ export default function StageTimeline({ complaint, coordinatorUser, wardenUser, 
       actorName:
         wardenUser?.name ||
         complaint.warden_verified_by ||
-        "Location Warden",
-      actorRole: "Location In-Charge",
+        "Warden",
+      actorRole: "Warden",
       timestamp: complaint.warden_verified_at,
       status: wardenStatus,
       description: complaint.warden_verdict
         ? `Verdict: ${complaint.warden_verdict} ${complaint.warden_notes ? `— "${complaint.warden_notes}"` : ""}`
         : complaint.is_spot_check
           ? "Randomly selected for in-person warden verification (~10%)"
-          : "Requires mandatory in-person verification by location warden",
+          : "Requires mandatory in-person verification by Warden",
       isLate: status === "Pending Warden Verification" && isOverdue,
     });
   }
@@ -385,14 +385,14 @@ export default function StageTimeline({ complaint, coordinatorUser, wardenUser, 
           <div className="flex items-start gap-3">
             <ShieldAlert className="h-5 w-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
             <div>
-              <h3 className="text-sm font-bold">Under Administrator Review</h3>
+              <h3 className="text-sm font-bold">Under Admin Review</h3>
               <p className="text-xs mt-1 text-rose-800 dark:text-rose-300 font-medium">
                 {complaint.admin_review_reason ||
                   "This complaint has reached the maximum student reopens (3/3) and is escalated to campus administration for final disposition."}
               </p>
               {complaint.admin_decision && (
                 <div className="mt-2 text-xs font-semibold bg-white/60 dark:bg-rose-900/40 p-2 rounded-lg">
-                  Administrator Decision: {complaint.admin_decision}
+                  Admin Decision: {complaint.admin_decision}
                 </div>
               )}
             </div>

@@ -384,13 +384,13 @@ export default function SystemSettingsPage() {
                 <div className="mt-0.5">
                   You are applying {Object.keys(stagedChanges).length}{" "}
                   configuration change(s). Sensitive security settings require
-                  Administrator authentication.
+                  Admin authentication.
                 </div>
               </div>
             </div>
 
             <Input
-              label="Confirm Administrator Password"
+              label="Confirm Admin Password"
               type="password"
               placeholder="Enter your admin password..."
               value={adminPassword}

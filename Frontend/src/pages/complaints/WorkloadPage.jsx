@@ -244,12 +244,12 @@ export default function WorkloadPage() {
         <Card className="p-5">
           <h3 className="mb-4 text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <MapPin className="h-4 w-4 text-indigo-500" />
-            Wardens / Location In-Charges Workload
+            Wardens Workload
           </h3>
           <Table
             columns={[
               {
-                header: "Warden / Location In-Charge",
+                header: "Warden",
                 accessor: "name",
                 render: (row) => (
                   <div>

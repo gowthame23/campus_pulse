@@ -232,7 +232,7 @@ def update_department(
             if archived_by_role == Administrator.ROLE.lower() and (current_user.role or "").lower() != Administrator.ROLE.lower():
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Only an Administrator can restore a department archived by an Administrator.",
+                    detail="Only an Admin can restore a department archived by an Admin.",
                 )
 
         arch_role = current_user.role.lower() if payload.archived else None

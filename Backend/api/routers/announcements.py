@@ -181,7 +181,7 @@ def get_admin_contact(
                 return AdminContactResponse(
                     available=True,
                     email=target_admin.email,
-                    name=target_admin.name or "Campus Administrator",
+                    name=target_admin.name or "Campus Admin",
                     message="Official campus administration contact.",
                 )
     except Exception:
@@ -220,7 +220,7 @@ def get_admin_contact(
         available=False,
         email=None,
         name=None,
-        message="Administrator contact email is currently unavailable. Please visit the campus administrative office.",
+        message="Admin contact email is currently unavailable. Please visit the campus administrative office.",
     )
 
 

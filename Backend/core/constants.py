@@ -116,6 +116,30 @@ ROLE_ALIASES = {
     "supervisor": ROLE_APP_MANAGER,
 }
 
+# Rule 1.1 & 1.3: The ONLY role names shown to users anywhere are:
+# Admin | App Manager | Coordinator | Employee | Warden | Student (Super Admin platform-level)
+ROLE_DISPLAY_NAMES = {
+    "administrator": "Admin",
+    "admin": "Admin",
+    "app_manager": "App Manager",
+    "manager": "App Manager",
+    "supervisor": "App Manager",
+    "coordinator": "Coordinator",
+    "employee": "Employee",
+    "location_in_charge": "Warden",
+    "warden": "Warden",
+    "student": "Student",
+    "super_admin": "Super Admin",
+}
+
+
+def get_role_display_name(role: str) -> str:
+    """Return canonical user-facing display name for a role string."""
+    if not role:
+        return ""
+    clean = str(role).strip().lower()
+    return ROLE_DISPLAY_NAMES.get(clean, clean.capitalize())
+
 # Category to Default Priority Map
 CATEGORY_PRIORITY_MAP = {
     "electrical hazard": "High",

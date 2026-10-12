@@ -1247,7 +1247,7 @@ class ComplaintService:
                     )
             self.notification_service.notify(
                 complaint.created_by,
-                "Your complaint has reached the maximum reopens and is now under Administrator review.",
+                "Your complaint has reached the maximum reopens and is now under Admin review.",
                 complaint_id=complaint_id,
                 title="Under Admin Review",
             )
@@ -1313,21 +1313,21 @@ class ComplaintService:
 
             self.notification_service.notify(
                 complaint.created_by,
-                f"Your complaint {complaint_id} was reviewed and closed by Administrator: {notes}",
+                f"Your complaint {complaint_id} was reviewed and closed by Admin: {notes}",
                 complaint_id=complaint_id,
                 title="Admin Decision: Closed",
             )
             if complaint.assigned_to:
                 self.notification_service.notify(
                     complaint.assigned_to,
-                    f"Complaint {complaint_id} closed by Administrator: {notes}",
+                    f"Complaint {complaint_id} closed by Admin: {notes}",
                     complaint_id=complaint_id,
                     title="Admin Decision: Closed",
                 )
             if warden_id:
                 self.notification_service.notify(
                     warden_id,
-                    f"Complaint {complaint_id} closed by Administrator: {notes}",
+                    f"Complaint {complaint_id} closed by Admin: {notes}",
                     complaint_id=complaint_id,
                     title="Admin Decision: Closed",
                 )
@@ -1354,21 +1354,21 @@ class ComplaintService:
 
             self.notification_service.notify(
                 complaint.created_by,
-                f"Your complaint {complaint_id} has been {action_text.lower()} following Administrator review.",
+                f"Your complaint {complaint_id} has been {action_text.lower()} following Admin review.",
                 complaint_id=complaint_id,
                 title=f"Admin Decision: {action_text}",
             )
             if complaint.assigned_to:
                 self.notification_service.notify(
                     complaint.assigned_to,
-                    f"Complaint {complaint_id} {action_text.lower()} by Administrator: {notes}",
+                    f"Complaint {complaint_id} {action_text.lower()} by Admin: {notes}",
                     complaint_id=complaint_id,
                     title=f"Admin Decision: {action_text}",
                 )
             if warden_id:
                 self.notification_service.notify(
                     warden_id,
-                    f"Complaint {complaint_id} {action_text.lower()} by Administrator.",
+                    f"Complaint {complaint_id} {action_text.lower()} by Admin.",
                     complaint_id=complaint_id,
                     title=f"Admin Decision: {action_text}",
                 )
@@ -1827,12 +1827,12 @@ class ComplaintService:
                         if int(getattr(complaint, "escalation_level", 0)) < 3:
                             complaint.escalation_level = 3
                             complaint.admin_notified = True
-                            complaint.add_history("SLA deadline exceeded by 48h. Escalated to Administrator.")
+                            complaint.add_history("SLA deadline exceeded by 48h. Escalated to Admin.")
                             for admin_u in self.auth_service.list_users(role="administrator"):
                                 if admin_u.active and not getattr(admin_u, "is_deleted", False):
                                     self.notification_service.notify(
                                         admin_u.user_id,
-                                        f"CRITICAL: Complaint {complaint.complaint_id} ({complaint.priority}) is 48h past SLA. Escalated to Administrator.",
+                                        f"CRITICAL: Complaint {complaint.complaint_id} ({complaint.priority}) is 48h past SLA. Escalated to Admin.",
                                         complaint_id=complaint.complaint_id,
                                         title="SLA Critical Escalation",
                                     )
@@ -2552,7 +2552,7 @@ class ComplaintService:
 
             complaint.escalated = True
             complaint.add_history(
-                f"Escalated to Administrator by App Manager {user.user_id}. Reason: {reason}"
+                f"Escalated to Admin by App Manager {user.user_id}. Reason: {reason}"
             )
             self.notification_service.notify(
                 admin_id,

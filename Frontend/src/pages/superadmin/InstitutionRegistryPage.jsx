@@ -70,7 +70,7 @@ export default function InstitutionRegistryPage() {
     <div className="space-y-6">
       <PageHeader
         title="Platform Institution Registry"
-        description="Manage registered institution tenants, platform metadata, and initial administrator onboarding."
+        description="Manage registered institution tenants, platform metadata, and initial admin onboarding."
         actions={
           <Button onClick={() => setModalOpen(true)} className="flex items-center gap-2">
             <Plus className="w-4 h-4" /> Onboard Institution
@@ -152,14 +152,14 @@ export default function InstitutionRegistryPage() {
             required
           />
           <Input
-            label="Institution Administrator Name"
+            label="Institution Admin Name"
             value={formData.admin_name}
             onChange={(e) => setFormData({ ...formData, admin_name: e.target.value })}
             placeholder="Full Name"
             required
           />
           <Input
-            label="Institution Administrator Email"
+            label="Institution Admin Email"
             type="email"
             value={formData.admin_email}
             onChange={(e) => setFormData({ ...formData, admin_email: e.target.value })}

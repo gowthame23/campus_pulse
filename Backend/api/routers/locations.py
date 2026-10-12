@@ -239,7 +239,7 @@ def get_location(
         if not location_service.auth_service.is_warden_assigned(current_user.user_id, location_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Location In-Charge / Warden cannot access unassigned locations.",
+                detail="Warden cannot access unassigned locations.",
             )
     elif role == "coordinator":
         coord_assignments = location_service.auth_service.list_coordinator_assignments(
@@ -355,7 +355,7 @@ def assign_location_in_charge(
         if not auth_service.is_app_manager_assigned(current_user.user_id, location_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="App Manager cannot assign a Location In-Charge outside their assigned scope.",
+                detail="App Manager cannot assign a Warden outside their assigned scope.",
             )
 
     if loc.in_charge_id and loc.in_charge_id != payload.in_charge_id:
@@ -384,7 +384,7 @@ def unassign_location_in_charge(
         if not auth_service.is_app_manager_assigned(current_user.user_id, location_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="App Manager cannot unassign a Location In-Charge outside their assigned scope.",
+                detail="App Manager cannot unassign a Warden outside their assigned scope.",
             )
     try:
         auth_service.unassign_location_in_charge(location_id)
@@ -469,13 +469,13 @@ def update_location(
             if archived_by_role == Administrator.ROLE.lower() and (current_user.role or "").lower() != Administrator.ROLE.lower():
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Only an Administrator can restore a location archived by an Administrator.",
+                    detail="Only an Admin can restore a location archived by an Admin.",
                 )
 
         if payload.app_manager_id is not None and (current_user.role or "").lower() != Administrator.ROLE.lower():
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only an Administrator can assign or unassign an App Manager.",
+                detail="Only an Admin can assign or unassign an App Manager.",
             )
 
         arch_role = current_user.role.lower() if payload.archived else None

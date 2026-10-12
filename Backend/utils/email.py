@@ -117,7 +117,7 @@ def _send_password_changed_email_sync(to_email, user_name) -> bool:
     smtp_password = os.environ.get("SMTP_PASSWORD")
     smtp_from = os.environ.get("SMTP_FROM", smtp_username)
 
-    body = f"Hello {user_name},\n\nYour Campus Pulse password was successfully updated.\nIf you did not perform this change, please contact an Administrator immediately."
+    body = f"Hello {user_name},\n\nYour Campus Pulse password was successfully updated.\nIf you did not perform this change, please contact an Admin immediately."
     msg = MIMEText(body)
     msg["Subject"] = "Campus Pulse - Password Security Notification"
     msg["From"] = smtp_from if smtp_from else "noreply@campus.edu"
@@ -175,7 +175,7 @@ def _send_activation_email_sync(to_email, activation_link, user_name="Student") 
         f"Security Notice:\n"
         f"- This activation link is unique to you and will expire in 7 days.\n"
         f"- Do not share this link with anyone.\n"
-        f"- If you did not request this account, please contact your Campus Administrator immediately.\n\n"
+        f"- If you did not request this account, please contact your Campus Admin immediately.\n\n"
         f"Regards,\n"
         f"Campus Pulse Team"
     )

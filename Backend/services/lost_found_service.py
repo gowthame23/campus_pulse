@@ -446,7 +446,7 @@ class LostFoundService:
             raise ValueError("Moderation reason is mandatory.")
         role_lower = (user_role or "").lower()
         if role_lower not in ("administrator", "app_manager", "superadmin", "admin"):
-            raise PermissionError("Only Administrators and App Managers can moderate Lost & Found items.")
+            raise PermissionError("Only Admins and App Managers can moderate Lost & Found items.")
         item = self.get_item(item_id)
         if not item:
             raise ValueError("Item not found.")

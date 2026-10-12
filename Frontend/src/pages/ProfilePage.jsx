@@ -24,23 +24,14 @@ import PageHeader from "../components/PageHeader.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { formatDate } from "../utils/dateFormatter.js";
 import { userService } from "../services/userService.js";
+import { getRoleDisplayName } from "../utils/constants.js";
 
 export default function ProfilePage() {
   const { user, setUser, refreshUser } = useAuth();
 
   const roleTitle = useMemo(() => {
     if (!user) return "";
-    const role = (user.role || "").toLowerCase();
-    if (role === "location_in_charge") {
-      const locName = (user.location_name || user.location_id || "").toLowerCase();
-      if (locName.includes("hostel")) return "Hostel Warden";
-      if (locName.includes("mess")) return "Mess Supervisor";
-      if (locName.includes("sac") || locName.includes("activity")) return "SAC In-Charge";
-      if (locName.includes("sport")) return "Sports In-Charge";
-      if (locName.includes("academic")) return "Academic Block Supervisor";
-      return "General Supervisor";
-    }
-    return user.role ? user.role.replace("_", " ") : "";
+    return getRoleDisplayName(user.role);
   }, [user]);
 
   const [isEditing, setIsEditing] = useState(false);

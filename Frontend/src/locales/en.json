@@ -81,8 +81,17 @@
     "title": "Safety Reports",
     "anonymous_report": "Submit Anonymous Safety Report",
     "case_code": "Confidential Case Code",
-    "safe_tip": "Save this code to check admin replies anonymously.",
     "status": "Report Status"
+  },
+
+  "roles": {
+    "admin": "Admin",
+    "app_manager": "App Manager",
+    "coordinator": "Coordinator",
+    "employee": "Employee",
+    "warden": "Warden",
+    "student": "Student",
+    "super_admin": "Super Admin"
   }
 }
 

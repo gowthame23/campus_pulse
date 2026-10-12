@@ -476,7 +476,7 @@ def patch_user_status(
     if (current_user.role or "").lower() == "app_manager" and target_user.role in ("administrator", "app_manager"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="App Managers are not authorized to manage Administrator or App Manager accounts."
+            detail="App Managers are not authorized to manage Admin or App Manager accounts."
         )
 
     if current_user.user_id == user_id and payload.status != "Active":
@@ -507,7 +507,7 @@ def patch_user_status(
         ]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="System must always contain at least one active Administrator.",
+                detail="System must always contain at least one active Admin.",
             )
 
     try:
@@ -669,13 +669,13 @@ def reset_user_password(
         if target_user.role not in ("coordinator", "location_in_charge", "student", "employee"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="App Managers can only reset passwords for Coordinators, Employees, Location In-charges, or Students.",
+                detail="App Managers can only reset passwords for Coordinators, Employees, Wardens, or Students.",
             )
     elif current_user.role == Administrator.ROLE:
         if target_user.role not in (Administrator.ROLE, AppManager.ROLE):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Administrators can only reset passwords for Admin or App Manager accounts.",
+                detail="Admins can only reset passwords for Admin or App Manager accounts.",
             )
 
     from utils.passwords import hash_password, validate_password_complexity

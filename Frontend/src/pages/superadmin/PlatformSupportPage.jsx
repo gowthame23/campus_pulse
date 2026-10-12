@@ -82,7 +82,7 @@ export default function PlatformSupportPage() {
     <div className="space-y-6">
       <PageHeader
         title="Technical Support Center — Super Admin"
-        description="Investigate and resolve platform technical issues reported by Institution Administrators."
+        description="Investigate and resolve platform technical issues reported by Institution Admins."
       />
 
       {error && (
@@ -189,7 +189,7 @@ export default function PlatformSupportPage() {
               label="Technical Resolution Notes"
               value={resolutionNotes}
               onChange={(e) => setResolutionNotes(e.target.value)}
-              placeholder="Enter technical resolution steps or response to Institution Administrator..."
+              placeholder="Enter technical resolution steps or response to Institution Admin..."
               rows={4}
             />
 

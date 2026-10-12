@@ -19,6 +19,7 @@ import { chatService } from "../../services/chatService.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import ChatWindow from "../../components/ChatWindow.jsx";
 import Loader from "../../components/Loader.jsx";
+import { getRoleDisplayName } from "../../utils/constants.js";
 
 export default function ChatPage() {
   const { itemId } = useParams();
@@ -268,12 +269,7 @@ export default function ChatPage() {
   };
 
   const getRoleLabel = (role) => {
-    const r = (role || "").toLowerCase();
-    if (r === "administrator") return "Administrator";
-    if (r === "app_manager") return "App Manager";
-    if (r === "location_in_charge") return "Warden / In-Charge";
-    if (r === "coordinator") return "Coordinator";
-    return role || "Staff";
+    return getRoleDisplayName(role) || "Staff";
   };
 
   // Filtered conversations & contacts
@@ -322,7 +318,7 @@ export default function ChatPage() {
               Personal Staff Chat
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-              Real-time 1-to-1 messaging between Administrators, App Managers, Wardens, and Coordinators
+              Real-time 1-to-1 messaging between Admins, App Managers, Wardens, and Coordinators
             </p>
           </div>
         </div>

@@ -618,15 +618,15 @@ export default function LocationManagementPage() {
     try {
       if (!inChargeId) {
         await locationService.unassignInCharge(locationId);
-        setMessage("Location in-charge unassigned successfully.");
+        setMessage("Warden unassigned successfully.");
       } else {
         await locationService.assignInCharge(locationId, inChargeId);
-        setMessage("Location in-charge assigned successfully.");
+        setMessage("Warden assigned successfully.");
       }
       reload();
     } catch (err) {
       setError(
-        err?.response?.data?.detail || "Unable to assign location in-charge.",
+        err?.response?.data?.detail || "Unable to assign warden.",
       );
     }
   };

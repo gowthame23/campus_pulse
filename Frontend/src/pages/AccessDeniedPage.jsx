@@ -15,7 +15,7 @@ export default function AccessDeniedPage() {
         </h1>
         <p className="mt-2 text-sm text-slate-500 leading-relaxed">
           Your account role does not have permission to access this page. Please
-          contact your system administrator if you believe this is an error.
+          contact your system admin if you believe this is an error.
         </p>
 
         <div className="mt-8">
