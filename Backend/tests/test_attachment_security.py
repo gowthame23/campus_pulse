@@ -25,7 +25,7 @@ def _get_headers_for(username, password):
 
 def _get_admin_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "gowthamejjurothu@gmail.com", "password": "Admin@123"})
+    login_res = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
     assert login_res.status_code == 200
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}

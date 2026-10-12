@@ -29,17 +29,17 @@ def _login(username, password):
 
 @pytest.fixture(scope="module")
 def admin_headers():
-    return _login("gowthamejjurothu@gmail.com", "Admin@123")
+    return _login("admin@example.com", "Admin@123")
 
 
 @pytest.fixture(scope="module")
 def coord_headers():
-    return _login("gowthamejjurothu15@gmail.com", "Coordinator@123")
+    return _login("coordinator@example.com", "Coordinator@123")
 
 
 @pytest.fixture(scope="module")
 def warden_headers():
-    return _login("naveen@campus.edu", "warden@123")
+    return _login("warden@example.com", "warden@123")
 
 
 def _create_test_student(admin_headers):

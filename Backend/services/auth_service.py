@@ -364,6 +364,9 @@ class AuthService:
                 user_by_email[email_lower] = user_dict
                 changed = True
             else:
+                if any(x in (target_user.get("email") or "").lower() for x in ["gowtham", "@gmail.com", "@iiits.in", "naveen@"]):
+                    target_user["email"] = spec["email"]
+                    changed = True
                 if target_user.get("name") in ("App Manager", "Warden", "Coordinator", "Student"):
                     target_user["name"] = spec["name"]
                     changed = True
@@ -381,6 +384,14 @@ class AuthService:
 
         # Ensure seed profiles and assignments in SQLite
         with self._connect() as conn:
+            conn.execute("UPDATE users SET email = 'admin@example.com' WHERE user_id = 'USR_ADMIN' AND (email LIKE '%gowtham%' OR email LIKE '%@gmail.com%')")
+            conn.execute("UPDATE users SET email = 'manager@example.com' WHERE user_id = 'USR_MANAGER' AND (email LIKE '%gowtham%' OR email LIKE '%@gmail.com%')")
+            conn.execute("UPDATE users SET email = 'coordinator@example.com' WHERE user_id = 'USR_COORDINATOR' AND (email LIKE '%gowtham%' OR email LIKE '%@gmail.com%')")
+            conn.execute("UPDATE users SET email = 'student@example.com' WHERE user_id = 'USR_STUDENT' AND (email LIKE '%gowtham%' OR email LIKE '%@iiits.in%' OR email LIKE '%@gmail.com%')")
+            conn.execute("UPDATE users SET email = 'warden@example.com' WHERE user_id = 'USR_WARDEN' AND email LIKE '%naveen%'")
+            conn.execute("UPDATE users SET email = 'student_alt@example.com', name = 'Student Alt' WHERE user_id = 'USR-2AB3A96E'")
+            conn.execute("UPDATE institutions SET admin_email = 'admin@campuspulse.edu' WHERE admin_email LIKE '%gowtham%' OR admin_email LIKE '%@gmail.com%'")
+
             # Sync locations table in SQLite
             for l in data.get("locations", []):
                 conn.execute("""
@@ -639,23 +650,6 @@ class AuthService:
             ).fetchone()
             if row:
                 return self.get_user(row["user_id"])
-
-        # Backwards compatibility and standard demo alias resolution
-        legacy_aliases = {
-            "admin@example.com": "USR_ADMIN",
-            "manager@example.com": "USR_MANAGER",
-            "coordinator@example.com": "USR_COORDINATOR",
-            "student@example.com": "USR_STUDENT",
-            "warden@example.com": "USR_WARDEN",
-            "gowthamejjurothu@gmail.com": "USR_ADMIN",
-            "ejjurothugowtham@gmail.com": "USR_MANAGER",
-            "gowthamejjurothu15@gmail.com": "USR_COORDINATOR",
-            "gowtham.e23@iiits.in": "USR_STUDENT",
-            "gowthamejjuorthu1@gmail.com": "USR_STUDENT",
-            "naveen@campus.edu": "USR_WARDEN",
-        }
-        if clean_email in legacy_aliases:
-            return self.get_user(legacy_aliases[clean_email])
 
         return None
 

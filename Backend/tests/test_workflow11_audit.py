@@ -23,7 +23,7 @@ def _get_headers(email, password):
     return {"Authorization": f"Bearer {token}"}
 
 def test_workflow_11_admin_audit_access():
-    admin_headers = _get_headers("gowthamejjurothu@gmail.com", "Admin@123")
+    admin_headers = _get_headers("admin@example.com", "Admin@123")
 
     # 1. List audit logs
     list_res = client.get("/audit", headers=admin_headers)
@@ -45,8 +45,8 @@ def test_workflow_11_admin_audit_access():
     assert exp_res.headers["content-type"].startswith("text/csv")
 
 def test_workflow_11_non_admin_forbidden():
-    std_headers = _get_headers("gowtham.e23@iiits.in", "Student@123")
-    coord_headers = _get_headers("gowthamejjurothu15@gmail.com", "Coordinator@123")
+    std_headers = _get_headers("student@example.com", "Student@123")
+    coord_headers = _get_headers("coordinator@example.com", "Coordinator@123")
 
     # Student -> 403 Forbidden
     res_std = client.get("/audit", headers=std_headers)

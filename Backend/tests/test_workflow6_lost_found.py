@@ -35,7 +35,7 @@ def _reset_limiter():
 
 def _get_student_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "gowtham.e23@iiits.in", "password": "Student@123"})
+    login_res = client.post("/auth/login", json={"username": "student@example.com", "password": "Student@123"})
     if login_res.status_code != 200:
         print("LOGIN STUDENT FAIL:", login_res.status_code, login_res.text)
     token = login_res.json()["access_token"]
@@ -43,7 +43,7 @@ def _get_student_headers():
 
 def _get_admin_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "gowthamejjurothu@gmail.com", "password": "Admin@123"})
+    login_res = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
@@ -157,7 +157,7 @@ def test_workflow_6_security_ownership_authorization():
 
     # Student A headers
     _reset_limiter()
-    res_a = client.post("/auth/login", json={"username": "gowtham.e23@iiits.in", "password": "Student@123"})
+    res_a = client.post("/auth/login", json={"username": "student@example.com", "password": "Student@123"})
     std_a_headers = {"Authorization": f"Bearer {res_a.json()['access_token']}"}
 
     # Student B setup (create student B and set is_first_login = 0)

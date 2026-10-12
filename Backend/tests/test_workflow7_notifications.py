@@ -20,7 +20,7 @@ def _reset_limiter():
 
 def _get_student_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "gowtham.e23@iiits.in", "password": "Student@123"})
+    login_res = client.post("/auth/login", json={"username": "student@example.com", "password": "Student@123"})
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 

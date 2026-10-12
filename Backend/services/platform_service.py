@@ -39,7 +39,7 @@ class PlatformService:
                         "ABC",
                         "Active",
                         "Administrator",
-                        "gowthamejjurothu@gmail.com",
+                        "admin@campuspulse.edu",
                         "+91-9876543210",
                         self.PLATFORM_VERSION,
                         self.DEPLOYMENT_ID,

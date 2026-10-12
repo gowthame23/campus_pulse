@@ -23,7 +23,7 @@ def _get_headers(email, password):
     return {"Authorization": f"Bearer {token}"}
 
 def test_workflow_12_admin_settings_access():
-    admin_headers = _get_headers("gowthamejjurothu@gmail.com", "Admin@123")
+    admin_headers = _get_headers("admin@example.com", "Admin@123")
 
     # 1. Get all settings
     all_res = client.get("/settings", headers=admin_headers)
@@ -50,8 +50,8 @@ def test_workflow_12_admin_settings_access():
     assert upd_res.status_code == 200
 
 def test_workflow_12_non_admin_forbidden():
-    std_headers = _get_headers("gowtham.e23@iiits.in", "Student@123")
-    coord_headers = _get_headers("gowthamejjurothu15@gmail.com", "Coordinator@123")
+    std_headers = _get_headers("student@example.com", "Student@123")
+    coord_headers = _get_headers("coordinator@example.com", "Coordinator@123")
 
     # Student -> 403 Forbidden
     res_std = client.get("/settings", headers=std_headers)

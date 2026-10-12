@@ -26,7 +26,7 @@ def _reset_limiter():
 
 def _get_student_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "gowtham.e23@iiits.in", "password": "Student@123"})
+    login_res = client.post("/auth/login", json={"username": "student@example.com", "password": "Student@123"})
     assert login_res.status_code == 200
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}, token
@@ -34,7 +34,7 @@ def _get_student_headers():
 
 def _get_admin_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "gowthamejjurothu@gmail.com", "password": "Admin@123"})
+    login_res = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
     assert login_res.status_code == 200
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}, token
@@ -55,7 +55,7 @@ def test_security_persistent_session_in_db():
 # 2. PASSWORD RESET ENUMERATION PROTECTION
 def test_security_password_reset_enumeration_protection():
     # Registered email
-    res1 = client.post("/auth/password-reset/request", json={"email": "gowtham.e23@iiits.in"})
+    res1 = client.post("/auth/password-reset/request", json={"email": "student@example.com"})
     assert res1.status_code == 200
     assert "reset_id" in res1.json()
     assert "If the account exists" in res1.json()["message"]
@@ -69,7 +69,7 @@ def test_security_password_reset_enumeration_protection():
 
 # 3. OTP BRUTE FORCE PROTECTION ACROSS RESET IDS
 def test_security_password_reset_otp_attempt_limits():
-    email = "gowtham.e23@iiits.in"
+    email = "student@example.com"
     req_res = client.post("/auth/password-reset/request", json={"email": email})
     reset_id = req_res.json()["reset_id"]
 
@@ -93,7 +93,7 @@ def test_security_profile_update_cannot_change_password():
     # Attempting to update password via generic profile update
     res = client.put("/users/USR_STUDENT", json={"password": "HackedPassword123!"}, headers=std_headers)
     # Password field is ignored by generic profile update; original password remains unchanged
-    login_check = client.post("/auth/login", json={"username": "gowtham.e23@iiits.in", "password": "Student@123"})
+    login_check = client.post("/auth/login", json={"username": "student@example.com", "password": "Student@123"})
     assert login_check.status_code == 200
 
 
@@ -228,7 +228,7 @@ def test_security_lost_found_authorization_guards():
 
     # 3. Unauthorized non-owner student cannot delete another student's report -> 403
     _reset_limiter()
-    student2_login = client.post("/auth/login", json={"username": "gowthamejjuorthu1@gmail.com", "password": "Student@123"})
+    student2_login = client.post("/auth/login", json={"username": "student_alt@example.com", "password": "Student@123"})
     if student2_login.status_code == 200:
         std2_headers = {"Authorization": f"Bearer {student2_login.json()['access_token']}"}
         del_res = client.delete(f"/lost-found/items/{item_id}", headers=std2_headers)
@@ -289,15 +289,15 @@ def test_security_metadata_endpoints_require_authentication():
 def test_security_analytics_authorization_matrix():
     std_headers, _ = _get_student_headers()
     _reset_limiter()
-    coord_login = client.post("/auth/login", json={"username": "gowthamejjurothu15@gmail.com", "password": "Coordinator@123"})
+    coord_login = client.post("/auth/login", json={"username": "coordinator@example.com", "password": "Coordinator@123"})
     coord_headers = {"Authorization": f"Bearer {coord_login.json()['access_token']}"}
 
     _reset_limiter()
-    warden_login = client.post("/auth/login", json={"username": "naveen@campus.edu", "password": "warden@123"})
+    warden_login = client.post("/auth/login", json={"username": "warden@example.com", "password": "warden@123"})
     warden_headers = {"Authorization": f"Bearer {warden_login.json()['access_token']}"}
 
     _reset_limiter()
-    mgr_login = client.post("/auth/login", json={"username": "ejjurothugowtham@gmail.com", "password": "Manager@123"})
+    mgr_login = client.post("/auth/login", json={"username": "manager@example.com", "password": "Manager@123"})
     mgr_headers = {"Authorization": f"Bearer {mgr_login.json()['access_token']}"}
 
     admin_headers, _ = _get_admin_headers()
@@ -442,15 +442,15 @@ def test_security_supervisor_dashboard_authorization():
     admin_headers, _ = _get_admin_headers()
 
     _reset_limiter()
-    coord_login = client.post("/auth/login", json={"username": "gowthamejjurothu15@gmail.com", "password": "Coordinator@123"})
+    coord_login = client.post("/auth/login", json={"username": "coordinator@example.com", "password": "Coordinator@123"})
     coord_headers = {"Authorization": f"Bearer {coord_login.json()['access_token']}"}
 
     _reset_limiter()
-    warden_login = client.post("/auth/login", json={"username": "naveen@campus.edu", "password": "warden@123"})
+    warden_login = client.post("/auth/login", json={"username": "warden@example.com", "password": "warden@123"})
     warden_headers = {"Authorization": f"Bearer {warden_login.json()['access_token']}"}
 
     _reset_limiter()
-    mgr_login = client.post("/auth/login", json={"username": "ejjurothugowtham@gmail.com", "password": "Manager@123"})
+    mgr_login = client.post("/auth/login", json={"username": "manager@example.com", "password": "Manager@123"})
     mgr_headers = {"Authorization": f"Bearer {mgr_login.json()['access_token']}"}
 
     # Student -> 403 (Proper HTTP 403 status code, no supervisor data in payload)
@@ -511,7 +511,7 @@ def _new_complaint(headers, location="LOC_HOSTEL_A", department="DEPT_ELECTRICAL
 
 # 22. BACKUPS: ADMIN-ONLY CREATE/DOWNLOAD, VALIDATED TYPE
 def test_security_backups_admin_only_and_type_validated():
-    mgr_headers = _login_headers("ejjurothugowtham@gmail.com", "Manager@123")
+    mgr_headers = _login_headers("manager@example.com", "Manager@123")
     admin_headers, _ = _get_admin_headers()
     assert client.post("/backups", json={"backup_name": "m"}, headers=mgr_headers).status_code == 403
 
@@ -544,8 +544,8 @@ def test_security_reports_generation_role_gated_and_validated():
 # 24. COMPLAINT OBJECT-LEVEL AUTHORIZATION
 def test_security_complaint_object_level_authorization():
     std_headers, _ = _get_student_headers()
-    warden_headers = _login_headers("naveen@campus.edu", "warden@123")
-    mgr_headers = _login_headers("ejjurothugowtham@gmail.com", "Manager@123")
+    warden_headers = _login_headers("warden@example.com", "warden@123")
+    mgr_headers = _login_headers("manager@example.com", "Manager@123")
     admin_headers, _ = _get_admin_headers()
     sa_headers = _login_headers("superadmin@campuspulse.edu", "Superadmin@123")
 
@@ -578,7 +578,7 @@ def test_security_complaint_object_level_authorization():
 # 25. ANNOUNCEMENT OWNERSHIP AND MISSING IDS
 def test_security_announcement_ownership_and_missing_ids():
     admin_headers, _ = _get_admin_headers()
-    coord_headers = _login_headers("gowthamejjurothu15@gmail.com", "Coordinator@123")
+    coord_headers = _login_headers("coordinator@example.com", "Coordinator@123")
     created = client.post("/announcements", json={
         "title": "Ownership test", "content": "c", "description": "d", "category": "General",
         "priority": "Normal", "target_type": "Campus", "target": "All",
@@ -710,7 +710,7 @@ def test_security_production_seed_requires_supplied_passwords(tmp_path, monkeypa
     service = AuthService(db_path=str(tmp_path / "prod.db"))
     users = service.repository.load()["users"]
     assert [u["user_id"] for u in users] == ["USR_ADMIN"]
-    assert service.authenticate("gowthamejjurothu@gmail.com", "Boot@Strap2026")
+    assert service.authenticate("admin@example.com", "Boot@Strap2026")
 
 
 # 33. SCHEMA VALIDATION FOR USER CREATION & PASSWORD RESET
@@ -753,7 +753,7 @@ def test_security_admin_profile_update_enforces_role_status_location_rules():
 # 34. ADMIN/MANAGER PASSWORD RESET REVOKES THE TARGET'S SESSIONS
 def test_security_admin_password_reset_revokes_sessions():
     student_id, _, student_headers = _new_student()
-    mgr_headers = _login_headers("ejjurothugowtham@gmail.com", "Manager@123")
+    mgr_headers = _login_headers("manager@example.com", "Manager@123")
     assert client.get("/auth/me", headers=student_headers).status_code == 200
     res = client.put(f"/users/{student_id}/reset-password", json={"new_password": "Reset@Pass789"}, headers=mgr_headers)
     assert res.status_code == 200
@@ -825,7 +825,7 @@ def test_security_super_admin_hidden_from_institution_users():
     assert client.put(f"/users/{sa_id}", json={"name": "Hacked"}, headers=admin_headers).status_code == 404
     assert client.patch(f"/users/{sa_id}/status", json={"status": "Inactive"}, headers=admin_headers).status_code == 404
     assert client.delete(f"/users/{sa_id}", headers=admin_headers).status_code == 404
-    mgr_headers = _login_headers("ejjurothugowtham@gmail.com", "Manager@123")
+    mgr_headers = _login_headers("manager@example.com", "Manager@123")
     assert client.put(f"/users/{sa_id}/reset-password", json={"new_password": "Hack@Pass123"}, headers=mgr_headers).status_code == 404
 
     sa_headers = _login_headers("superadmin@campuspulse.edu", "Superadmin@123")
@@ -843,15 +843,15 @@ def test_security_lost_found_delete_ownership_strict():
     _, _, other_student_headers = _new_student()
 
     _reset_limiter()
-    coord_login = client.post("/auth/login", json={"username": "gowthamejjurothu15@gmail.com", "password": "Coordinator@123"})
+    coord_login = client.post("/auth/login", json={"username": "coordinator@example.com", "password": "Coordinator@123"})
     coord_headers = {"Authorization": f"Bearer {coord_login.json()['access_token']}"}
 
     _reset_limiter()
-    warden_login = client.post("/auth/login", json={"username": "naveen@campus.edu", "password": "warden@123"})
+    warden_login = client.post("/auth/login", json={"username": "warden@example.com", "password": "warden@123"})
     warden_headers = {"Authorization": f"Bearer {warden_login.json()['access_token']}"}
 
     _reset_limiter()
-    mgr_login = client.post("/auth/login", json={"username": "ejjurothugowtham@gmail.com", "password": "Manager@123"})
+    mgr_login = client.post("/auth/login", json={"username": "manager@example.com", "password": "Manager@123"})
     mgr_headers = {"Authorization": f"Bearer {mgr_login.json()['access_token']}"}
 
     admin_headers, _ = _get_admin_headers()

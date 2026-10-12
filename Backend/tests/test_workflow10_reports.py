@@ -23,7 +23,7 @@ def _get_headers(email, password):
     return {"Authorization": f"Bearer {token}"}
 
 def test_workflow_10_admin_reports():
-    headers = _get_headers("gowthamejjurothu@gmail.com", "Admin@123")
+    headers = _get_headers("admin@example.com", "Admin@123")
 
     # 1. Complaints report
     c_res = client.get("/reports/complaints", headers=headers)
@@ -59,6 +59,6 @@ def test_workflow_10_admin_reports():
     assert "total_users" in u_res.json()
 
 def test_workflow_10_student_forbidden():
-    headers = _get_headers("gowtham.e23@iiits.in", "Student@123")
+    headers = _get_headers("student@example.com", "Student@123")
     res = client.get("/reports/complaints", headers=headers)
     assert res.status_code == 403

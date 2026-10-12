@@ -231,11 +231,11 @@ To set up and run Campus Pulse from scratch on a new developer workstation:
    ```
    *Verification:* Open `http://127.0.0.1:5173/` in your browser.
 4. **Login with Verified Seed Accounts:**
-   - **Administrator:** `gowthamejjurothu@gmail.com` / `Admin@123`
-   - **App Manager:** `ejjurothugowtham@gmail.com` / `Manager@123`
-   - **Hostel Warden:** `naveen@campus.edu` / `warden@123`
-   - **Coordinator:** `gowthamejjurothu15@gmail.com` / `Coordinator@123`
-   - **Student:** `gowtham.e23@iiits.in` / `Student@123`
+   - **Administrator:** `admin@example.com` / `Admin@123`
+   - **App Manager:** `manager@example.com` / `Manager@123`
+   - **Hostel Warden:** `warden@example.com` / `warden@123`
+   - **Coordinator:** `coordinator@example.com` / `Coordinator@123`
+   - **Student:** `student@example.com` / `Student@123`
 5. **Run Test Suites:**
    ```bash
    python Backend/tests/smoke_test.py

@@ -25,8 +25,8 @@ def _get_headers_for(username, password):
     return {"Authorization": f"Bearer {token}"}
 
 def test_concurrency_simultaneous_updates_and_status_changes():
-    std_headers = _get_headers_for("gowtham.e23@iiits.in", "Student@123")
-    admin_headers = _get_headers_for("gowthamejjurothu@gmail.com", "Admin@123")
+    std_headers = _get_headers_for("student@example.com", "Student@123")
+    admin_headers = _get_headers_for("admin@example.com", "Admin@123")
 
     # Create complaint
     uid = uuid.uuid4().hex[:6]

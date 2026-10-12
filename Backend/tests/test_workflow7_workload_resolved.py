@@ -24,8 +24,8 @@ def _reset_limiter():
             try:
                 conn = sqlite3.connect(db_p)
                 conn.execute("DELETE FROM login_attempts")
-                conn.execute("UPDATE users SET password = ?, active = 1, status = 'Active' WHERE email = ?", (hash_password("Student@123"), "gowtham.e23@iiits.in"))
-                conn.execute("UPDATE users SET password = ?, active = 1, status = 'Active' WHERE email = ?", (hash_password("Admin@123"), "gowthamejjurothu@gmail.com"))
+                conn.execute("UPDATE users SET password = ?, active = 1, status = 'Active' WHERE email = ?", (hash_password("Student@123"), "student@example.com"))
+                conn.execute("UPDATE users SET password = ?, active = 1, status = 'Active' WHERE email = ?", (hash_password("Admin@123"), "admin@example.com"))
                 conn.commit()
                 conn.close()
             except Exception:
@@ -43,13 +43,13 @@ def login_user(email, password):
 
 def test_workload_endpoint_rbac_and_metrics():
     # 1. Student access should be forbidden (403)
-    student_headers = login_user("gowtham.e23@iiits.in", "Student@123")
+    student_headers = login_user("student@example.com", "Student@123")
     res_student = client.get("/complaints/workload", headers=student_headers)
     assert res_student.status_code == 403
     assert "Students are not authorized to view staff workload." in res_student.json()["detail"]
 
     # 2. Admin access should succeed
-    admin_headers = login_user("gowthamejjurothu@gmail.com", "Admin@123")
+    admin_headers = login_user("admin@example.com", "Admin@123")
     res_admin = client.get("/complaints/workload", headers=admin_headers)
     assert res_admin.status_code == 200
     data = res_admin.json()
@@ -81,7 +81,7 @@ def test_workload_endpoint_rbac_and_metrics():
 
 
 def test_resolved_endpoint_filtering_and_lifecycle():
-    admin_headers = login_user("gowthamejjurothu@gmail.com", "Admin@123")
+    admin_headers = login_user("admin@example.com", "Admin@123")
 
     # 1. Fetch resolved list
     res = client.get("/complaints/resolved", headers=admin_headers)
@@ -104,6 +104,6 @@ def test_resolved_endpoint_filtering_and_lifecycle():
     assert res_q.status_code == 200
 
     # 3. Student can view resolved items
-    student_headers = login_user("gowtham.e23@iiits.in", "Student@123")
+    student_headers = login_user("student@example.com", "Student@123")
     res_st = client.get("/complaints/resolved", headers=student_headers)
     assert res_st.status_code == 200

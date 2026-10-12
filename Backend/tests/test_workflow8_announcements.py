@@ -19,31 +19,31 @@ def _reset_limiter():
 
 def _get_admin_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "gowthamejjurothu@gmail.com", "password": "Admin@123"})
+    login_res = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
 def _get_student_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "gowtham.e23@iiits.in", "password": "Student@123"})
+    login_res = client.post("/auth/login", json={"username": "student@example.com", "password": "Student@123"})
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
 def _get_coordinator_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "gowthamejjurothu15@gmail.com", "password": "Coordinator@123"})
+    login_res = client.post("/auth/login", json={"username": "coordinator@example.com", "password": "Coordinator@123"})
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
 def _get_manager_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "ejjurothugowtham@gmail.com", "password": "Manager@123"})
+    login_res = client.post("/auth/login", json={"username": "manager@example.com", "password": "Manager@123"})
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
 def _get_warden_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "naveen@campus.edu", "password": "warden@123"})
+    login_res = client.post("/auth/login", json={"username": "warden@example.com", "password": "warden@123"})
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
@@ -163,7 +163,7 @@ def test_workflow_8_get_admin_contact_endpoint():
     assert res_std.status_code == 200
     data_std = res_std.json()
     assert data_std["available"] is True
-    assert data_std["email"] == "gowthamejjurothu@gmail.com"
+    assert data_std["email"] == "admin@example.com"
     assert data_std["name"] is not None
     assert "contact" in data_std["message"].lower()
 
@@ -171,7 +171,7 @@ def test_workflow_8_get_admin_contact_endpoint():
     res_coord = client.get("/announcements/admin-contact", headers=coord_headers)
     assert res_coord.status_code == 200
     assert res_coord.json()["available"] is True
-    assert res_coord.json()["email"] == "gowthamejjurothu@gmail.com"
+    assert res_coord.json()["email"] == "admin@example.com"
 
     # 3. Unauthenticated request without session or token is rejected with 401
     anon_client = TestClient(app)
