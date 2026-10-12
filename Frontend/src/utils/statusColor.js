@@ -28,9 +28,10 @@ export function getStatusTone(status) {
 
 export function getSlaTone(slaStatus) {
   if (!slaStatus) return "default";
-  if (slaStatus.includes("On Time")) return "success";
-  if (slaStatus.includes("Due Today")) return "warning";
-  if (slaStatus.includes("Overdue")) return "danger";
+  const s = String(slaStatus).toLowerCase();
+  if (s.includes("on time")) return "success";
+  if (s.includes("due today")) return "warning";
+  if (s.includes("overdue") || s.includes("breached") || s.includes("late")) return "danger";
   return "default";
 }
 

@@ -970,6 +970,7 @@ export default function ComplaintDetailsPage() {
         complaint={complaint}
         coordinatorUser={coordinatorUser}
         wardenUser={wardenUser}
+        attachments={attachments}
       />
 
       {/* Deletion Request Alert Banner for App Manager / Admin */}
@@ -1516,11 +1517,14 @@ export default function ComplaintDetailsPage() {
                       Student Confirmation Required
                     </span>
                     <span className="text-[10px] font-mono font-bold text-slate-500">
-                      Reopen: {complaint.reopen_count || 0}/3
+                      {complaint.reopen_count || 0} of 3 reopens used
                     </span>
                   </div>
+                  <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
+                    Auto-closes in 48h if unconfirmed (reminder at 24h).
+                  </div>
                   {(isOwner || isAdmin) ? (
-                    <div className="space-y-2">
+                    <div className="space-y-2 pt-1">
                       <Button
                         type="button"
                         variant="success"
@@ -1528,21 +1532,35 @@ export default function ComplaintDetailsPage() {
                         className="w-full font-bold py-2.5 text-xs flex items-center justify-center gap-1.5 shadow-sm"
                       >
                         <Check className="h-4 w-4" />
-                        Confirm & Close Ticket
+                        Confirm fixed
                       </Button>
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => setShowStudentReopenModal(true)}
+                        onClick={() => {
+                          setStudentReopenReason("");
+                          setShowStudentReopenModal(true);
+                        }}
                         className="w-full font-bold py-2 text-xs text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-900 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center justify-center gap-1.5"
                       >
                         <AlertTriangle className="h-4 w-4" />
-                        Still Not Fixed / Reopen
+                        Still not fixed
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          setStudentReopenReason("Photo doesn't match: The uploaded resolution photo does not correspond to the reported issue.");
+                          setShowStudentReopenModal(true);
+                        }}
+                        className="w-full font-medium py-1.5 text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center justify-center gap-1.5 border border-dashed border-amber-300 dark:border-amber-800"
+                      >
+                        Photo doesn't match
                       </Button>
                     </div>
                   ) : (
                     <p className="text-[11px] text-slate-500 font-medium">
-                      Work has been marked resolved. Awaiting student verification.
+                      Work has been marked resolved. Awaiting student confirmation.
                     </p>
                   )}
                 </div>
