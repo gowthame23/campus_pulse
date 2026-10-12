@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Wrench,
@@ -18,6 +18,12 @@ import {
   Building,
   Hourglass,
   Camera,
+  MoreVertical,
+  Upload,
+  TrendingUp,
+  X,
+  Layers,
+  HelpCircle,
 } from "lucide-react";
 import Button from "../../components/Button.jsx";
 import EmptyState from "../../components/EmptyState.jsx";
@@ -34,6 +40,7 @@ import { attachmentService } from "../../services/attachmentService.js";
 import { announcementService } from "../../services/announcementService.js";
 import { notificationService } from "../../services/notificationService.js";
 import { locationService } from "../../services/locationService.js";
+import { departmentService } from "../../services/departmentService.js";
 import { formatDate } from "../../utils/dateFormatter.js";
 import { getStatusTone, getPriorityTone, getSlaTone } from "../../utils/statusColor.js";
 
@@ -56,6 +63,65 @@ const getLocationName = (locId, locations = []) => {
   return idStr;
 };
 
+const getWaitingTime = (createdAt) => {
+  if (!createdAt) return "";
+  const diff = Math.max(0, Date.now() - new Date(createdAt).getTime());
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours > 24) {
+    const days = Math.floor(hours / 24);
+    return `Waiting ${days}d ${hours % 24}h`;
+  }
+  if (hours > 0) return `Waiting ${hours}h ${mins}m`;
+  return `Waiting ${mins}m`;
+};
+
+const getDeadlineBadge = (c) => {
+  const deadline = c.sla_deadline || c.due_date;
+  if (!deadline) return null;
+  const diff = new Date(deadline).getTime() - Date.now();
+  const isOverdue = diff <= 0;
+  const absDiff = Math.abs(diff);
+  const hours = Math.floor(absDiff / (1000 * 60 * 60));
+  const mins = Math.floor((absDiff % (1000 * 60 * 60)) / (1000 * 60));
+  if (isOverdue) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 animate-pulse">
+        <AlertTriangle className="h-3 w-3" />
+        LATE by {hours}h {mins}m
+      </span>
+    );
+  }
+  if (hours < 4) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+        <Clock className="h-3 w-3" />
+        Due in {hours}h {mins}m
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+      <Clock className="h-3 w-3" />
+      Due in {hours}h {mins}m
+    </span>
+  );
+};
+
+const PRESET_NOTES = [
+  "Investigating the issue on site",
+  "Spare parts ordered",
+  "Technician dispatched to location",
+  "Repair work actively underway",
+];
+
+const RESOLUTION_PRESETS = [
+  "Issue resolved and tested on site",
+  "Replaced faulty components",
+  "Cleaning and servicing completed",
+  "Restored to normal operation",
+];
+
 export default function CoordinatorDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -67,18 +133,39 @@ export default function CoordinatorDashboard() {
   // Action Modals State
   const [selectedComplaint, setSelectedComplaint] = useState(null);
 
+  // Progress Note Modal
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [progressNoteText, setProgressNoteText] = useState("");
   const [submittingProgressNote, setSubmittingProgressNote] = useState(false);
 
+  // Pause Modal
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [pauseReasonText, setPauseReasonText] = useState("");
   const [submittingPause, setSubmittingPause] = useState(false);
 
+  // Wrong Location Modal
+  const [showWrongLocationModal, setShowWrongLocationModal] = useState(false);
+  const [wrongLocationNotes, setWrongLocationNotes] = useState("");
+  const [submittingWrongLocation, setSubmittingWrongLocation] = useState(false);
+
+  // Mark Done Modal
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [resolveNotesText, setResolveNotesText] = useState("");
+  const [resolvePreset, setResolvePreset] = useState("");
   const [resolvePhotoFile, setResolvePhotoFile] = useState(null);
+  const [isPhotoSkipped, setIsPhotoSkipped] = useState(false);
+  const [photoSkipReason, setPhotoSkipReason] = useState("");
   const [submittingResolve, setSubmittingResolve] = useState(false);
+
+  // More Menu Popover
+  const [openMenuComplaintId, setOpenMenuComplaintId] = useState(null);
+
+  // Hidden File Inputs for Camera and Gallery
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
+
+  // Own Performance Stats
+  const [ownStats, setOwnStats] = useState(null);
 
   const {
     data: dashboardData,
@@ -87,7 +174,7 @@ export default function CoordinatorDashboard() {
     reload,
   } = useAsyncData(
     async () => {
-      const [compRes, ancRes, notifRes, locRes] = await Promise.all([
+      const [compRes, ancRes, notifRes, locRes, deptRes, statsRes] = await Promise.all([
         complaintService.list().catch(() => ({ data: [] })),
         announcementService.list().catch(() => ({ data: [] })),
         notificationService
@@ -95,42 +182,55 @@ export default function CoordinatorDashboard() {
           .then((res) => ({ data: res.data.items }))
           .catch(() => ({ data: [] })),
         locationService.list().catch(() => ({ data: [] })),
+        departmentService.list().catch(() => ({ data: [] })),
+        complaintService.getCoordinatorStats().catch(() => ({ data: [] })),
       ]);
+
+      const myStats = (statsRes.data || []).find(
+        (s) => s.coordinator_id === user?.user_id || s.email === user?.email,
+      );
+      if (myStats) setOwnStats(myStats);
+
       return {
         complaints: compRes.data || [],
         announcements: ancRes.data || [],
         notifications: notifRes.data || [],
         locations: locRes.data || [],
+        departments: deptRes.data || [],
       };
     },
-    { complaints: [], announcements: [], notifications: [], locations: [] },
+    { complaints: [], announcements: [], notifications: [], locations: [], departments: [] },
   );
 
   const complaints = dashboardData?.complaints || [];
   const announcements = dashboardData?.announcements || [];
   const notifications = dashboardData?.notifications || [];
   const locations = dashboardData?.locations || [];
+  const departments = dashboardData?.departments || [];
 
   // Filter 1: Available Work (Unassigned or unaccepted queue matching coordinator's department or location)
+  // Sorted OLDEST FIRST
   const availableComplaints = useMemo(() => {
-    return complaints.filter((c) => {
-      const isUnclaimed =
-        !c.assigned_to ||
-        c.status === "Submitted" ||
-        c.status === "Pending" ||
-        c.status === "Awaiting Coordinator Assignment";
-      const isNotClosed = !c.status?.startsWith("Closed");
+    return complaints
+      .filter((c) => {
+        const isUnclaimed =
+          !c.assigned_to ||
+          c.status === "Submitted" ||
+          c.status === "Pending" ||
+          c.status === "Awaiting Coordinator Assignment";
+        const isNotClosed = !c.status?.startsWith("Closed");
 
-      if (!isUnclaimed || !isNotClosed) return false;
+        if (!isUnclaimed || !isNotClosed) return false;
 
-      // Department or location match
-      if (user?.department_id && c.department_id === user.department_id) return true;
-      if (user?.department && c.department_name === user.department) return true;
-      if (user?.location_id && c.location_id === user.location_id) return true;
+        // Department or location match
+        if (user?.department_id && c.department_id === user.department_id) return true;
+        if (user?.department && c.department_name === user.department) return true;
+        if (user?.location_id && c.location_id === user.location_id) return true;
 
-      // If coordinator has no specific dept restriction, include all unclaimed
-      return !user?.department_id && !user?.location_id;
-    });
+        // If coordinator has no specific dept restriction, include all unclaimed
+        return !user?.department_id && !user?.location_id;
+      })
+      .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
   }, [complaints, user]);
 
   // Filter 2: My Work (Tickets I accepted or am assigned to)
@@ -158,6 +258,21 @@ export default function CoordinatorDashboard() {
     [myWorkComplaints],
   );
 
+  // Mapped departments and locations for display
+  const mappedDepartments = useMemo(() => {
+    if (user?.department) return [user.department];
+    if (user?.department_name) return [user.department_name];
+    const dept = departments.find((d) => d.coordinator_id === user?.user_id);
+    if (dept) return [dept.name];
+    return ["General Operations"];
+  }, [user, departments]);
+
+  const mappedLocations = useMemo(() => {
+    if (user?.location_name) return [user.location_name];
+    if (user?.location_id) return [getLocationName(user.location_id, locations)];
+    return ["All Campus Locations"];
+  }, [user, locations]);
+
   // Actions
   const handleAccept = async (complaintId) => {
     try {
@@ -169,7 +284,8 @@ export default function CoordinatorDashboard() {
     } catch (err) {
       if (err.response?.status === 409) {
         setToastTone("danger");
-        setToastMessage("Taken by another coordinator.");
+        const detail = err.response?.data?.detail;
+        setToastMessage(detail || "Taken by another coordinator.");
       } else {
         setToastTone("danger");
         setToastMessage(err.response?.data?.detail || "Could not accept ticket.");
@@ -199,6 +315,19 @@ export default function CoordinatorDashboard() {
     } catch (err) {
       setToastTone("danger");
       setToastMessage(err.response?.data?.detail || "Failed to resume work.");
+    }
+  };
+
+  const handleQuickPresetNote = async (complaintId, presetText) => {
+    try {
+      await complaintService.addProgressNote(complaintId, presetText);
+      setToastTone("success");
+      setToastMessage(`Progress note logged: "${presetText}"`);
+      setOpenMenuComplaintId(null);
+      reload();
+    } catch (err) {
+      setToastTone("danger");
+      setToastMessage(err.response?.data?.detail || "Failed to log progress note.");
     }
   };
 
@@ -242,36 +371,97 @@ export default function CoordinatorDashboard() {
     }
   };
 
+  const handleWrongLocationSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedComplaint) return;
+    setSubmittingWrongLocation(true);
+    try {
+      await complaintService.addProgressNote(
+        selectedComplaint.complaint_id,
+        `[WRONG LOCATION REPORTED]: ${wrongLocationNotes.trim() || "Item does not belong to this location."}`,
+      );
+      setToastTone("info");
+      setToastMessage("Wrong location report noted. Warden and App Manager alerted.");
+      setShowWrongLocationModal(false);
+      setWrongLocationNotes("");
+      setSelectedComplaint(null);
+      reload();
+    } catch (err) {
+      setToastTone("danger");
+      setToastMessage(err.response?.data?.detail || "Failed to report wrong location.");
+    } finally {
+      setSubmittingWrongLocation(false);
+    }
+  };
+
+  const handleOpenResolveModal = (complaint) => {
+    setSelectedComplaint(complaint);
+    setResolveNotesText("");
+    setResolvePreset("");
+    setResolvePhotoFile(null);
+    setIsPhotoSkipped(false);
+    setPhotoSkipReason("");
+    setShowResolveModal(true);
+    setOpenMenuComplaintId(null);
+  };
+
   const handleResolveSubmit = async (e) => {
     e.preventDefault();
     if (!selectedComplaint) return;
 
+    const studentHasPhoto = Boolean(
+      selectedComplaint.attachment_url ||
+      (selectedComplaint.attachments && selectedComplaint.attachments.length > 0)
+    );
+
+    // If student had photo and coordinator chose to skip
+    if (isPhotoSkipped) {
+      const streak = ownStats?.photo_skip_streak || 0;
+      if (streak >= 2 && !photoSkipReason.trim()) {
+        setToastTone("danger");
+        setToastMessage("Reason is required because your photo skip streak is 2 or more.");
+        return;
+      }
+      if (!photoSkipReason.trim()) {
+        setToastTone("danger");
+        setToastMessage("Please specify why the student's photo is not relevant.");
+        return;
+      }
+    }
+
+    // High/Critical priority check
     const p = (selectedComplaint.priority || "Medium").toLowerCase();
     const isHighOrCrit = p === "high" || p === "critical";
-
-    if (isHighOrCrit && !resolvePhotoFile) {
+    if (isHighOrCrit && !resolvePhotoFile && !isPhotoSkipped) {
       setToastTone("danger");
       setToastMessage("High/Critical priority tickets require an After Repair photo.");
       return;
     }
 
-    if (!resolvePhotoFile && !resolveNotesText.trim()) {
-      setToastTone("danger");
-      setToastMessage("Resolution notes are required when no photo is provided.");
-      return;
-    }
+    const finalNotes = resolveNotesText.trim() || resolvePreset || "Work completed and verified on site.";
 
     setSubmittingResolve(true);
     try {
-      if (resolvePhotoFile) {
+      if (resolvePhotoFile && !isPhotoSkipped) {
         await attachmentService.upload(selectedComplaint.complaint_id, [resolvePhotoFile], "After Repair");
       }
-      await complaintService.resolve(selectedComplaint.complaint_id, resolveNotesText.trim());
+
+      const payload = isPhotoSkipped
+        ? {
+            notes: finalNotes,
+            skip_photo: true,
+            photo_skipped: true,
+            photo_skip_reason: photoSkipReason.trim(),
+          }
+        : {
+            notes: finalNotes,
+            preset_code: resolvePreset || undefined,
+          };
+
+      await complaintService.resolve(selectedComplaint.complaint_id, payload);
       setToastTone("success");
       setToastMessage("Work marked completed and submitted for verification!");
       setShowResolveModal(false);
-      setResolveNotesText("");
-      setResolvePhotoFile(null);
       setSelectedComplaint(null);
       reload();
     } catch (err) {
@@ -289,6 +479,11 @@ export default function CoordinatorDashboard() {
     return <EmptyState title="Dashboard Unavailable" description={error} />;
   }
 
+  const studentHasPhoto = Boolean(
+    selectedComplaint?.attachment_url ||
+    (selectedComplaint?.attachments && selectedComplaint.attachments.length > 0)
+  );
+
   return (
     <div className="space-y-6">
       {/* Toast Notification */}
@@ -300,17 +495,44 @@ export default function CoordinatorDashboard() {
         />
       )}
 
-      {/* Header Section */}
+      {/* Coordinator Coverage & Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            Good morning, {user?.name || "Coordinator"}
-          </h1>
-          <p className="text-xs font-normal text-slate-500 dark:text-slate-400 mt-1">
-            Department Operations & Field Execution • {myWorkComplaints.length} active assigned tickets
-          </p>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+              Good morning, {user?.name || "Coordinator"}
+            </h1>
+            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+              Field Execution
+            </span>
+          </div>
+
+          {/* Mapped Departments & Locations Pill Bar */}
+          <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-slate-600 dark:text-slate-400">
+            <span className="flex items-center gap-1 font-semibold text-slate-800 dark:text-slate-200">
+              <Building className="h-3.5 w-3.5 text-primary" />
+              {mappedDepartments.join(", ")}
+            </span>
+            <span>•</span>
+            <span className="flex items-center gap-1 font-semibold text-slate-800 dark:text-slate-200">
+              <MapPin className="h-3.5 w-3.5 text-amber-500" />
+              {mappedLocations.join(", ")}
+            </span>
+            <span>•</span>
+            <span>{myWorkComplaints.length} active assigned tickets</span>
+          </div>
         </div>
-        <div className="flex items-center gap-2.5 shrink-0">
+
+        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+          <Button
+            onClick={() => navigate("/coordinators/performance")}
+            variant="outline"
+            size="md"
+            className="font-medium shrink-0 flex items-center gap-1.5"
+          >
+            <TrendingUp className="h-4 w-4" />
+            Performance & SLA
+          </Button>
           <Button
             onClick={() => navigate("/complaints")}
             variant="outline"
@@ -345,10 +567,10 @@ export default function CoordinatorDashboard() {
           onClick={() => setActiveTab("my_work")}
         />
         <StatCard
-          label="Paused (Waiting Parts)"
-          value={myWorkComplaints.filter((c) => c.status === "Waiting for Parts").length}
-          subtext="SLA paused for spare parts"
-          onClick={() => setActiveTab("my_work")}
+          label="Photo Quality & Skips"
+          value={`${ownStats?.photo_percent !== undefined ? ownStats.photo_percent + "%" : "100%"}`}
+          subtext={`Streak: ${ownStats?.photo_skip_streak || 0} / 2 limit`}
+          onClick={() => navigate("/coordinators/performance")}
         />
       </div>
 
@@ -425,7 +647,7 @@ export default function CoordinatorDashboard() {
           <div className="p-5 space-y-4">
             <div className="flex items-center justify-between pb-2">
               <span className="text-xs text-slate-500 font-medium">
-                Tickets awaiting pickup in your department/location queue. Click <strong>Accept</strong> to claim.
+                Team intake queue (oldest first). First to click <strong>Accept</strong> claims the ticket.
               </span>
               <Button size="sm" variant="ghost" onClick={reload} className="text-xs">
                 Refresh Queue
@@ -442,9 +664,9 @@ export default function CoordinatorDashboard() {
                 {availableComplaints.map((c) => (
                   <div
                     key={c.complaint_id}
-                    className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-slate-900/30 p-2 rounded-xl transition-colors"
+                    className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-slate-900/30 p-3 rounded-xl transition-colors"
                   >
-                    <div className="space-y-1 min-w-0">
+                    <div className="space-y-1.5 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
                           to={`/complaints/${c.complaint_id}`}
@@ -461,6 +683,9 @@ export default function CoordinatorDashboard() {
                         <Badge tone={getStatusTone(c.status)}>
                           {c.status}
                         </Badge>
+                        <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded">
+                          {getWaitingTime(c.created_at)}
+                        </span>
                       </div>
 
                       <p className="text-xs text-slate-500 line-clamp-1">
@@ -489,13 +714,13 @@ export default function CoordinatorDashboard() {
 
                     <div className="flex items-center gap-2 shrink-0">
                       <Button
-                        size="sm"
+                        size="md"
                         variant="primary"
                         onClick={() => handleAccept(c.complaint_id)}
-                        className="font-bold text-xs flex items-center gap-1.5 shadow-2xs"
+                        className="font-bold text-xs flex items-center gap-1.5 shadow-sm py-2 px-4"
                       >
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        Accept Ticket
+                        <CheckCircle2 className="h-4 w-4" />
+                        Accept
                       </Button>
                       <Button
                         size="sm"
@@ -518,7 +743,7 @@ export default function CoordinatorDashboard() {
           <div className="p-5 space-y-4">
             <div className="flex items-center justify-between pb-2">
               <span className="text-xs text-slate-500 font-medium">
-                Active tickets assigned to you. Perform real-time work transitions below.
+                Active tickets assigned to you. Big one-tap primary buttons for fast mobile execution.
               </span>
               <Button size="sm" variant="ghost" onClick={reload} className="text-xs">
                 Refresh My Work
@@ -535,7 +760,7 @@ export default function CoordinatorDashboard() {
                 {myWorkComplaints.map((c) => (
                   <div
                     key={c.complaint_id}
-                    className="py-4 first:pt-0 last:pb-0 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-slate-900/30 p-2.5 rounded-xl transition-colors"
+                    className="py-4 first:pt-0 last:pb-0 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-slate-900/30 p-3 rounded-xl transition-colors"
                   >
                     <div className="space-y-1.5 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -554,11 +779,7 @@ export default function CoordinatorDashboard() {
                         <Badge tone={getStatusTone(c.status)}>
                           {c.status}
                         </Badge>
-                        {c.sla_status && (
-                          <Badge tone={getSlaTone(c.sla_status)}>
-                            {c.sla_status}
-                          </Badge>
-                        )}
+                        {getDeadlineBadge(c)}
                       </div>
 
                       <p className="text-xs text-slate-500 line-clamp-1">
@@ -574,104 +795,149 @@ export default function CoordinatorDashboard() {
                         <span>{c.category || c.complaint_type || "General"}</span>
                         <span>•</span>
                         <span>Assigned {c.assigned_at ? formatDate(c.assigned_at) : "Recently"}</span>
-                        {c.due_date && (
-                          <>
-                            <span>•</span>
-                            <span className="text-slate-600 dark:text-slate-300 font-medium">
-                              SLA Due: {formatDate(c.due_date)}
-                            </span>
-                          </>
-                        )}
                       </div>
                     </div>
 
-                    {/* Action Buttons for this Ticket */}
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    {/* Primary Big Action & More Menu */}
+                    <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+                      {/* One Big Primary Action Button */}
                       {c.status === "Assigned" && (
                         <Button
-                          size="sm"
+                          size="md"
                           variant="primary"
                           onClick={() => handleStartWork(c.complaint_id)}
-                          className="font-bold text-xs flex items-center gap-1 shadow-2xs"
+                          className="font-bold text-xs flex items-center gap-1.5 shadow-sm py-2 px-5"
                         >
-                          <PlayCircle className="h-3.5 w-3.5" />
+                          <PlayCircle className="h-4 w-4" />
                           Start Work
                         </Button>
                       )}
 
                       {c.status === "In Progress" && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedComplaint(c);
-                              setShowProgressModal(true);
-                            }}
-                            className="text-xs flex items-center gap-1"
-                          >
-                            <FileText className="h-3.5 w-3.5" />
-                            Progress Note
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedComplaint(c);
-                              setShowPauseModal(true);
-                            }}
-                            className="text-xs text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 hover:bg-amber-50 flex items-center gap-1"
-                          >
-                            <PauseCircle className="h-3.5 w-3.5" />
-                            Waiting Parts
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="success"
-                            onClick={() => {
-                              setSelectedComplaint(c);
-                              setShowResolveModal(true);
-                            }}
-                            className="font-bold text-xs flex items-center gap-1"
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                            Mark Done
-                          </Button>
-                        </>
+                        <Button
+                          size="md"
+                          variant="success"
+                          onClick={() => handleOpenResolveModal(c)}
+                          className="font-bold text-xs flex items-center gap-1.5 shadow-sm py-2 px-5"
+                        >
+                          <Check className="h-4 w-4" />
+                          Mark Done
+                        </Button>
                       )}
 
                       {c.status === "Waiting for Parts" && (
                         <Button
-                          size="sm"
+                          size="md"
                           variant="primary"
                           onClick={() => handleResumeWork(c.complaint_id)}
-                          className="font-bold text-xs flex items-center gap-1"
+                          className="font-bold text-xs flex items-center gap-1.5 shadow-sm py-2 px-5"
                         >
-                          <PlayCircle className="h-3.5 w-3.5" />
+                          <PlayCircle className="h-4 w-4" />
                           Resume Work
                         </Button>
                       )}
 
                       {c.status === "Pending Warden Verification" && (
-                        <span className="text-[11px] text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-2.5 py-1 rounded-md font-semibold border border-purple-200 dark:border-purple-800">
+                        <span className="text-[11px] text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-3 py-1.5 rounded-lg font-semibold border border-purple-200 dark:border-purple-800">
                           Awaiting Warden Inspection
                         </span>
                       )}
 
                       {c.status === "Waiting for Verification" && (
-                        <span className="text-[11px] text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-md font-semibold border border-emerald-200 dark:border-emerald-800">
+                        <span className="text-[11px] text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 rounded-lg font-semibold border border-emerald-200 dark:border-emerald-800">
                           Awaiting Student Confirmation
                         </span>
                       )}
 
+                      {/* Details Button */}
                       <Button
                         size="sm"
-                        variant="ghost"
+                        variant="outline"
                         onClick={() => navigate(`/complaints/${c.complaint_id}`)}
                         className="text-xs"
                       >
-                        View
+                        Details
                       </Button>
+
+                      {/* More Dropdown Menu */}
+                      <div className="relative">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            setOpenMenuComplaintId(
+                              openMenuComplaintId === c.complaint_id ? null : c.complaint_id,
+                            )
+                          }
+                          className="!p-1.5 text-slate-500 hover:text-slate-800"
+                          title="More options"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+
+                        {openMenuComplaintId === c.complaint_id && (
+                          <div className="absolute right-0 top-8 z-30 w-56 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#101726] p-2 shadow-lg space-y-1">
+                            <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                              Quick Presets
+                            </div>
+
+                            {PRESET_NOTES.map((preset, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => handleQuickPresetNote(c.complaint_id, preset)}
+                                className="w-full text-left px-2 py-1.5 text-xs rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5"
+                              >
+                                <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                                {preset}
+                              </button>
+                            ))}
+
+                            <div className="border-t border-slate-100 dark:border-slate-800 my-1" />
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedComplaint(c);
+                                setShowProgressModal(true);
+                                setOpenMenuComplaintId(null);
+                              }}
+                              className="w-full text-left px-2 py-1.5 text-xs rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5"
+                            >
+                              <FileText className="h-3.5 w-3.5 text-slate-400" />
+                              Custom Progress Note
+                            </button>
+
+                            {c.status === "In Progress" && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedComplaint(c);
+                                  setShowPauseModal(true);
+                                  setOpenMenuComplaintId(null);
+                                }}
+                                className="w-full text-left px-2 py-1.5 text-xs rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors flex items-center gap-1.5"
+                              >
+                                <PauseCircle className="h-3.5 w-3.5" />
+                                Waiting for Parts (Pause)
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedComplaint(c);
+                                setShowWrongLocationModal(true);
+                                setOpenMenuComplaintId(null);
+                              }}
+                              className="w-full text-left px-2 py-1.5 text-xs rounded-lg text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors flex items-center gap-1.5"
+                            >
+                              <MapPin className="h-3.5 w-3.5" />
+                              Report Wrong Location
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -742,7 +1008,7 @@ export default function CoordinatorDashboard() {
               label="Reason for Delay"
               value={pauseReasonText}
               onChange={(e) => setPauseReasonText(e.target.value)}
-              placeholder="e.g. Awaiting specialized replacement valve from store..."
+              placeholder="e.g. Awaiting specialized replacement valve from central stores..."
               rows={3}
               required
             />
@@ -765,6 +1031,48 @@ export default function CoordinatorDashboard() {
         </Modal>
       )}
 
+      {/* Wrong Location Modal */}
+      {showWrongLocationModal && (
+        <Modal
+          isOpen={showWrongLocationModal}
+          onClose={() => {
+            setShowWrongLocationModal(false);
+            setSelectedComplaint(null);
+          }}
+          title="📍 Report Wrong Location"
+        >
+          <form onSubmit={handleWrongLocationSubmit} className="space-y-4">
+            <p className="text-xs text-slate-500">
+              Flag that ticket <strong>{selectedComplaint?.complaint_id}</strong> was filed for the wrong room/location.
+              This notifies the Warden and App Manager for re-routing.
+            </p>
+            <Textarea
+              label="Location Note / Correct Room"
+              value={wrongLocationNotes}
+              onChange={(e) => setWrongLocationNotes(e.target.value)}
+              placeholder="e.g. Actual room is Block B Room 302, not Block A..."
+              rows={3}
+              required
+            />
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowWrongLocationModal(false);
+                  setSelectedComplaint(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" variant="danger" disabled={submittingWrongLocation}>
+                {submittingWrongLocation ? "Reporting..." : "Flag Wrong Location"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
       {/* Mark Done Modal */}
       {showResolveModal && (
         <Modal
@@ -776,40 +1084,157 @@ export default function CoordinatorDashboard() {
           title="✅ Mark Work Completed"
         >
           <form onSubmit={handleResolveSubmit} className="space-y-4">
-            <p className="text-xs text-slate-500">
-              Complete physical work on ticket <strong>{selectedComplaint?.complaint_id}</strong>.
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-xs space-y-1">
+              <div className="font-bold text-slate-900 dark:text-slate-100">
+                {selectedComplaint?.title}
+              </div>
+              <div className="text-slate-500">
+                {selectedComplaint?.description}
+              </div>
               {["high", "critical"].includes((selectedComplaint?.priority || "").toLowerCase()) && (
-                <span className="block mt-1 font-bold text-amber-600 dark:text-amber-400">
-                  ⚠️ High/Critical priority tickets require an "After Repair" photo attachment.
-                </span>
-              )}
-            </p>
-            <Textarea
-              label="Resolution Notes"
-              value={resolveNotesText}
-              onChange={(e) => setResolveNotesText(e.target.value)}
-              placeholder="Describe work completed, components replaced..."
-              rows={3}
-            />
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                After Repair Photo{" "}
-                {["high", "critical"].includes((selectedComplaint?.priority || "").toLowerCase())
-                  ? "(Required)"
-                  : "(Recommended)"}
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setResolvePhotoFile(e.target.files?.[0] || null)}
-                className="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90 cursor-pointer"
-              />
-              {resolvePhotoFile && (
-                <p className="text-[11px] text-emerald-600 font-medium mt-1">
-                  Selected: {resolvePhotoFile.name}
-                </p>
+                <div className="font-bold text-amber-600 dark:text-amber-400 pt-1">
+                  ⚠️ High/Critical priority tickets require an After Repair photo or explicit skip reason.
+                </div>
               )}
             </div>
+
+            {/* Hidden file inputs: camera first with capture, gallery as fallback */}
+            <input
+              type="file"
+              ref={cameraInputRef}
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                setResolvePhotoFile(e.target.files?.[0] || null);
+                setIsPhotoSkipped(false);
+              }}
+            />
+            <input
+              type="file"
+              ref={galleryInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                setResolvePhotoFile(e.target.files?.[0] || null);
+                setIsPhotoSkipped(false);
+              }}
+            />
+
+            {/* Photo Section */}
+            {!isPhotoSkipped ? (
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  After Repair Photo{" "}
+                  {studentHasPhoto ? "(Matches student's before photo)" : "(Optional)"}
+                </label>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="flex items-center justify-center gap-1.5 p-3 rounded-xl border border-dashed border-primary bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-colors"
+                  >
+                    <Camera className="h-4 w-4" />
+                    Take Photo (Camera)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="flex items-center justify-center gap-1.5 p-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 transition-colors"
+                  >
+                    <Upload className="h-4 w-4" />
+                    From Gallery
+                  </button>
+                </div>
+
+                {resolvePhotoFile && (
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 text-emerald-700 dark:text-emerald-300 text-xs">
+                    <span className="font-semibold truncate">Selected: {resolvePhotoFile.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setResolvePhotoFile(null)}
+                      className="text-rose-600 hover:text-rose-800 p-1"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Skip button only when student had a photo */}
+                {studentHasPhoto && (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPhotoSkipped(true);
+                        setResolvePhotoFile(null);
+                      }}
+                      className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1"
+                    >
+                      Skip – student photo not relevant
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Photo Skipped Mode */
+              <div className="p-3 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span>Photo Skipped — Reason Required</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsPhotoSkipped(false)}
+                    className="text-primary hover:underline font-semibold text-[11px]"
+                  >
+                    Cancel Skip & Take Photo
+                  </button>
+                </div>
+                <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80">
+                  Student provided a photo. Explain why an "After" photo is not relevant:
+                </p>
+                <input
+                  type="text"
+                  value={photoSkipReason}
+                  onChange={(e) => setPhotoSkipReason(e.target.value)}
+                  placeholder="e.g. Student attached a meme/blank image, issue was software setting..."
+                  className="w-full h-9 rounded-xl border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 px-3 text-xs outline-none focus:border-amber-500 text-slate-800 dark:text-slate-100"
+                  required
+                />
+              </div>
+            )}
+
+            {/* Resolution Preset or Note */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Resolution Preset (One-Tap)
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mb-2">
+                {RESOLUTION_PRESETS.map((p, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setResolvePreset(resolvePreset === p ? "" : p)}
+                    className={`p-2 rounded-xl text-left text-xs transition-colors border ${
+                      resolvePreset === p
+                        ? "border-primary bg-primary/10 text-primary font-bold"
+                        : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+
+              <Textarea
+                label="Additional Completion Details"
+                value={resolveNotesText}
+                onChange={(e) => setResolveNotesText(e.target.value)}
+                placeholder="Describe work completed, components replaced..."
+                rows={2}
+              />
+            </div>
+
             <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
               <Button
                 type="button"

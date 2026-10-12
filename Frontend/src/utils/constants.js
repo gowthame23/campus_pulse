@@ -21,3 +21,10 @@ export const COMPLAINT_STATUS = {
   PENDING_WARDEN_VERIFICATION: "Pending Warden Verification",
   ADMIN_REVIEW: "Admin Review",
 };
+
+export const PRESET_PROGRESS_NOTES = {
+  INVESTIGATING: "Investigating the issue on site",
+  PARTS_ORDERED: "Spare parts ordered",
+  TECHNICIAN_DISPATCHED: "Technician dispatched to location",
+  WORK_UNDERWAY: "Repair work actively underway",
+};

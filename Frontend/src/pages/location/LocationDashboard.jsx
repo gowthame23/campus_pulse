@@ -157,7 +157,54 @@ export default function LocationDashboard() {
     );
   }, [complaints]);
 
+  const unclaimedComplaints = useMemo(() => {
+    return complaints.filter((c) => {
+      if (user?.location_id && c.location_id !== user.location_id) return false;
+      return (
+        (c.status === "Submitted" || c.status === "Pending" || !c.assigned_to) &&
+        c.accept_due_at &&
+        new Date(c.accept_due_at) < new Date()
+      );
+    });
+  }, [complaints, user]);
+
+  const blockedTooLongComplaints = useMemo(() => {
+    return complaints.filter((c) => {
+      if (user?.location_id && c.location_id !== user.location_id) return false;
+      if (c.status !== "Waiting for Parts") return false;
+      if (c.paused_at) {
+        const pausedMs = Date.now() - new Date(c.paused_at).getTime();
+        return pausedMs > 72 * 3600 * 1000;
+      }
+      return false;
+    });
+  }, [complaints, user]);
+
+  const photoSkipComplaints = useMemo(() => {
+    return complaints.filter((c) => {
+      if (user?.location_id && c.location_id !== user.location_id) return false;
+      return c.photo_skipped || (c.photo_skip_streak && c.photo_skip_streak >= 2);
+    });
+  }, [complaints, user]);
+
   // Action Handlers
+  const handlePhotoMismatch = async (ticket) => {
+    try {
+      await complaintService.wardenVerify(
+        ticket.complaint_id,
+        "Not Fixed",
+        "Photo does not match the actual reported issue or repair work.",
+        { photo_mismatch: true }
+      );
+      setToastTone("success");
+      setToastMessage(`Ticket ${ticket.complaint_id} flagged for photo mismatch and returned to coordinator.`);
+      reload();
+    } catch (err) {
+      setToastTone("danger");
+      setToastMessage(err.response?.data?.detail || "Photo mismatch submission failed.");
+    }
+  };
+
   const handleVerifyFixed = async () => {
     if (!verifyModalTicket) return;
     setSubmittingVerify(true);
@@ -264,6 +311,53 @@ export default function LocationDashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Top Alerts Panel */}
+      {(overdueComplaints.length > 0 || blockedTooLongComplaints.length > 0 || unclaimedComplaints.length > 0 || photoSkipComplaints.length > 0) && (
+        <div className="space-y-2">
+          {overdueComplaints.length > 0 && (
+            <div className="p-3 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50/70 dark:bg-rose-950/30 text-rose-900 dark:text-rose-200 text-xs font-semibold flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
+                ⚠️ {overdueComplaints.length} overdue complaint(s) breaching resolution turnaround target!
+              </span>
+              <Button size="sm" variant="outline" onClick={() => navigate("/complaints", { state: { sla: "Overdue" } })} className="text-[11px] py-1">
+                View Overdue
+              </Button>
+            </div>
+          )}
+          {blockedTooLongComplaints.length > 0 && (
+            <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/70 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 text-xs font-semibold flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-amber-600 shrink-0" />
+                ⚠️ {blockedTooLongComplaints.length} complaint(s) waiting for parts for &gt;72 hours without resolution.
+              </span>
+              <Button size="sm" variant="outline" onClick={() => navigate("/complaints", { state: { status: "Waiting for Parts" } })} className="text-[11px] py-1">
+                Inspect Blocked
+              </Button>
+            </div>
+          )}
+          {unclaimedComplaints.length > 0 && (
+            <div className="p-3 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/70 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200 text-xs font-semibold flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-blue-600 shrink-0" />
+                ⚠️ {unclaimedComplaints.length} complaint(s) went unclaimed past acceptance deadline.
+              </span>
+              <Button size="sm" variant="outline" onClick={() => navigate("/complaints", { state: { status: "unassigned" } })} className="text-[11px] py-1">
+                Review Unclaimed
+              </Button>
+            </div>
+          )}
+          {photoSkipComplaints.length > 0 && (
+            <div className="p-3 rounded-xl border border-purple-200 dark:border-purple-900 bg-purple-50/70 dark:bg-purple-950/30 text-purple-900 dark:text-purple-200 text-xs font-semibold flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <ImageIcon className="h-4 w-4 text-purple-600 shrink-0" />
+                📸 {photoSkipComplaints.length} complaint(s) with skipped photos or active skip streaks.
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 4 Key Metrics Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -405,6 +499,15 @@ export default function LocationDashboard() {
                             >
                               <XCircle className="h-3.5 w-3.5" />
                               Not Fixed
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handlePhotoMismatch(c)}
+                              className="font-semibold text-xs flex items-center gap-1 text-amber-700 dark:text-amber-300 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                            >
+                              <ImageIcon className="h-3.5 w-3.5" />
+                              Photo doesn't match
                             </Button>
                           </>
                         )}

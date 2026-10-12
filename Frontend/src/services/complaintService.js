@@ -9,9 +9,10 @@ export const complaintService = {
   requestDeletion: (complaintId, reason) => apiClient.delete(`/complaints/${complaintId}`, { data: { reason } }),
   approveDeletion: (complaintId) => apiClient.post(`/complaints/${complaintId}/approve-deletion`),
   rejectDeletion: (complaintId) => apiClient.post(`/complaints/${complaintId}/reject-deletion`),
-  assign: (complaintId, coordinatorId) =>
+  assign: (complaintId, coordinatorId, reason = "") =>
     apiClient.post(`/complaints/${complaintId}/assign`, {
       coordinator_id: coordinatorId,
+      reason,
     }),
   take: (complaintId) =>
     apiClient.post(`/complaints/${complaintId}/take`),
@@ -24,10 +25,10 @@ export const complaintService = {
   resume: (complaintId) => apiClient.post(`/complaints/${complaintId}/resume`),
   updateStatus: (complaintId, status) =>
     apiClient.patch(`/complaints/${complaintId}/status`, { status }),
-  resolve: (complaintId, notes = "") =>
-    apiClient.put(`/complaints/${complaintId}/resolve`, { notes }),
-  wardenVerify: (complaintId, verdict, notes = "") =>
-    apiClient.post(`/complaints/${complaintId}/warden-verify`, { verdict, notes }),
+  resolve: (complaintId, payload = "") =>
+    apiClient.put(`/complaints/${complaintId}/resolve`, typeof payload === "string" ? { notes: payload } : payload),
+  wardenVerify: (complaintId, verdict, notes = "", extra = {}) =>
+    apiClient.post(`/complaints/${complaintId}/warden-verify`, { verdict, notes, ...extra }),
   verify: (complaintId) => apiClient.post(`/complaints/${complaintId}/verify`),
   reopen: (complaintId, reason) =>
     apiClient.post(`/complaints/${complaintId}/reopen`, { reason }),
@@ -61,7 +62,7 @@ export const complaintService = {
     apiClient.post(`/complaints/${complaintId}/escalate`, { reason }),
   getWorkload: () => apiClient.get("/complaints/workload"),
   getResolved: (params = {}) => apiClient.get("/complaints/resolved", { params }),
-  getCoordinatorStats: () => apiClient.get("/coordinators/stats"),
+  getCoordinatorStats: (params = {}) => apiClient.get("/coordinators/stats", { params }),
   getCoverageGaps: () => apiClient.get("/departments/coverage-gaps"),
   getWsTicket: () => apiClient.post("/api/ws-ticket"),
 };

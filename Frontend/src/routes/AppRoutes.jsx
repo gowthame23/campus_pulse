@@ -46,6 +46,7 @@ const PlatformHealthPage = lazy(() => import("../pages/superadmin/PlatformHealth
 const TechnicalSupportPage = lazy(() => import("../pages/admin/TechnicalSupportPage.jsx"));
 const WorkloadPage = lazy(() => import("../pages/complaints/WorkloadPage.jsx"));
 const ResolvedPage = lazy(() => import("../pages/complaints/ResolvedPage.jsx"));
+const CoordinatorPerformancePage = lazy(() => import("../pages/coordinator/CoordinatorPerformancePage.jsx"));
 
 
 function RoleHome() {
@@ -129,6 +130,14 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute roles={[ROLES.ADMINISTRATOR, ROLES.APP_MANAGER, ROLES.LOCATION_IN_CHARGE, ROLES.COORDINATOR]}>
               <WorkloadPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/coordinators/performance"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMINISTRATOR, ROLES.APP_MANAGER, ROLES.LOCATION_IN_CHARGE, ROLES.COORDINATOR]}>
+              <CoordinatorPerformancePage />
             </ProtectedRoute>
           }
         />
