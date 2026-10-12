@@ -13,6 +13,7 @@ import {
   Package,
   Megaphone,
   Shield,
+  ShieldAlert,
   Layers,
   Activity,
   Building,
@@ -104,6 +105,7 @@ export default function Sidebar({ isOpen, onClose }) {
         {
           title: "INSIGHTS",
           items: [
+            { to: "/health-map", label: "Campus Health Map", icon: Activity },
             { to: "/reports", label: "Reports", icon: PieChart },
             { to: "/analytics", label: "Analytics", icon: BarChart3 },
           ],
@@ -111,6 +113,7 @@ export default function Sidebar({ isOpen, onClose }) {
         {
           title: "SYSTEM",
           items: [
+            { to: "/admin/safety-reports", label: "Safety Reports", icon: ShieldAlert },
             { to: "/admin/audit", label: "Audit Log", icon: Shield },
             { to: "/backups", label: "Backups", icon: Activity },
             { to: "/system/settings", label: "Settings", icon: Settings },
@@ -151,6 +154,7 @@ export default function Sidebar({ isOpen, onClose }) {
         {
           title: "INSIGHTS",
           items: [
+            { to: "/health-map", label: "Campus Health Map", icon: Activity },
             { to: "/reports", label: "Reports", icon: PieChart },
             { to: "/analytics", label: "Analytics", icon: BarChart3 },
           ],
@@ -187,7 +191,10 @@ export default function Sidebar({ isOpen, onClose }) {
         },
         {
           title: "INSIGHTS",
-          items: [{ to: "/reports", label: "Reports", icon: PieChart }],
+          items: [
+            { to: "/health-map", label: "Campus Health Map", icon: Activity },
+            { to: "/reports", label: "Reports", icon: PieChart },
+          ],
         },
         {
           title: "ACCOUNT",
@@ -226,6 +233,7 @@ export default function Sidebar({ isOpen, onClose }) {
         items: [
           { to: "/student", label: "Home", icon: Home },
           { to: "/complaints", label: "Complaints", icon: FileText },
+          { to: "/safety", label: "Report Safely", icon: ShieldAlert },
           { to: "/resolved", label: "Resolved Views", icon: CheckCircle2 },
           { to: "/lost-found", label: "Lost & Found", icon: Package },
           { to: "/announcements", label: "Announcements", icon: Megaphone },

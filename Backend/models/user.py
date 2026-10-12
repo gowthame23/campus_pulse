@@ -54,6 +54,7 @@ class User:
         photo_skip_streak=0,
         force_next_warden_check=0,
         language="en",
+        safety_blocked_until=None,
     ):
         self.user_id = user_id
         self.name = name
@@ -100,6 +101,7 @@ class User:
         self.photo_skip_streak = int(photo_skip_streak or 0)
         self.force_next_warden_check = int(force_next_warden_check or 0)
         self.language = language or "en"
+        self.safety_blocked_until = safety_blocked_until
 
     def check_password(self, password):
         return verify_password(password, self.password)
@@ -153,6 +155,7 @@ class User:
             "photo_skip_streak": self.photo_skip_streak,
             "force_next_warden_check": self.force_next_warden_check,
             "language": self.language,
+            "safety_blocked_until": self.safety_blocked_until,
         }
 
     @classmethod
@@ -197,4 +200,5 @@ class User:
             photo_skip_streak=int(data.get("photo_skip_streak", 0) or 0),
             force_next_warden_check=int(data.get("force_next_warden_check", 0) or 0),
             language=data.get("language", "en"),
+            safety_blocked_until=data.get("safety_blocked_until"),
         )

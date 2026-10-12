@@ -33,6 +33,7 @@ import Badge from "../../components/Badge.jsx";
 import Modal from "../../components/Modal.jsx";
 import Textarea from "../../components/Textarea.jsx";
 import Toast from "../../components/Toast.jsx";
+import FixerOfTheMonthWidget from "../../components/FixerOfTheMonthWidget.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
 import { complaintService } from "../../services/complaintService.js";
@@ -600,6 +601,9 @@ export default function CoordinatorDashboard() {
           </Button>
         </div>
       )}
+
+      {/* Fixer of the Month Staff Recognition Banner */}
+      <FixerOfTheMonthWidget />
 
       {/* Main Two-Tab Work Interface */}
       <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#101726] shadow-xs overflow-hidden">

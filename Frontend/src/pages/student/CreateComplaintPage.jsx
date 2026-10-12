@@ -16,19 +16,32 @@ import Button from "../../components/Button.jsx";
 import Card from "../../components/Card.jsx";
 import Loader from "../../components/Loader.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
+import Input from "../../components/Input.jsx";
 import Select from "../../components/Select.jsx";
 import Textarea from "../../components/Textarea.jsx";
 import Toast from "../../components/Toast.jsx";
 import Modal from "../../components/Modal.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useLanguage } from "../../context/LanguageContext.jsx";
 import { complaintService } from "../../services/complaintService.js";
 import { departmentService } from "../../services/departmentService.js";
 import { locationService } from "../../services/locationService.js";
 import { attachmentService } from "../../services/attachmentService.js";
 import { getApiError } from "../../api/axios.js";
 
+const QUICK_CATEGORIES = [
+  { key: "electrical", label: "Electrical", icon: "⚡", keyword: "elec" },
+  { key: "plumbing", label: "Plumbing", icon: "🚿", keyword: "plumb" },
+  { key: "carpentry", label: "Carpentry", icon: "🚪", keyword: "carpent" },
+  { key: "housekeeping", label: "Cleaning", icon: "🧹", keyword: "clean" },
+  { key: "internet", label: "Wi-Fi", icon: "📶", keyword: "net" },
+  { key: "mess", label: "Mess", icon: "🍽️", keyword: "mess" },
+  { key: "general", label: "Other", icon: "📦", keyword: "maint" },
+];
+
 export default function CreateComplaintPage() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [departments, setDepartments] = useState([]);
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +59,36 @@ export default function CreateComplaintPage() {
   const cameraInputRef = useRef(null);
 
   const navigate = useNavigate();
+  const [locSearch, setLocSearch] = useState("");
+  const [recentPlaceIds, setRecentPlaceIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("cp_recent_places") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  const [outsideHostelConfirmed, setOutsideHostelConfirmed] = useState(false);
+  const [selectedCategoryKey, setSelectedCategoryKey] = useState(null);
+
+  const handleQuickCategory = (cat) => {
+    setSelectedCategoryKey(cat.key);
+    const deptList = availableDepartments.length > 0 ? availableDepartments : departments;
+    const matchedDept = deptList.find(d => 
+      d.name.toLowerCase().includes(cat.keyword) || 
+      (d.complaint_types || []).some(t => t.toLowerCase().includes(cat.keyword))
+    );
+    if (matchedDept) {
+      setValue("department_id", matchedDept.department_id);
+      const matchedIssue = (matchedDept.complaint_types || []).find(t => 
+        t.toLowerCase().includes(cat.keyword)
+      ) || matchedDept.complaint_types?.[0] || cat.label;
+      setValue("complaint_type", matchedIssue);
+    } else {
+      setValue("complaint_type", cat.label);
+    }
+  };
+
   const {
     register,
     handleSubmit,
@@ -60,6 +103,13 @@ export default function CreateComplaintPage() {
   const titleVal = watch("title");
   const locationVal = watch("location_id");
   const visibilityVal = watch("visibility_type");
+
+  // Pre-select student's own place if available
+  useEffect(() => {
+    if (user?.location_id && !locationVal) {
+      setValue("location_id", user.location_id);
+    }
+  }, [user, locationVal, setValue]);
 
   // Derive dynamic options solely from active backend database configuration
   const availableDepartments = useMemo(() => {
@@ -87,7 +137,18 @@ export default function CreateComplaintPage() {
     );
   }, [locationVal, departments, locations]);
 
-  // Group active locations by Location Type for clean UI selection
+  // Check if student is filing for a hostel outside their own
+  const isOutsideHostel = useMemo(() => {
+    if (!user?.location_id || !locationVal || user.location_id === locationVal) return false;
+    const userLoc = (locations || []).find(l => l.location_id === user.location_id);
+    const selectedLoc = (locations || []).find(l => l.location_id === locationVal);
+    if (!userLoc || !selectedLoc) return false;
+    const isUserHostel = (userLoc.location_type || "").toLowerCase().includes("hostel") || userLoc.name.toLowerCase().includes("hostel");
+    const isSelectedHostel = (selectedLoc.location_type || "").toLowerCase().includes("hostel") || selectedLoc.name.toLowerCase().includes("hostel");
+    return isUserHostel && isSelectedHostel;
+  }, [user, locationVal, locations]);
+
+  // Group active locations by Location Type for clean UI selection, filtering by locSearch
   const groupedLocations = useMemo(() => {
     const types = [
       "Hostel",
@@ -108,25 +169,19 @@ export default function CreateComplaintPage() {
       return "Other / Not Sure";
     };
 
+    const s = locSearch.trim().toLowerCase();
     return types.map(t => {
-      let filtered = (locations || []).filter(l => getLocationType(l) === t);
-      // Restriction: Student's assigned hostel restricts hostel complaints,
-      // but not non-hostel campus locations (Academic Block, Mess, SAC, Sports, etc.).
-      if (t === "Hostel" && user?.role?.toLowerCase() === "student") {
-        const studentLocId = user.location_id;
-        const studentLocName = user.location_name;
-        filtered = filtered.filter(l =>
-          (studentLocId && l.location_id === studentLocId) ||
-          (studentLocName && l.name?.toLowerCase() === studentLocName.toLowerCase()) ||
-          (studentLocId && l.name?.toLowerCase() === studentLocId.toLowerCase())
-        );
-      }
+      let filtered = (locations || []).filter(l => {
+        const matchesType = getLocationType(l) === t;
+        const matchesSearch = !s || l.name.toLowerCase().includes(s);
+        return matchesType && matchesSearch;
+      });
       return {
         type_name: t,
         locations: filtered,
       };
     }).filter(g => g.locations.length > 0);
-  }, [locations, user]);
+  }, [locations, locSearch]);
 
   const availableIssues = useMemo(() => {
     if (!locationVal || !selectedDepartmentId) return [];
@@ -268,7 +323,16 @@ export default function CreateComplaintPage() {
         visibility_type: values.visibility_type || "Public",
         priority: isUrgent ? "High" : (values.priority || "Normal"),
         is_urgent: isUrgent,
+        exact_spot: values.exact_spot?.trim() || null,
       };
+
+      // Save to recent places
+      try {
+        const prev = JSON.parse(localStorage.getItem("cp_recent_places") || "[]");
+        const next = [values.location_id, ...prev.filter(id => id !== values.location_id)].slice(0, 5);
+        localStorage.setItem("cp_recent_places", JSON.stringify(next));
+      } catch {}
+
       const response = await complaintService.create(payload);
       const complaintId = response.data.complaint_id;
 
@@ -317,28 +381,130 @@ export default function CreateComplaintPage() {
         ) : (
           <form className="grid gap-5" onSubmit={handleSubmit(onSubmit)}>
             {/* Step 1 - Select Location */}
-            <Select
-              label="Step 1 — Select Location"
-              error={errors.location_id?.message}
-              {...register("location_id", {
-                required: "Location is required.",
-                onChange: () => {
-                  setValue("department_id", "");
-                  setValue("complaint_type", "");
-                },
-              })}
-            >
-              <option value="">Choose Location</option>
-              {groupedLocations.map((group) => (
-                <optgroup key={group.type_name} label={group.type_name}>
-                  {group.locations.map((loc) => (
-                    <option key={loc.location_id} value={loc.location_id}>
-                      {loc.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </Select>
+            <div className="space-y-3">
+              {/* Recent places pills */}
+              {recentPlaceIds.length > 0 && (
+                <div>
+                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block mb-1.5">
+                    📍 You recently reported from:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {recentPlaceIds.map((rId) => {
+                      const rLoc = locations.find((l) => l.location_id === rId);
+                      if (!rLoc) return null;
+                      return (
+                        <button
+                          key={rId}
+                          type="button"
+                          onClick={() => {
+                            setValue("location_id", rId);
+                            setValue("department_id", "");
+                            setValue("complaint_type", "");
+                          }}
+                          className={`px-2.5 py-1 text-xs rounded-lg border font-medium transition-colors cursor-pointer ${
+                            locationVal === rId
+                              ? "bg-primary text-white border-primary shadow-xs"
+                              : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700"
+                          }`}
+                        >
+                          {rLoc.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Location search filter */}
+              <input
+                type="text"
+                placeholder="Search locations (e.g. Mess, Block A, Room 204)..."
+                value={locSearch}
+                onChange={(e) => setLocSearch(e.target.value)}
+                className="h-9 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+              />
+
+              <Select
+                label="Step 1 — Select Location"
+                error={errors.location_id?.message}
+                {...register("location_id", {
+                  required: "Location is required.",
+                  onChange: () => {
+                    setValue("department_id", "");
+                    setValue("complaint_type", "");
+                  },
+                })}
+              >
+                <option value="">Choose Location</option>
+                {groupedLocations.map((group) => (
+                  <optgroup key={group.type_name} label={group.type_name}>
+                    {group.locations.map((loc) => (
+                      <option key={loc.location_id} value={loc.location_id}>
+                        {loc.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </Select>
+
+              {/* Outside hostel confirmation banner */}
+              {isOutsideHostel && !outsideHostelConfirmed && (
+                <div className="p-3 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 flex items-center justify-between gap-3 text-xs">
+                  <div className="text-amber-800 dark:text-amber-300">
+                    <span className="font-bold">⚠️ Different Location:</span> This is{" "}
+                    <strong>{locations.find((l) => l.location_id === locationVal)?.name || locationVal}</strong>. You live in{" "}
+                    <strong>{locations.find((l) => l.location_id === user?.location_id)?.name || user?.location_id}</strong>. Report for {locations.find((l) => l.location_id === locationVal)?.name || locationVal}?
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOutsideHostelConfirmed(true)}
+                    className="shrink-0 px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg text-xs cursor-pointer shadow-xs"
+                  >
+                    Yes, continue
+                  </button>
+                </div>
+              )}
+
+              {/* Exact Spot input */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                  Exact Spot (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Floor 2, Right bathroom, 2nd tap from door, Room 204..."
+                  className="h-10 w-full rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 px-3.5 text-xs font-medium text-slate-900 dark:text-slate-100 outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                  {...register("exact_spot")}
+                />
+                <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                  Helps the coordinator locate the issue immediately without having to call or ask.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Category Buttons */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                Quick Category (One-Tap Pick)
+              </label>
+              <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                {QUICK_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat.key}
+                    type="button"
+                    onClick={() => handleQuickCategory(cat)}
+                    className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all text-center cursor-pointer ${
+                      selectedCategoryKey === cat.key
+                        ? "border-primary bg-primary/10 text-primary font-bold shadow-xs scale-102"
+                        : "border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    <span className="text-xl mb-1">{cat.icon}</span>
+                    <span className="text-[10px] font-semibold truncate w-full">{cat.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Step 2 - Select Department */}
             <Select
@@ -476,14 +642,19 @@ export default function CreateComplaintPage() {
               </div>
             )}
 
-            <Textarea
-              label="Detailed Description"
-              placeholder="Provide exact details of the issue so coordinators can fix it quickly..."
-              error={errors.description?.message}
-              {...register("description", {
-                required: "Description is required.",
-              })}
-            />
+            <div>
+              <Textarea
+                label="Detailed Description"
+                placeholder="Provide exact details of the issue so coordinators can fix it quickly..."
+                error={errors.description?.message}
+                {...register("description", {
+                  required: "Description is required.",
+                })}
+              />
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                <span>💡 Tip:</span> Use the 🎤 on your keyboard to speak instead of typing.
+              </p>
+            </div>
 
             {/* Urgent Priority Flag */}
             <div className="flex items-start gap-3 p-3.5 rounded-xl border border-rose-200/80 dark:border-rose-900/40 bg-rose-50/50 dark:bg-rose-950/20">

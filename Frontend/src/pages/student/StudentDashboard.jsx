@@ -23,6 +23,7 @@ import Badge from "../../components/Badge.jsx";
 import Card from "../../components/Card.jsx";
 import Modal from "../../components/Modal.jsx";
 import Toast from "../../components/Toast.jsx";
+import FixerOfTheMonthWidget from "../../components/FixerOfTheMonthWidget.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
 import { complaintService } from "../../services/complaintService.js";
@@ -279,6 +280,9 @@ export default function StudentDashboard() {
           }
         />
       </div>
+
+      {/* Fixer of the Month Recognition Banner */}
+      <FixerOfTheMonthWidget />
 
       {/* Urgent Attention / Action Cards */}
       {needAttentionComplaints.length > 0 && (

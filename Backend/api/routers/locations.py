@@ -5,11 +5,13 @@ from api.dependencies import (
     get_auth_service,
     get_department_service,
     get_location_service,
+    get_complaint_service,
 )
 from api.schemas import (
     AssignLocationAppManagerRequest,
     AssignLocationInChargeRequest,
     AssignLocationCoordinatorRequest,
+    CreateLocationFromSpotRequest,
     LocationCreateRequest,
     LocationResponse,
     LocationTypeCreateRequest,
@@ -129,6 +131,95 @@ def create_location_type(
         if hasattr(error, "status_code"):
             raise error
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@router.get("/frequent-spots")
+def get_frequent_spots(
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE, "location_in_charge", "warden")),
+    complaint_service=Depends(get_complaint_service),
+    location_service=Depends(get_location_service),
+):
+    """Scan complaints in the last 30 days for exact_spot repeated >= 5 times."""
+    db = complaint_service.repository
+    query = """
+        SELECT location_id, exact_spot, COUNT(*) as report_count
+        FROM complaints
+        WHERE exact_spot IS NOT NULL AND TRIM(exact_spot) != ''
+          AND created_at >= datetime('now', '-30 days')
+        GROUP BY location_id, exact_spot
+        HAVING COUNT(*) >= 5
+        ORDER BY report_count DESC;
+    """
+    with db.get_connection() as conn:
+        rows = conn.execute(query).fetchall()
+
+    locations = {l.location_id: l for l in location_service.list_locations(include_archived=True)}
+    location_names = {l.name.lower() for l in locations.values()}
+
+    results = []
+    for r in rows:
+        loc_id = r["location_id"]
+        spot = r["exact_spot"].strip()
+        cnt = r["report_count"]
+        if spot.lower() in location_names:
+            continue
+        loc = locations.get(loc_id)
+        results.append({
+            "location_id": loc_id,
+            "location_name": loc.name if loc else loc_id,
+            "exact_spot": spot,
+            "count": cnt,
+        })
+    return results
+
+
+@router.post("/create-from-spot", status_code=status.HTTP_201_CREATED)
+def create_location_from_spot(
+    payload: CreateLocationFromSpotRequest,
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
+    location_service=Depends(get_location_service),
+    auth_service=Depends(get_auth_service),
+    audit_service=Depends(get_audit_service),
+):
+    """One-tap creates a child location inheriting parent's warden and coordinator mappings."""
+    parent = location_service.get_location(payload.location_id)
+    if not parent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent location not found.")
+
+    child_name = payload.child_name or f"{parent.name} - {payload.exact_spot.strip()}"
+    new_loc = location_service.create_location(
+        name=child_name,
+        location_type=parent.location_type,
+    )
+
+    # Inherit parent's warden (in_charge_id)
+    if parent.in_charge_id:
+        try:
+            location_service.assign_in_charge(new_loc.location_id, parent.in_charge_id)
+        except Exception:
+            pass
+
+    # Inherit parent's coordinator mappings
+    parent_assignments = auth_service.list_coordinator_assignments(location_id=parent.location_id)
+    for pa in parent_assignments:
+        if pa.get("is_active", 1):
+            try:
+                auth_service.assign_coordinator_to_location_dept(
+                    pa["coordinator_id"],
+                    new_loc.location_id,
+                    pa["department_id"],
+                )
+            except Exception:
+                pass
+
+    audit_service.log(
+        current_user.user_id,
+        "Create Location From Frequent Spot",
+        new_loc.location_id,
+        new_value={"parent_id": parent.location_id, "exact_spot": payload.exact_spot, "name": child_name},
+    )
+
+    return model_to_dict(location_service.get_location(new_loc.location_id))
 
 
 @router.get("/{location_id}", response_model=LocationResponse)

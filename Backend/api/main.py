@@ -237,7 +237,9 @@ from api.routers import (
     programs,
     public_complaints,
     push,
+    recognitions,
     reports,
+    safety_reports,
     search,
     settings,
     setup,
@@ -262,6 +264,8 @@ app.include_router(audit.router)
 app.include_router(lost_found.router)
 app.include_router(announcements.router)
 app.include_router(feedback.router)
+app.include_router(recognitions.router)
+app.include_router(safety_reports.router)
 app.include_router(reports.router)
 app.include_router(search.router)
 app.include_router(backups.router)

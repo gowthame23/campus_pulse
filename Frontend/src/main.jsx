@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
+import { LanguageProvider } from "./context/LanguageContext.jsx";
 import "./index.css";
 import { registerSW } from "virtual:pwa-register";
 
@@ -15,11 +16,13 @@ if (typeof window !== "undefined" && "serviceWorker" in navigator) {
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <ThemeProvider>
-      <BrowserRouter>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </BrowserRouter>
+      <LanguageProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </BrowserRouter>
+      </LanguageProvider>
     </ThemeProvider>
   </StrictMode>,
 );

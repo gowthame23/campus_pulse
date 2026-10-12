@@ -165,6 +165,7 @@ class ComplaintService:
         priority=None,
         is_urgent=False,
         urgent_reason=None,
+        exact_spot=None,
     ):
         # 1. Role Verification - Only Students and Location In-Charges can create complaints
         if (getattr(user, "role", "") or "").lower() not in ("student", "location_in_charge"):
@@ -321,6 +322,7 @@ class ComplaintService:
         complaint.sla_deadline = sla_deadline
         complaint.is_urgent = bool(is_urgent)
         complaint.urgent_reason = urgent_reason if is_urgent else None
+        complaint.exact_spot = exact_spot
 
         # 8. Auto-routing: Check active coordinators for (location, department)
         candidate_coords = self._get_mapped_coordinators(location_id, department_id)

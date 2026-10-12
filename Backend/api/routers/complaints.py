@@ -35,6 +35,7 @@ from api.schemas import (
     EscalateRequest,
     WardenVerifyRequest,
     AdminDecisionRequest,
+    ComplaintFeedbackRequest,
     model_to_dict,
 )
 from api.security import get_current_user, require_roles
@@ -44,7 +45,7 @@ from models.complaint import Complaint
 from models.coordinator import Coordinator
 from models.location_in_charge import LocationInCharge
 from models.student import Student
-from utils.helper import csv_safe, parse_date
+from utils.helper import csv_safe, generate_id, now_string, parse_date
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -793,6 +794,7 @@ def create_complaint(
             priority=payload.priority,
             is_urgent=payload.is_urgent,
             urgent_reason=payload.urgent_reason,
+            exact_spot=payload.exact_spot,
         )
         return _format_complaint(complaint, complaint_service)
     except PermissionError as p_err:
@@ -968,6 +970,7 @@ def unblock_complaint(
 
 
 @router.post("/{complaint_id}/close", response_model=ComplaintResponse)
+@router.post("/{complaint_id}/confirm", response_model=ComplaintResponse)
 def close_complaint(
     complaint_id: str,
     current_user=Depends(
@@ -1871,3 +1874,109 @@ def escalate_complaint(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except PermissionError as p_err:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
+
+
+@router.post("/{complaint_id}/feedback", status_code=status.HTTP_201_CREATED)
+def submit_complaint_feedback(
+    complaint_id: str,
+    payload: ComplaintFeedbackRequest,
+    current_user=Depends(require_roles(Student.ROLE)),
+    complaint_service=Depends(get_complaint_service),
+    audit_service=Depends(get_audit_service),
+):
+    """Students can rate (-1 to 5) and leave a thank you note once per complaint."""
+    complaint = complaint_service.get_complaint(complaint_id)
+    if not complaint:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found.")
+
+    # Must be closed
+    if complaint.status not in (STATUS_CLOSED, STATUS_AUTO_CLOSED, "Closed", "Closed (Auto Closed)"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Feedback can only be submitted once the complaint is closed.",
+        )
+
+    # Must be the student who filed it or an affected student
+    is_author = current_user.user_id == complaint.created_by or getattr(current_user, "email", None) == complaint.created_by
+    is_affected = complaint_service.is_student_affected(complaint_id, current_user.user_id)
+    if not is_author and not is_affected:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the student who reported this complaint or an affected student can submit feedback.",
+        )
+
+    db = complaint_service.repository
+    now_ts = now_string()
+    feedback_id = generate_id("FBK")
+
+    with db.get_connection() as conn:
+        existing = conn.execute(
+            "SELECT feedback_id FROM complaint_feedback WHERE complaint_id = ? AND student_id = ?",
+            (complaint_id, current_user.user_id),
+        ).fetchone()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You have already submitted feedback for this complaint.",
+            )
+
+        conn.execute(
+            """
+            INSERT INTO complaint_feedback (feedback_id, complaint_id, student_id, rating, thank_you_note, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (feedback_id, complaint_id, current_user.user_id, payload.rating, payload.thank_you_note or "", now_ts),
+        )
+        conn.commit()
+
+    # Notify coordinator if thank you note is provided
+    if payload.thank_you_note and payload.thank_you_note.strip() and complaint.assigned_to:
+        complaint_service.notification_service.notify(
+            complaint.assigned_to,
+            f"A student left a thank you note: \"{payload.thank_you_note.strip()}\"",
+            complaint_id=complaint_id,
+            title="Thank You Note Received",
+        )
+
+    audit_service.log(
+        current_user.user_id,
+        "SUBMIT_FEEDBACK",
+        complaint_id,
+        new_value={"feedback_id": feedback_id, "rating": payload.rating, "has_thank_you": bool(payload.thank_you_note)},
+    )
+
+    return {
+        "message": "Feedback submitted successfully.",
+        "feedback_id": feedback_id,
+        "rating": payload.rating,
+        "thank_you_note": payload.thank_you_note or "",
+    }
+
+
+@router.get("/{complaint_id}/feedback")
+def get_complaint_feedback(
+    complaint_id: str,
+    current_user=Depends(get_current_user),
+    complaint_service=Depends(get_complaint_service),
+):
+    """Retrieve feedback entries for a complaint."""
+    complaint = complaint_service.get_complaint(complaint_id)
+    if not complaint:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found.")
+    _ensure_visible(complaint, current_user, complaint_service)
+
+    db = complaint_service.repository
+    with db.get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT fb.feedback_id, fb.complaint_id, fb.student_id, fb.rating, fb.thank_you_note, fb.created_at, u.name as student_name
+            FROM complaint_feedback fb
+            LEFT JOIN users u ON u.user_id = fb.student_id
+            WHERE fb.complaint_id = ?
+            ORDER BY fb.created_at DESC
+            """,
+            (complaint_id,),
+        ).fetchall()
+
+    return [dict(r) for r in rows]
+

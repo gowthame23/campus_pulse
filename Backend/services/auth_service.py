@@ -537,6 +537,7 @@ class AuthService:
             "photo_skip_streak": int(data.get("photo_skip_streak", 0) or 0),
             "force_next_warden_check": int(data.get("force_next_warden_check", 0) or 0),
             "language": data.get("language") or "en",
+            "safety_blocked_until": data.get("safety_blocked_until"),
         }
 
         role_classes = {
@@ -877,8 +878,8 @@ class AuthService:
                         first_login, active, department_id, location_id, created_at, updated_at,
                         last_login, last_logout, created_by, is_deleted, deleted_at, deleted_by,
                         deactivated_by_user_id, deactivated_by_role, deactivated_at,
-                        photo_skip_streak, force_next_warden_check, language
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        photo_skip_streak, force_next_warden_check, language, safety_blocked_until
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(user_id) DO UPDATE SET
                         name=excluded.name,
                         email=excluded.email,
@@ -902,7 +903,8 @@ class AuthService:
                         deactivated_at=excluded.deactivated_at,
                         photo_skip_streak=excluded.photo_skip_streak,
                         force_next_warden_check=excluded.force_next_warden_check,
-                        language=excluded.language
+                        language=excluded.language,
+                        safety_blocked_until=excluded.safety_blocked_until
                     """,
                     (
                         user_id,
@@ -934,6 +936,7 @@ class AuthService:
                         int(user_dict.get("photo_skip_streak", 0) or 0),
                         int(user_dict.get("force_next_warden_check", 0) or 0),
                         user_dict.get("language") or "en",
+                        user_dict.get("safety_blocked_until"),
                     ),
                 )
 

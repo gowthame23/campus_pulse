@@ -1,0 +1,88 @@
+{
+  "app_title": "Campus Pulse",
+  "welcome": "Welcome to Campus Pulse",
+  "choose_language": "Choose your preferred language",
+  "speech_tip": "Tip: Use the 🎤 on your keyboard to speak instead of typing",
+  "continue": "Continue",
+  "select_language": "Language",
+  "english": "English",
+  "telugu": "తెలుగు",
+  "hindi": "हिन्दी",
+
+  "complaints": "Complaints",
+  "new_complaint": "File a Complaint",
+  "public_complaints": "Public Issues",
+  "title": "Title",
+  "category": "Category",
+  "location": "Location",
+  "exact_spot": "Exact Spot (e.g. Room 302, Washroom Sink 2)",
+  "description": "Description",
+  "urgent": "Urgent",
+  "urgent_reason": "Urgent Reason",
+  "submit": "Submit Complaint",
+  "search_locations": "Search location...",
+  "recent_places": "Recent Places",
+  "outside_hostel_warning": "You live in {home}. Do you want to file a complaint for {selected}?",
+  
+  "status": "Status",
+  "priority": "Priority",
+  "submitted": "Submitted",
+  "assigned": "Assigned",
+  "in_progress": "In Progress",
+  "waiting_for_parts": "Waiting for Parts",
+  "pending_warden": "Pending Warden Verification",
+  "waiting_verification": "Waiting for Verification",
+  "closed": "Closed",
+  "auto_closed": "Closed (Auto Closed)",
+  "reopened": "Reopened",
+
+  "categories": {
+    "electrical": "Electrical",
+    "plumbing": "Plumbing",
+    "carpentry": "Carpentry",
+    "housekeeping": "Housekeeping",
+    "internet": "Wi-Fi & Internet",
+    "mess": "Mess & Dining",
+    "general": "General Maintenance"
+  },
+
+  "feedback": {
+    "rate_fix": "Rate the Resolution",
+    "thank_you_note": "Send a Thank You Note to your coordinator (optional)",
+    "submit_feedback": "Submit Feedback",
+    "feedback_success": "Thank you! Your feedback has been recorded.",
+    "star": "Star",
+    "stars": "Stars"
+  },
+
+  "recognitions": {
+    "fixer_of_the_month": "Fixer of the Month",
+    "leaderboard": "Coordinator Leaderboard",
+    "score": "Score",
+    "on_time": "On-Time Rate",
+    "reopen_free": "Zero Reopens",
+    "satisfaction": "Satisfaction",
+    "badges": "Coordinator Badges",
+    "certificate": "View Certificate"
+  },
+
+  "health_map": {
+    "title": "Campus Health Map",
+    "overall_health": "Campus Status",
+    "healthy": "Healthy",
+    "warning": "Warning",
+    "critical": "Critical",
+    "open_issues": "Open Issues",
+    "overdue": "Overdue",
+    "pattern_detected": "Pattern Alert"
+  },
+
+  "safety_reports": {
+    "title": "Safety Reports",
+    "anonymous_report": "Submit Anonymous Safety Report",
+    "case_code": "Confidential Case Code",
+    "safe_tip": "Save this code to check admin replies anonymously.",
+    "status": "Report Status"
+  }
+}
+

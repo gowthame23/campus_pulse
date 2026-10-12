@@ -44,6 +44,7 @@ def run_migrations(db_path: str = "storage/campus_pulse.db"):
         _migrate_operational_tables(conn)
         _migrate_push_subscriptions_table(conn)
         _migrate_lost_found_items_table(conn)
+        _migrate_phase5_tables(conn)
         _normalize_priorities_and_deadlines(conn)
         _reroute_warden_assigned_open_complaints(conn)
 
@@ -145,6 +146,7 @@ def _migrate_complaints_table(conn: sqlite3.Connection):
         "reopen_notes": "TEXT",
         "resolution_proof_url": "TEXT",
         "affected_upgraded": "INTEGER DEFAULT 0",
+        "exact_spot": "TEXT",
     }
 
     for col_name, col_type in new_columns.items():
@@ -160,6 +162,7 @@ def _migrate_users_table(conn: sqlite3.Connection):
         "photo_skip_streak": "INTEGER DEFAULT 0",
         "force_next_warden_check": "INTEGER DEFAULT 0",
         "language": "TEXT DEFAULT 'en'",
+        "safety_blocked_until": "TEXT",
     }
     for col_name, col_type in user_cols.items():
         if col_name not in existing_cols:
@@ -395,3 +398,111 @@ def _migrate_lost_found_items_table(conn: sqlite3.Connection):
         if col_name not in existing_cols:
             conn.execute(f"ALTER TABLE lost_found_items ADD COLUMN {col_name} {col_type};")
             logger.info(f"Added column {col_name} to lost_found_items table.")
+
+
+def _migrate_phase5_tables(conn: sqlite3.Connection):
+    """Ensure feedback, recognitions, badges, and safety reports tables exist."""
+    # 1. Feedback table (rating + optional thank you note)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS complaint_feedback (
+            feedback_id TEXT PRIMARY KEY,
+            complaint_id TEXT NOT NULL,
+            student_id TEXT NOT NULL,
+            rating INTEGER NOT NULL,
+            thank_you_note TEXT DEFAULT '',
+            created_at TEXT NOT NULL
+        );
+    """)
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_feedback_complaint_student
+        ON complaint_feedback(complaint_id, student_id);
+    """)
+
+    # 2. Fixer of the Month recognitions
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS recognitions (
+            recognition_id TEXT PRIMARY KEY,
+            month TEXT NOT NULL,
+            coordinator_id TEXT NOT NULL,
+            scope TEXT NOT NULL DEFAULT 'campus',
+            score REAL NOT NULL,
+            is_winner INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_recognitions_month
+        ON recognitions(month, coordinator_id);
+    """)
+
+    # 3. Coordinator badges
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS coordinator_badges (
+            badge_id TEXT PRIMARY KEY,
+            coordinator_id TEXT NOT NULL,
+            badge_name TEXT NOT NULL,
+            badge_description TEXT NOT NULL,
+            awarded_at TEXT NOT NULL
+        );
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_coordinator_badges_coord
+        ON coordinator_badges(coordinator_id);
+    """)
+
+    # 4. Safety reports (Admin feature switch, private case codes)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS safety_reports (
+            report_id TEXT PRIMARY KEY,
+            case_code TEXT NOT NULL UNIQUE,
+            category TEXT NOT NULL,
+            description TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'submitted',
+            outcome TEXT,
+            outcome_notes TEXT,
+            created_at TEXT NOT NULL,
+            closed_at TEXT
+        );
+    """)
+
+    # 5. Safety report messages (two-way anonymous chat)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS safety_report_messages (
+            message_id TEXT PRIMARY KEY,
+            report_id TEXT NOT NULL,
+            sender_type TEXT NOT NULL,
+            body TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_safety_msgs_report
+        ON safety_report_messages(report_id, created_at);
+    """)
+
+    # 6. Safety report identity (sealed table, never returned by normal endpoints)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS safety_report_identity (
+            report_id TEXT PRIMARY KEY,
+            reporter_user_id TEXT NOT NULL,
+            revealed INTEGER NOT NULL DEFAULT 0,
+            revealed_at TEXT,
+            revealed_by TEXT,
+            reveal_reason TEXT
+        );
+    """)
+
+    # 7. Default system settings for safety and health map
+    default_settings = [
+        ("setting_safety_reports_enabled", "safety_reports_enabled", "false", "boolean", "safety", "Enable safety reports module", 1),
+        ("setting_safety_emergency_numbers", "safety_emergency_numbers", "112", "string", "safety", "Campus emergency contact numbers", 1),
+        ("setting_show_health_map_to_students", "show_health_map_to_students", "false", "boolean", "features", "Expose campus health map to students", 1),
+        ("setting_health_map_pattern_threshold", "health_map_pattern_threshold", "5", "integer", "features", "Threshold for recurring problem pattern alerts", 1),
+    ]
+    for s_id, s_key, s_val, s_type, s_cat, s_desc, is_edit in default_settings:
+        conn.execute("""
+            INSERT OR IGNORE INTO system_settings (setting_id, setting_key, setting_value, setting_type, category, description, is_editable, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'));
+        """, (s_id, s_key, s_val, s_type, s_cat, s_desc, is_edit))
+    logger.info("Phase 5 tables migration verified.")
+

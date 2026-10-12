@@ -128,6 +128,12 @@ export default function ComplaintDetailsPage() {
   const [adminReassignCoord, setAdminReassignCoord] = useState("");
   const [submittingAdminDecision, setSubmittingAdminDecision] = useState(false);
 
+  // Student Rating & Feedback state
+  const [feedbacks, setFeedbacks] = useState([]);
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackNote, setFeedbackNote] = useState("");
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+
   const navigate = useNavigate();
 
   // Student Edit / Delete state
@@ -401,6 +407,7 @@ export default function ComplaintDetailsPage() {
         commentsResponse,
         attachmentsResponse,
         usersResponse,
+        feedbackResponse,
       ] = await Promise.all([
         complaintService.getById(complaintId),
         departmentService.list().catch(() => ({ data: [] })),
@@ -408,12 +415,14 @@ export default function ComplaintDetailsPage() {
         complaintService.getComments(complaintId).catch(() => ({ data: [] })),
         attachmentService.list(complaintId).catch(() => ({ data: [] })),
         userService.list().catch(() => ({ data: [] })),
+        complaintService.getFeedback(complaintId).catch(() => ({ data: [] })),
       ]);
       setComplaint(complaintResponse.data);
       setDepartments(departmentResponse.data || []);
       setLocations(locationResponse.data || []);
       setComments(commentsResponse.data || []);
       setAttachments(attachmentsResponse.data || []);
+      setFeedbacks(feedbackResponse.data || []);
       const userList = usersResponse.data || [];
       setAllUsers(userList);
       setCoordinators(userList.filter((u) => (u.role || "").toLowerCase() === "coordinator"));
@@ -797,6 +806,27 @@ export default function ComplaintDetailsPage() {
     }
   };
 
+  const handleFeedbackSubmit = async (e) => {
+    e.preventDefault();
+    setSubmittingFeedback(true);
+    setMessage("");
+    setError("");
+    try {
+      await complaintService.submitFeedback(complaintId, {
+        rating: feedbackRating,
+        thank_you_note: feedbackNote.trim() || undefined,
+      });
+      setMessage("Thank you! Your feedback has been shared with the coordinator.");
+      const fbRes = await complaintService.getFeedback(complaintId).catch(() => ({ data: [] }));
+      setFeedbacks(fbRes.data || []);
+      setFeedbackNote("");
+    } catch (err) {
+      setError(getApiError(err, "Failed to submit feedback."));
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
+
   const handleStudentReopenSubmit = async (e) => {
     e.preventDefault();
     if (!studentReopenReason.trim()) {
@@ -930,6 +960,14 @@ export default function ComplaintDetailsPage() {
             <span>{location?.name || complaint.location_name || complaint.location_id}</span>
             <span>•</span>
             <span>{complaint.category || complaint.complaint_type || "General Issue"}</span>
+            {complaint.exact_spot && (
+              <>
+                <span>•</span>
+                <span className="font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800">
+                  📍 {complaint.exact_spot}
+                </span>
+              </>
+            )}
           </p>
         </div>
 
@@ -1050,6 +1088,20 @@ export default function ComplaintDetailsPage() {
                   </dd>
                 </div>
               </div>
+
+              {complaint.exact_spot && (
+                <div className="flex items-center gap-3 p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60">
+                  <MapPin className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <div>
+                    <dt className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+                      Exact Spot
+                    </dt>
+                    <dd className="font-bold text-slate-900 dark:text-slate-100 mt-0.5 text-xs">
+                      {complaint.exact_spot}
+                    </dd>
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center gap-3">
                 <Tag className="h-4 w-4 text-primary shrink-0" />
@@ -1588,6 +1640,86 @@ export default function ComplaintDetailsPage() {
                   ) : (
                     <p className="text-[11px] text-slate-500 font-medium italic">
                       Under review by campus administration.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Student Feedback & Rating for Closed complaints */}
+              {["Closed", "Closed (Auto Closed)"].includes(complaint.status) && (
+                <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                      <span>⭐</span> Coordinator Rating & Feedback
+                    </span>
+                    {feedbacks.length > 0 && (
+                      <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                        Feedback Submitted
+                      </span>
+                    )}
+                  </div>
+
+                  {feedbacks.length > 0 ? (
+                    <div className="space-y-2">
+                      {feedbacks.map((fb, idx) => (
+                        <div key={idx} className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+                          <div className="flex items-center justify-between font-semibold">
+                            <span className="text-amber-500">
+                              {"★".repeat(Math.max(1, fb.rating || 5))}{"☆".repeat(Math.max(0, 5 - Math.max(1, fb.rating || 5)))}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {fb.created_at ? formatDate(fb.created_at) : ""}
+                            </span>
+                          </div>
+                          {fb.thank_you_note && (
+                            <p className="mt-1 text-slate-700 dark:text-slate-200 italic">
+                              "{fb.thank_you_note}"
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : isOwner ? (
+                    <form onSubmit={handleFeedbackSubmit} className="space-y-2.5">
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                        How was the resolution? Rate your experience and leave an optional thank-you note for the coordinator.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setFeedbackRating(star)}
+                            className={`text-xl transition-transform hover:scale-125 cursor-pointer ${
+                              star <= feedbackRating ? "text-amber-400" : "text-slate-300 dark:text-slate-600"
+                            }`}
+                          >
+                            ★
+                          </button>
+                        ))}
+                        <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 ml-1">
+                          {feedbackRating} / 5 Stars
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Add a thank-you note for the coordinator (optional)..."
+                        value={feedbackNote}
+                        onChange={(e) => setFeedbackNote(e.target.value)}
+                        className="h-9 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 outline-none focus:border-primary"
+                      />
+                      <Button
+                        type="submit"
+                        variant="primary"
+                        disabled={submittingFeedback}
+                        className="w-full text-xs font-bold py-1.5"
+                      >
+                        {submittingFeedback ? "Submitting..." : "Send Feedback & Thank You"}
+                      </Button>
+                    </form>
+                  ) : (
+                    <p className="text-[11px] text-slate-500 italic">
+                      No student feedback submitted for this resolution yet.
                     </p>
                   )}
                 </div>

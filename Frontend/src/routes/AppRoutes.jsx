@@ -47,6 +47,9 @@ const TechnicalSupportPage = lazy(() => import("../pages/admin/TechnicalSupportP
 const WorkloadPage = lazy(() => import("../pages/complaints/WorkloadPage.jsx"));
 const ResolvedPage = lazy(() => import("../pages/complaints/ResolvedPage.jsx"));
 const CoordinatorPerformancePage = lazy(() => import("../pages/coordinator/CoordinatorPerformancePage.jsx"));
+const HealthMapPage = lazy(() => import("../pages/admin/HealthMapPage.jsx"));
+const SafetyReportPage = lazy(() => import("../pages/student/SafetyReportPage.jsx"));
+const SafetyReportsAdminPage = lazy(() => import("../pages/admin/SafetyReportsAdminPage.jsx"));
 
 
 function RoleHome() {
@@ -351,6 +354,38 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute roles={[ROLES.ADMINISTRATOR, ROLES.APP_MANAGER]}>
               <AuditLogPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/safety-reports"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMINISTRATOR]}>
+              <SafetyReportsAdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/health-map"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMINISTRATOR, ROLES.APP_MANAGER, ROLES.LOCATION_IN_CHARGE, ROLES.STUDENT]}>
+              <HealthMapPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/health-map/tv"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMINISTRATOR, ROLES.APP_MANAGER, ROLES.LOCATION_IN_CHARGE, ROLES.COORDINATOR]}>
+              <HealthMapPage tvModeOverride={true} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/safety"
+          element={
+            <ProtectedRoute>
+              <SafetyReportPage />
             </ProtectedRoute>
           }
         />

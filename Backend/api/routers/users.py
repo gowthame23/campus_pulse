@@ -17,6 +17,7 @@ from api.schemas import (
     UserResponse,
     UserStatusUpdateRequest,
     UserUpdateRequest,
+    LanguageUpdateRequest,
     user_to_response,
 )
 from api.security import get_current_user, invalidate_user_sessions, require_roles
@@ -795,3 +796,24 @@ def assign_app_manager_locations(
         }
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@router.put("/me/language")
+def update_my_language(
+    payload: LanguageUpdateRequest,
+    current_user=Depends(get_current_user),
+    auth_service=Depends(get_auth_service),
+    audit_service=Depends(get_audit_service),
+):
+    """Update preferred UI language for current user ('en', 'te', 'hi')."""
+    old_lang = getattr(current_user, "language", "en")
+    current_user.language = payload.language
+    auth_service.save_user(current_user)
+    audit_service.log(
+        current_user.user_id,
+        "Update Language Preference",
+        current_user.user_id,
+        old_value={"language": old_lang},
+        new_value={"language": payload.language},
+    )
+    return {"message": "Language preference updated successfully.", "language": payload.language}

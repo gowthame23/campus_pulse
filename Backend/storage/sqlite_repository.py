@@ -22,6 +22,9 @@ class SQLiteRepository:
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
+    def get_connection(self):
+        return self._connect()
+
     def _initialize_schema(self):
         with self._connect() as connection:
             connection.execute("""
@@ -1441,11 +1444,12 @@ class SQLiteRepository:
                         deletion_reason, deletion_requested_at,
                         wrong_location_corrected_at, wrong_location_corrections,
                         last_progress_code, photo_skipped, photo_skip_reason,
-                        reopen_notes, resolution_proof_url, affected_upgraded
+                        reopen_notes, resolution_proof_url, affected_upgraded,
+                        exact_spot
                     ) VALUES (
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                     )
                     """,
                     [
@@ -1673,6 +1677,7 @@ class SQLiteRepository:
             item.get("reopen_notes"),
             item.get("resolution_proof_url"),
             int(bool(item.get("affected_upgraded", False))),
+            item.get("exact_spot"),
         )
 
     def _row_to_user(self, row):
@@ -1814,4 +1819,5 @@ class SQLiteRepository:
             "reopen_notes": row["reopen_notes"] if "reopen_notes" in row.keys() else None,
             "resolution_proof_url": row["resolution_proof_url"] if "resolution_proof_url" in row.keys() else None,
             "affected_upgraded": bool(row["affected_upgraded"]) if "affected_upgraded" in row.keys() and row["affected_upgraded"] is not None else False,
+            "exact_spot": row["exact_spot"] if "exact_spot" in row.keys() else None,
         }
