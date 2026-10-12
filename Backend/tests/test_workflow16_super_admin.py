@@ -66,7 +66,7 @@ def test_sa_05_institution_detail_access():
 
 
 def test_sa_06_support_issue_creation():
-    admin_token = get_token("gowthamejjurothu@gmail.com", "Admin@123")
+    admin_token = get_token("admin@example.com", "Admin@123")
     payload = {
         "module": "Complaints",
         "title": "SLA Engine Timeout Issue",
@@ -126,31 +126,31 @@ def test_sa_10_version_endpoint():
 
 # Authorization Checks: 5 Institutional roles must be denied Super Admin endpoints
 def test_sa_11_administrator_cannot_access_super_admin_dashboard():
-    admin_token = get_token("gowthamejjurothu@gmail.com", "Admin@123")
+    admin_token = get_token("admin@example.com", "Admin@123")
     res = client.get("/platform/dashboard", headers=get_auth_headers(admin_token))
     assert res.status_code == 403
 
 
 def test_sa_12_app_manager_cannot_access_super_admin_dashboard():
-    mgr_token = get_token("ejjurothugowtham@gmail.com", "Manager@123")
+    mgr_token = get_token("manager@example.com", "Manager@123")
     res = client.get("/platform/dashboard", headers=get_auth_headers(mgr_token))
     assert res.status_code == 403
 
 
 def test_sa_13_warden_cannot_access_super_admin_dashboard():
-    warden_token = get_token("naveen@campus.edu", "warden@123")
+    warden_token = get_token("warden@example.com", "warden@123")
     res = client.get("/platform/dashboard", headers=get_auth_headers(warden_token))
     assert res.status_code == 403
 
 
 def test_sa_14_coordinator_cannot_access_super_admin_dashboard():
-    coord_token = get_token("gowthamejjurothu15@gmail.com", "Coordinator@123")
+    coord_token = get_token("coordinator@example.com", "Coordinator@123")
     res = client.get("/platform/dashboard", headers=get_auth_headers(coord_token))
     assert res.status_code == 403
 
 
 def test_sa_15_student_cannot_access_super_admin_dashboard():
-    student_token = get_token("gowtham.e23@iiits.in", "Student@123")
+    student_token = get_token("student@example.com", "Student@123")
     res = client.get("/platform/dashboard", headers=get_auth_headers(student_token))
     assert res.status_code == 403
 
@@ -188,7 +188,7 @@ def test_sa_20_super_admin_cannot_modify_institution_complaints():
 
 def test_sa_21_institution_support_isolation():
     # Institution A admin can create support ticket
-    admin_token = get_token("gowthamejjurothu@gmail.com", "Admin@123")
+    admin_token = get_token("admin@example.com", "Admin@123")
     res = client.get("/platform/support", headers=get_auth_headers(admin_token))
     assert res.status_code == 200
     tickets = res.json()

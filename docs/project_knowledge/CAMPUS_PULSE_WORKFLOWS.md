@@ -213,8 +213,8 @@ sequenceDiagram
     Page->>Page: canCreate = false -> Hides "Compose Notice" button & modal
     Page->>API: GET /announcements/admin-contact
     API->>DB: Query active Administrator in users table
-    DB-->>API: Returns USR_ADMIN (gowthamejjurothu@gmail.com)
-    API-->>Page: 200 OK { available: true, email: "gowthamejjurothu@gmail.com" }
+    DB-->>API: Returns USR_ADMIN (admin@example.com)
+    API-->>Page: 200 OK { available: true, email: "admin@example.com" }
     Page->>Student: Renders Admin Contact mailto link (Zero Hardcoded Emails)
     
     opt Mandatory Acknowledgement

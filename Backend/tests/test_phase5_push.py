@@ -27,7 +27,7 @@ client = TestClient(app)
 def _get_student_headers():
     login_res = client.post(
         "/auth/login",
-        json={"username": "gowtham.e23@iiits.in", "password": "Student@123"},
+        json={"username": "student@example.com", "password": "Student@123"},
     )
     assert login_res.status_code == 200
     token = login_res.json()["access_token"]

@@ -69,7 +69,7 @@ def get_about_info(
         "release_date": "2026-08-06",
         "database_version": "SQLite 3",
         "current_build_number": "20260806.1",
-        "developer_contact": "gowthamejjurothu@gmail.com",
+        "developer_contact": "dev@example.com",
     }
 
 

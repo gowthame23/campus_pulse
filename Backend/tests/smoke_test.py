@@ -66,10 +66,10 @@ def main():
     # 3. Seed Accounts Login
     print(f"\n{INFO} Checking dev seed accounts...")
     dev_users = [
-        ("Administrator", "gowthamejjurothu@gmail.com", "Admin@123"),
-        ("Supervisor", "ejjurothugowtham@gmail.com", "Manager@123"),
-        ("Coordinator", "gowthamejjurothu15@gmail.com", "Coordinator@123"),
-        ("Student", "gowtham.e23@iiits.in", "Student@123"),
+        ("Administrator", "admin@example.com", "Admin@123"),
+        ("Supervisor", "manager@example.com", "Manager@123"),
+        ("Coordinator", "coordinator@example.com", "Coordinator@123"),
+        ("Student", "student@example.com", "Student@123"),
     ]
 
     tokens = {}

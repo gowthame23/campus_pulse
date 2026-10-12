@@ -24,8 +24,8 @@ def _reset_limiter():
             try:
                 conn = sqlite3.connect(db_p)
                 conn.execute("DELETE FROM login_attempts")
-                conn.execute("UPDATE users SET password = ?, active = 1, status = 'Active' WHERE email = ?", (hash_password("Student@123"), "gowtham.e23@iiits.in"))
-                conn.execute("UPDATE users SET password = ?, active = 1, status = 'Active' WHERE email = ?", (hash_password("Admin@123"), "gowthamejjurothu@gmail.com"))
+                conn.execute("UPDATE users SET password = ?, active = 1, status = 'Active' WHERE email = ?", (hash_password("Student@123"), "student@example.com"))
+                conn.execute("UPDATE users SET password = ?, active = 1, status = 'Active' WHERE email = ?", (hash_password("Admin@123"), "admin@example.com"))
                 conn.commit()
                 conn.close()
             except Exception:
@@ -43,7 +43,7 @@ def login_user(email, password):
 
 def test_lost_found_report_deletion_cascade():
     # 1. Login as Student (Reporter) and create a Found report
-    reporter_headers = login_user("gowtham.e23@iiits.in", "Student@123")
+    reporter_headers = login_user("student@example.com", "Student@123")
     create_res = client.post(
         "/lost-found/report",
         json={
@@ -62,7 +62,7 @@ def test_lost_found_report_deletion_cascade():
     item_id = item["item_id"]
 
     # 2. Login as Admin and attempt claim or insert legacy claim to test cascade
-    admin_headers = login_user("gowthamejjurothu@gmail.com", "Admin@123")
+    admin_headers = login_user("admin@example.com", "Admin@123")
     
     # Insert legacy claim via DB to verify cascade behavior when report is deleted
     import sqlite3
@@ -71,7 +71,7 @@ def test_lost_found_report_deletion_cascade():
     conn = sqlite3.connect(get_db_path())
     conn.execute(
         "INSERT OR REPLACE INTO ownership_claims (claim_id, item_id, claimed_by, claim_reason, proof_description, status, created_at) VALUES (?, ?, ?, ?, ?, 'Pending', datetime('now'))",
-        (claim_id, item_id, "gowthamejjurothu@gmail.com", "Cascade test claim", "Test proof description")
+        (claim_id, item_id, "admin@example.com", "Cascade test claim", "Test proof description")
     )
     conn.commit()
     conn.close()

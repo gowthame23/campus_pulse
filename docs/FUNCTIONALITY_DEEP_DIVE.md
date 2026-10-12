@@ -253,7 +253,7 @@ Provides students with verified circulars and a secure, dynamically resolved adm
 #### D. User Journey
 1. Student navigates to `/announcements`.
 2. Sees official circulars with unread badges and priority tags.
-3. Views official header card displaying the College Administrator contact email (e.g., `mailto:gowthamejjurothu@gmail.com`).
+3. Views official header card displaying the College Administrator contact email (e.g., `mailto:admin@example.com`).
 4. If mandatory acknowledgement is required, clicks "Acknowledge" to record compliance.
 
 #### E. Frontend Implementation

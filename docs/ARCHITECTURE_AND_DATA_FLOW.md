@@ -164,7 +164,7 @@ Below are detailed step-by-step traces for the primary workflows verified in the
 ---
 
 ### Trace 1: Student Login Workflow
-1. **User Action:** Student enters email `gowtham.e23@iiits.in` and password `Student@123` on [`Frontend/src/pages/auth/LoginPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/auth/LoginPage.jsx).
+1. **User Action:** Student enters email `student@example.com` and password `Student@123` on [`Frontend/src/pages/auth/LoginPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/auth/LoginPage.jsx).
 2. **Frontend Dispatch:** `LoginPage.jsx` submits form to `authService.login({ username, password })`.
 3. **HTTP Transport:** `POST /auth/login` received by [`Backend/api/routers/auth.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/api/routers/auth.py).
 4. **Middleware:** `rate_limit_middleware` records attempt in `login_attempts` table.

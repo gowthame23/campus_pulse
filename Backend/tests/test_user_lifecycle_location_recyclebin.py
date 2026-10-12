@@ -20,7 +20,7 @@ def _reset_limiter():
 
 def _get_admin_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "gowthamejjurothu@gmail.com", "password": "Admin@123"})
+    login_res = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
     if login_res.status_code != 200:
         pytest.fail(f"Admin login failed: {login_res.text}")
     token = login_res.json()["access_token"]

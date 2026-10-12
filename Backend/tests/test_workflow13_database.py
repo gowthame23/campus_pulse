@@ -23,7 +23,7 @@ def _get_headers(email, password):
     return {"Authorization": f"Bearer {token}"}
 
 def test_workflow_13_master_references():
-    headers = _get_headers("gowtham.e23@iiits.in", "Student@123")
+    headers = _get_headers("student@example.com", "Student@123")
 
     # 1. Get all master references
     res_all = client.get("/master-references", headers=headers)

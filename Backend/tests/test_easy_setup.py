@@ -72,7 +72,7 @@ def _get_admin_headers():
     try:
         return _login("admin@example.com", "Admin@123")
     except Exception:
-        return _login("gowthamejjurothu@gmail.com", "Admin@123")
+        return _login("admin@example.com", "Admin@123")
 
 
 @pytest.fixture(scope="module")

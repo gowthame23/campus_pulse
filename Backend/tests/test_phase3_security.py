@@ -32,7 +32,7 @@ def _reset_limiter():
 
 def _get_admin_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "gowthamejjurothu@gmail.com", "password": "Admin@123"})
+    login_res = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
     assert login_res.status_code == 200
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
@@ -40,7 +40,7 @@ def _get_admin_headers():
 
 def _get_manager_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "ejjurothugowtham@gmail.com", "password": "Manager@123"})
+    login_res = client.post("/auth/login", json={"username": "manager@example.com", "password": "Manager@123"})
     assert login_res.status_code == 200
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
@@ -48,7 +48,7 @@ def _get_manager_headers():
 
 def _get_student_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "gowtham.e23@iiits.in", "password": "Student@123"})
+    login_res = client.post("/auth/login", json={"username": "student@example.com", "password": "Student@123"})
     assert login_res.status_code == 200
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
@@ -56,7 +56,7 @@ def _get_student_headers():
 
 def _get_coordinator_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "gowthamejjurothu15@gmail.com", "password": "Coordinator@123"})
+    login_res = client.post("/auth/login", json={"username": "coordinator@example.com", "password": "Coordinator@123"})
     assert login_res.status_code == 200
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
