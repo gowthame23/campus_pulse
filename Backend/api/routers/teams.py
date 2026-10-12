@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from api.dependencies import get_team_service
+from api.dependencies import get_team_service, get_setup_import_service, get_audit_service
 from api.schemas import TeamCreateRequest, TeamUpdateRequest
 from api.security import require_roles, get_current_user
 from models.administrator import Administrator
@@ -168,4 +168,45 @@ def deactivate_team(
         return {"message": "Team deactivated successfully.", "team": updated}
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/{team_id}/members/{user_id}/reset-password", response_model=Dict[str, Any])
+def reset_team_member_password(
+    team_id: str,
+    user_id: str,
+    current_user=Depends(
+        require_roles(
+            Administrator.ROLE,
+            AppManager.ROLE,
+            Coordinator.ROLE,
+        )
+    ),
+    team_service: TeamService = Depends(get_team_service),
+    setup_service=Depends(get_setup_import_service),
+    audit_service=Depends(get_audit_service),
+):
+    team = team_service.get_team(team_id)
+    if not team:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Team not found."
+        )
+    members = getattr(team, "member_ids", None) or (team.get("member_ids") if isinstance(team, dict) else [])
+    if user_id not in members and getattr(team, "coordinator_id", None) != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="User is not a member of this team."
+        )
+    try:
+        slip = setup_service.reset_worker_password(user_id, actor_user=current_user)
+        audit_service.log(
+            current_user.user_id,
+            "Reset Team Member Password",
+            user_id,
+            old_value={"team_id": team_id},
+            new_value={"name": slip["name"], "phone": slip["phone"]},
+        )
+        return slip
+    except PermissionError as p_err:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
+    except ValueError as v_err:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(v_err))
 

@@ -120,6 +120,7 @@ class User:
             "password": self.password,
             "role": self.role,
             "phone_number": self.phone_number,
+            "phone": self.phone_number,
             "status": self.status,
             "profile_photo": self.profile_photo,
             "first_login": self.first_login,

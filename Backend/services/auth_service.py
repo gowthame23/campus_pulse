@@ -778,6 +778,19 @@ class AuthService:
             rows = conn.execute(query, params).fetchall()
             return [self._user_from_joined_row(r) for r in rows if r["user_id"]]
 
+    @staticmethod
+    def normalize_phone(phone):
+        if not phone:
+            return None
+        cleaned = re.sub(r"[\s\-\(\)\.]", "", str(phone).strip())
+        if cleaned.startswith("+91") and len(cleaned) == 13:
+            cleaned = cleaned[3:]
+        elif cleaned.startswith("91") and len(cleaned) == 12:
+            cleaned = cleaned[2:]
+        elif cleaned.startswith("+"):
+            cleaned = cleaned[1:]
+        return cleaned if cleaned else None
+
     def validate_user_fields(
         self,
         email,
@@ -796,25 +809,31 @@ class AuthService:
             raise ValueError("Full Name cannot exceed 100 characters.")
 
         # 2. Email Validation
-        if not email or not email.strip():
-            raise ValueError("Email is required.")
-        clean_email = email.strip().lower()
-        if not re.match(self.EMAIL_REGEX, clean_email):
-            raise ValueError("Invalid email format.")
-        existing_email_user = self.get_user_by_email(clean_email)
-        if existing_email_user and existing_email_user.user_id != current_user_id:
-            raise ValueError("A user with this email address already exists.")
+        if not email or not str(email).strip():
+            if (role or "").lower() == "employee":
+                clean_email = None
+            else:
+                raise ValueError("Email is required.")
+        else:
+            clean_email = str(email).strip().lower()
+            if not re.match(self.EMAIL_REGEX, clean_email):
+                raise ValueError("Invalid email format.")
+            existing_email_user = self.get_user_by_email(clean_email)
+            if existing_email_user and existing_email_user.user_id != current_user_id:
+                raise ValueError("A user with this email address already exists.")
 
         # 3. Phone Validation
         if phone:
-            clean_phone = phone.strip()
-            if not clean_phone.isdigit() or not (10 <= len(clean_phone) <= 15):
+            clean_phone = self.normalize_phone(phone)
+            if not clean_phone or not clean_phone.isdigit() or not (10 <= len(clean_phone) <= 15):
                 raise ValueError(
                     "Phone number must be numeric and between 10 to 15 digits."
                 )
             existing_phone_user = self.get_user_by_phone(clean_phone)
             if existing_phone_user and existing_phone_user.user_id != current_user_id:
                 raise ValueError("A user with this phone number already exists.")
+        elif (role or "").lower() in ("employee", "coordinator", "location_in_charge") and not email:
+            raise ValueError("Phone number is required when email is not provided.")
 
         # 4. Roll Number Validation (Student)
         if role == Student.ROLE or roll_number:
@@ -1072,13 +1091,29 @@ class AuthService:
         # Role-specific assignments checks (Location/department assignment is performed separately after creation)
         pass
 
-        # Temporary password generation & complexity validation
-        if password and str(password).strip():
-            temp_password = str(password).strip()
-            if not validate_password_complexity(temp_password):
-                raise ValueError("Password does not meet complexity requirements.")
+        # For workers without email, auto-generate placeholder email and worker temp password
+        is_worker_without_email = (
+            (role or "").lower() == "employee"
+            and (not email or not str(email).strip() or str(email).strip().endswith("@worker.campuspulse"))
+        )
+        if is_worker_without_email:
+            if not phone_number:
+                raise ValueError("Phone number is required for employees without email.")
+            clean_p = self.normalize_phone(phone_number)
+            email = f"{clean_p}@worker.campuspulse"
+            if not password or not str(password).strip():
+                import secrets
+                temp_password = f"CP-{secrets.randbelow(9000) + 1000}"
+            else:
+                temp_password = str(password).strip()
         else:
-            temp_password = generate_temp_password()
+            # Temporary password generation & complexity validation
+            if password and str(password).strip():
+                temp_password = str(password).strip()
+                if not validate_password_complexity(temp_password):
+                    raise ValueError("Password does not meet complexity requirements.")
+            else:
+                temp_password = generate_temp_password()
 
         # Auto-generate employee_id or roll_number if not provided for staff/student roles
         if role in (Coordinator.ROLE, LocationInCharge.ROLE, AppManager.ROLE, Administrator.ROLE, Employee.ROLE) and not employee_id:
@@ -1111,13 +1146,14 @@ class AuthService:
         }
         user_cls = role_classes.get(role, User)
 
+        clean_phone_val = self.normalize_phone(phone_number) if phone_number else None
         user = user_cls(
             user_id=user_id,
             name=name.strip(),
             email=email.strip().lower(),
             password=hashed_pwd,
             role=role,
-            phone_number=phone_number.strip() if phone_number else None,
+            phone_number=clean_phone_val,
             status=User.STATUS_ACTIVE,
             first_login=True,
             active=True,
@@ -1155,7 +1191,13 @@ class AuthService:
     def get_user_by_identity(self, identity):
         if not identity:
             return None
-        clean_id = identity.strip()
+        clean_id = str(identity).strip()
+        # 0. Phone Number
+        clean_phone = self.normalize_phone(clean_id)
+        if clean_phone and clean_phone.isdigit() and len(clean_phone) >= 10:
+            user = self.get_user_by_phone(clean_phone)
+            if user:
+                return user
         # 1. Roll Number (Student)
         user = self.get_user_by_roll_number(clean_id)
         if user:
@@ -1908,8 +1950,8 @@ class AuthService:
         with self._connect() as conn:
             conn.execute(
                 """
-                INSERT INTO locations (location_id, name, location_type, in_charge_id, coordinator_id, app_manager_id, active, archived)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO locations (location_id, name, location_type, in_charge_id, coordinator_id, app_manager_id, active, archived, parent_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(location_id) DO UPDATE SET
                     name=excluded.name,
                     location_type=excluded.location_type,
@@ -1917,7 +1959,8 @@ class AuthService:
                     coordinator_id=excluded.coordinator_id,
                     app_manager_id=excluded.app_manager_id,
                     active=excluded.active,
-                    archived=excluded.archived
+                    archived=excluded.archived,
+                    parent_id=excluded.parent_id
                 """,
                 (
                     location.location_id,
@@ -1928,6 +1971,7 @@ class AuthService:
                     getattr(location, "app_manager_id", None),
                     int(location.active),
                     int(getattr(location, "archived", False)),
+                    getattr(location, "parent_id", None),
                 ),
             )
 

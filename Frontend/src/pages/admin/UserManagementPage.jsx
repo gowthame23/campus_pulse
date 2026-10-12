@@ -45,12 +45,15 @@ import TableToolbar from "../../components/TableToolbar.jsx";
 import Toast from "../../components/Toast.jsx";
 import Badge from "../../components/Badge.jsx";
 import ConfirmDialog from "../../components/ConfirmDialog.jsx";
+import BulkImportModal from "../../components/BulkImportModal.jsx";
+import CredentialSlipModal from "../../components/CredentialSlipModal.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
 import { departmentService } from "../../services/departmentService.js";
 import { locationService } from "../../services/locationService.js";
 import { programService } from "../../services/programService.js";
 import { userService } from "../../services/userService.js";
+import { setupService } from "../../services/setupService.js";
 import { ROLES, getRoleDisplayName } from "../../utils/constants.js";
 import { matchesSearch } from "../../utils/search.js";
 import apiClient, { getApiError } from "../../api/axios.js";
@@ -94,6 +97,8 @@ export default function UserManagementPage() {
   const [importYear, setImportYear] = useState("1");
   const [importLocationId, setImportLocationId] = useState("");
   const [updateExisting, setUpdateExisting] = useState(false);
+  const [showStaffImportModal, setShowStaffImportModal] = useState(false);
+  const [slipData, setSlipData] = useState(null);
 
   // Academic Program Management modal
   const [showProgramModal, setShowProgramModal] = useState(false);
@@ -837,6 +842,24 @@ export default function UserManagementPage() {
             >
               <Key className="h-4 w-4 text-slate-500" />
             </Button>
+            {row.role !== ROLES.STUDENT && (
+              <Button
+                variant="subtle"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const res = await setupService.resetWorkerPassword(row.user_id);
+                    setSlipData(res);
+                  } catch (err) {
+                    setError(err?.response?.data?.detail || "Failed to generate temporary password slip.");
+                  }
+                }}
+                className="!h-9 px-2 text-xs font-bold text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                title="Generate Worker Login Slip (CP-XXXX)"
+              >
+                <FileText className="h-4 w-4 text-amber-600" />
+              </Button>
+            )}
             {currentUser?.role === ROLES.ADMINISTRATOR && (
               <Button
                 variant="subtle"
@@ -996,15 +1019,26 @@ export default function UserManagementPage() {
                 </span>
               </p>
             </div>
-            <Button
-              variant="subtle"
-              size="sm"
-              onClick={handleDownloadTemplate}
-              className="h-10 text-xs font-bold flex items-center gap-1.5"
-            >
-              <Download className="h-4 w-4" />
-              Download Excel/CSV Template
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setShowStaffImportModal(true)}
+                className="h-10 text-xs font-bold flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                <Upload className="h-4 w-4" />
+                Bulk Import Staff
+              </Button>
+              <Button
+                variant="subtle"
+                size="sm"
+                onClick={handleDownloadTemplate}
+                className="h-10 text-xs font-bold flex items-center gap-1.5"
+              >
+                <Download className="h-4 w-4" />
+                Download Student Template
+              </Button>
+            </div>
           </div>
 
           <hr className="border-slate-100 dark:border-slate-800 my-4" />
@@ -1748,6 +1782,24 @@ export default function UserManagementPage() {
           }}
         />
       )}
+
+      {/* Bulk Import Staff Modal (Part 3.2b) */}
+      <BulkImportModal
+        isOpen={showStaffImportModal}
+        onClose={() => setShowStaffImportModal(false)}
+        type="staff"
+        onSuccess={() => {
+          reload();
+          setMessage("Staff imported successfully.");
+        }}
+      />
+
+      {/* Credential Slip Modal for Worker Login Slip (Part 3.5c) */}
+      <CredentialSlipModal
+        isOpen={Boolean(slipData)}
+        onClose={() => setSlipData(null)}
+        credentialData={slipData}
+      />
     </div>
   );
 }

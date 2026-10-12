@@ -14,6 +14,7 @@ import {
   Plus,
   Tag,
   Check,
+  Upload,
 } from "lucide-react";
 import Button from "../../components/Button.jsx";
 import Card from "../../components/Card.jsx";
@@ -25,6 +26,7 @@ import Table from "../../components/Table.jsx";
 import TableToolbar from "../../components/TableToolbar.jsx";
 import Toast from "../../components/Toast.jsx";
 import Modal from "../../components/Modal.jsx";
+import BulkImportModal from "../../components/BulkImportModal.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
 import { locationService } from "../../services/locationService.js";
 import { userService } from "../../services/userService.js";
@@ -452,6 +454,7 @@ export default function LocationManagementPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedTypeFilter, setSelectedTypeFilter] = useState("");
+  const [showBulkImport, setShowBulkImport] = useState(false);
 
   // Option 1: New Location under an existing Type
   const [createModalType, setCreateModalType] = useState(null); // e.g. "Hostel"
@@ -1208,6 +1211,15 @@ export default function LocationManagementPage() {
               <PlusCircle className="h-4 w-4 mr-1.5 shrink-0" />
               + New Location Type
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowBulkImport(true)}
+              className="h-10 px-4 rounded-xl text-xs font-bold border-indigo-200 text-indigo-700 dark:border-indigo-800 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 shrink-0"
+            >
+              <Upload className="h-4 w-4 mr-1.5 shrink-0" />
+              Bulk Import Locations
+            </Button>
             <label className="flex items-center gap-2 cursor-pointer select-none shrink-0">
               <input
                 type="checkbox"
@@ -1494,6 +1506,17 @@ export default function LocationManagementPage() {
           </Button>
         </div>
       </Modal>
+
+      {/* Bulk Import Locations Modal (Part 3.2a) */}
+      <BulkImportModal
+        isOpen={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        type="locations"
+        onSuccess={() => {
+          reload();
+          setMessage("Locations imported successfully.");
+        }}
+      />
     </div>
   );
 }

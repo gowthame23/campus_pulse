@@ -150,6 +150,15 @@ export default function ForgotPasswordPage() {
                 "Send OTP"
               )}
             </Button>
+
+            <div className="mt-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-center">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Staff or worker without email?
+              </p>
+              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
+                Ask your Coordinator or App Manager to reset your password.
+              </p>
+            </div>
           </form>
         )}
 

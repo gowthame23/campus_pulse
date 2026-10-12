@@ -11,6 +11,7 @@ import {
   Sun,
   CheckCircle,
   RefreshCw,
+  Upload,
 } from "lucide-react";
 import Button from "../../components/Button.jsx";
 import Card from "../../components/Card.jsx";
@@ -19,6 +20,7 @@ import Input from "../../components/Input.jsx";
 import Select from "../../components/Select.jsx";
 import Toast from "../../components/Toast.jsx";
 import Loader from "../../components/Loader.jsx";
+import BulkImportModal from "../../components/BulkImportModal.jsx";
 import { emergencyService } from "../../services/emergencyService.js";
 import { departmentService } from "../../services/departmentService.js";
 import { locationService } from "../../services/locationService.js";
@@ -60,6 +62,7 @@ export default function EmergencyManagementPage() {
   const [cntSortOrder, setCntSortOrder] = useState(0);
   const [cntActive, setCntActive] = useState(true);
   const [cntTimeWindow, setCntTimeWindow] = useState("all"); // "all" | "day" | "night"
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
 
   useEffect(() => {
     loadAll();
@@ -399,14 +402,24 @@ export default function EmergencyManagementPage() {
                 Staff lines displayed when an emergency occurs. Ordered location-specific first, day/night filtered.
               </p>
             </div>
-            <Button
-              onClick={() => handleOpenContactModal()}
-              variant="primary"
-              size="sm"
-              className="bg-rose-600 hover:bg-rose-700 font-bold"
-            >
-              <Plus className="h-4 w-4 mr-1" /> Add Contact
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setShowBulkImportModal(true)}
+                variant="outline"
+                size="sm"
+                className="font-bold border-rose-200 text-rose-700 dark:border-rose-900/60 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+              >
+                <Upload className="h-4 w-4 mr-1" /> Bulk Import Contacts
+              </Button>
+              <Button
+                onClick={() => handleOpenContactModal()}
+                variant="primary"
+                size="sm"
+                className="bg-rose-600 hover:bg-rose-700 font-bold"
+              >
+                <Plus className="h-4 w-4 mr-1" /> Add Contact
+              </Button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -682,6 +695,17 @@ export default function EmergencyManagementPage() {
           </form>
         </Modal>
       )}
+
+      {/* Bulk Import Emergency Contacts Modal (Part 3.2c) */}
+      <BulkImportModal
+        isOpen={showBulkImportModal}
+        onClose={() => setShowBulkImportModal(false)}
+        type="emergency_contacts"
+        onSuccess={() => {
+          loadAll();
+          setToast({ type: "success", message: "Emergency contacts imported successfully." });
+        }}
+      />
     </div>
   );
 }

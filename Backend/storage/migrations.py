@@ -743,5 +743,11 @@ def _migrate_emergency_tables(conn: sqlite3.Connection):
 
     logger.info("Emergency tables and schema migration verified.")
 
+    # Location hierarchy: parent_id column
+    loc_cols = [c["name"] for c in conn.execute("PRAGMA table_info(locations)").fetchall()]
+    if "parent_id" not in loc_cols:
+        conn.execute("ALTER TABLE locations ADD COLUMN parent_id TEXT NULL;")
+        logger.info("Added parent_id column to locations table.")
+
 
 

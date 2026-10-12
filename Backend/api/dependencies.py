@@ -28,6 +28,7 @@ from services.platform_service import PlatformService
 from services.program_service import ProgramService
 from services.public_complaint_service import PublicComplaintService
 from services.emergency_service import EmergencyService
+from services.setup_import_service import SetupImportService
 
 
 from pathlib import Path
@@ -111,6 +112,13 @@ def _get_services_for_db(path: str = None):
             complaint_service=cmpl_svc,
         )
 
+        setup_svc = SetupImportService(
+            auth_service=auth_svc,
+            team_service=tm_svc,
+            emergency_service=emg_svc,
+            complaint_service=cmpl_svc,
+        )
+
         _service_cache[path] = {
             "dashboard": dash_svc,
             "notification": notif_svc,
@@ -138,6 +146,7 @@ def _get_services_for_db(path: str = None):
             "program": prg_svc,
             "team": tm_svc,
             "emergency": emg_svc,
+            "setup_import": setup_svc,
         }
     return _service_cache[path]
 
@@ -266,5 +275,9 @@ def get_team_service() -> TeamService:
 
 def get_emergency_service() -> EmergencyService:
     return _get_services_for_db()["emergency"]
+
+
+def get_setup_import_service() -> SetupImportService:
+    return _get_services_for_db()["setup_import"]
 
 
