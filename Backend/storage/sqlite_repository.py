@@ -1445,11 +1445,14 @@ class SQLiteRepository:
                         wrong_location_corrected_at, wrong_location_corrections,
                         last_progress_code, photo_skipped, photo_skip_reason,
                         reopen_notes, resolution_proof_url, affected_upgraded,
-                        exact_spot
+                        exact_spot, awaiting_assign_since, assigned_by,
+                        assign_escalation_level, marked_by, team_id,
+                        returned_reason, assignee_on_leave_flag, assignee_removed_flag
                     ) VALUES (
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?
                     )
                     """,
                     [
@@ -1678,6 +1681,14 @@ class SQLiteRepository:
             item.get("resolution_proof_url"),
             int(bool(item.get("affected_upgraded", False))),
             item.get("exact_spot"),
+            item.get("awaiting_assign_since"),
+            item.get("assigned_by"),
+            int(item.get("assign_escalation_level", 0) or 0),
+            item.get("marked_by"),
+            item.get("team_id"),
+            item.get("returned_reason"),
+            int(bool(item.get("assignee_on_leave_flag", False))),
+            int(bool(item.get("assignee_removed_flag", False))),
         )
 
     def _row_to_user(self, row):
@@ -1820,4 +1831,12 @@ class SQLiteRepository:
             "resolution_proof_url": row["resolution_proof_url"] if "resolution_proof_url" in row.keys() else None,
             "affected_upgraded": bool(row["affected_upgraded"]) if "affected_upgraded" in row.keys() and row["affected_upgraded"] is not None else False,
             "exact_spot": row["exact_spot"] if "exact_spot" in row.keys() else None,
+            "awaiting_assign_since": row["awaiting_assign_since"] if "awaiting_assign_since" in row.keys() else None,
+            "assigned_by": row["assigned_by"] if "assigned_by" in row.keys() else None,
+            "assign_escalation_level": row["assign_escalation_level"] if "assign_escalation_level" in row.keys() and row["assign_escalation_level"] is not None else 0,
+            "marked_by": row["marked_by"] if "marked_by" in row.keys() else None,
+            "team_id": row["team_id"] if "team_id" in row.keys() else None,
+            "returned_reason": row["returned_reason"] if "returned_reason" in row.keys() else None,
+            "assignee_on_leave_flag": bool(row["assignee_on_leave_flag"]) if "assignee_on_leave_flag" in row.keys() and row["assignee_on_leave_flag"] is not None else False,
+            "assignee_removed_flag": bool(row["assignee_removed_flag"]) if "assignee_removed_flag" in row.keys() and row["assignee_removed_flag"] is not None else False,
         }

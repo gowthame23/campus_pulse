@@ -168,8 +168,8 @@ def test_complaint_feedback(admin_headers, coord_headers, warden_headers):
     )
     assert fb_res.status_code == 400
 
-    # Coordinator accepts and resolves
-    client.post(f"/complaints/{cmp_id}/accept", headers=coord_headers)
+    # Coordinator assigns and resolves
+    client.post(f"/complaints/{cmp_id}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=coord_headers)
     client.put(
         f"/complaints/{cmp_id}/resolve",
         json={"skip_photo": True, "notes": "Switch replaced successfully."},

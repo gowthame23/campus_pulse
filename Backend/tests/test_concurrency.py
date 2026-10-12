@@ -60,4 +60,4 @@ def test_concurrency_simultaneous_updates_and_status_changes():
     # Both requests finish safely without server crash or DB corruption
     assert len(results) == 2
     status_codes = [r[1] for r in results]
-    assert all(code in (200, 400, 409, 422) for code in status_codes)
+    assert all(code in (200, 400, 409, 410, 422) for code in status_codes)

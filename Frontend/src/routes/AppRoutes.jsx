@@ -50,6 +50,9 @@ const CoordinatorPerformancePage = lazy(() => import("../pages/coordinator/Coord
 const HealthMapPage = lazy(() => import("../pages/admin/HealthMapPage.jsx"));
 const SafetyReportPage = lazy(() => import("../pages/student/SafetyReportPage.jsx"));
 const SafetyReportsAdminPage = lazy(() => import("../pages/admin/SafetyReportsAdminPage.jsx"));
+const EmployeeDashboard = lazy(() => import("../pages/employee/EmployeeDashboard.jsx"));
+const TeamsManagementPage = lazy(() => import("../pages/admin/TeamsManagementPage.jsx"));
+const CoverageGapsPage = lazy(() => import("../pages/admin/CoverageGapsPage.jsx"));
 
 
 function RoleHome() {
@@ -69,6 +72,8 @@ function RoleHome() {
   if (user?.role === ROLES.SUPER_ADMIN)
     return <Navigate to="/superadmin" replace />;
   if (user?.role === ROLES.STUDENT) return <Navigate to="/student" replace />;
+  if (user?.role === ROLES.EMPLOYEE)
+    return <Navigate to="/employee" replace />;
   if (user?.role === ROLES.COORDINATOR)
     return <Navigate to="/coordinator" replace />;
   if (user?.role === ROLES.APP_MANAGER)
@@ -80,6 +85,7 @@ function RoleHome() {
 
   return <Navigate to="/403" replace />;
 }
+
 
 export default function AppRoutes() {
   return (
@@ -234,6 +240,30 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute roles={[ROLES.ADMINISTRATOR]}>
               <SystemSettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee"
+          element={
+            <ProtectedRoute roles={[ROLES.EMPLOYEE]}>
+              <EmployeeDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/teams"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMINISTRATOR, ROLES.APP_MANAGER]}>
+              <TeamsManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/coverage-gaps"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMINISTRATOR, ROLES.APP_MANAGER]}>
+              <CoverageGapsPage />
             </ProtectedRoute>
           }
         />

@@ -9,6 +9,7 @@ from models.administrator import Administrator
 from models.app_manager import AppManager
 from models.coordinator import Coordinator
 from models.department import Department
+from models.employee import Employee
 from models.location import Location
 from models.location_in_charge import LocationInCharge
 from models.student import Student
@@ -546,6 +547,7 @@ class AuthService:
             Administrator.ROLE: Administrator,
             AppManager.ROLE: AppManager,
             LocationInCharge.ROLE: LocationInCharge,
+            Employee.ROLE: Employee,
         }
 
         role_str = data.get("role")
@@ -557,6 +559,7 @@ class AuthService:
             Administrator,
             AppManager,
             LocationInCharge,
+            Employee,
         ):
             u = user_cls(
                 data["user_id"],
@@ -1049,7 +1052,7 @@ class AuthService:
                 "App Managers cannot create other App Manager accounts."
             )
 
-        if target_role not in ("app_manager", "coordinator", "location_in_charge", "student"):
+        if target_role not in ("app_manager", "coordinator", "location_in_charge", "student", "employee"):
             raise PermissionError(
                 f"Cannot create a user with role '{role}'."
             )
@@ -1078,7 +1081,7 @@ class AuthService:
             temp_password = generate_temp_password()
 
         # Auto-generate employee_id or roll_number if not provided for staff/student roles
-        if role in (Coordinator.ROLE, LocationInCharge.ROLE, AppManager.ROLE, Administrator.ROLE) and not employee_id:
+        if role in (Coordinator.ROLE, LocationInCharge.ROLE, AppManager.ROLE, Administrator.ROLE, Employee.ROLE) and not employee_id:
             import secrets, string
             employee_id = f"EMP{''.join(secrets.choice(string.digits) for _ in range(5))}"
         elif role == Student.ROLE and not roll_number:
@@ -1104,6 +1107,7 @@ class AuthService:
             Administrator.ROLE: Administrator,
             AppManager.ROLE: AppManager,
             LocationInCharge.ROLE: LocationInCharge,
+            Employee.ROLE: Employee,
         }
         user_cls = role_classes.get(role, User)
 

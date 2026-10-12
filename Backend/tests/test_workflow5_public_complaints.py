@@ -91,7 +91,7 @@ def test_workflow_5_public_complaint_flow_and_join():
     assert join_again.status_code == 409
 
     # 8. Mark complaint resolved by admin then close it, then attempt join -> 400 Bad Request
-    client.post(f"/complaints/{pub_id}/accept", json={}, headers=admin_headers)
+    client.post(f"/complaints/{pub_id}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=admin_headers)
     resolve_res = client.post(f"/complaints/{pub_id}/resolve", json={"notes": "Power restored."}, headers=admin_headers)
     assert resolve_res.status_code == 200
     client.post(f"/complaints/{pub_id}/close", json={}, headers=std_headers)

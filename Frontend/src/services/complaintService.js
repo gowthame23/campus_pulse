@@ -14,12 +14,37 @@ export const complaintService = {
       coordinator_id: coordinatorId,
       reason,
     }),
+  assignWork: (complaintId, assigneeId, reason = "") =>
+    apiClient.post(`/complaints/${complaintId}/assign`, {
+      assignee_id: assigneeId,
+      reason,
+    }),
+  returnToCoordinator: (complaintId, reason) =>
+    apiClient.post(`/complaints/${complaintId}/return`, { reason }),
+  reportWrongLocation: (complaintId, correctLocationId, note = "") =>
+    apiClient.post(`/complaints/${complaintId}/wrong-location`, {
+      correct_location_id: correctLocationId,
+      note,
+    }),
   take: (complaintId) =>
     apiClient.post(`/complaints/${complaintId}/take`),
   accept: (complaintId) => apiClient.post(`/complaints/${complaintId}/accept`),
   startWork: (complaintId) => apiClient.post(`/complaints/${complaintId}/start-work`),
   addProgressNote: (complaintId, note) =>
     apiClient.post(`/complaints/${complaintId}/progress-notes`, { note }),
+  recordProgress: (complaintId, note = "", photoUrl = null, noteCode = null) =>
+    apiClient.post(`/complaints/${complaintId}/progress`, {
+      note,
+      photo_url: photoUrl,
+      note_code: noteCode,
+    }),
+  block: (complaintId, reason, expectedDate = null) =>
+    apiClient.post(`/complaints/${complaintId}/block`, {
+      reason,
+      expected_date: expectedDate,
+    }),
+  unblock: (complaintId) =>
+    apiClient.post(`/complaints/${complaintId}/unblock`),
   pause: (complaintId, reason) =>
     apiClient.post(`/complaints/${complaintId}/pause`, { reason }),
   resume: (complaintId) => apiClient.post(`/complaints/${complaintId}/resume`),

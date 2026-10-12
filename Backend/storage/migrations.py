@@ -45,6 +45,7 @@ def run_migrations(db_path: str = "storage/campus_pulse.db"):
         _migrate_push_subscriptions_table(conn)
         _migrate_lost_found_items_table(conn)
         _migrate_phase5_tables(conn)
+        _migrate_teams_and_leaves(conn)
         _normalize_priorities_and_deadlines(conn)
         _reroute_warden_assigned_open_complaints(conn)
 
@@ -505,4 +506,160 @@ def _migrate_phase5_tables(conn: sqlite3.Connection):
             VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'));
         """, (s_id, s_key, s_val, s_type, s_cat, s_desc, is_edit))
     logger.info("Phase 5 tables migration verified.")
+
+
+def _migrate_teams_and_leaves(conn: sqlite3.Connection):
+    """Ensure teams, team_locations, team_members, user_leaves tables and complaints columns exist.
+    Migrate existing coordinator_assignments into teams if teams table is empty.
+    """
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS teams (
+            team_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            department_id TEXT NOT NULL,
+            coordinator_id TEXT NOT NULL,
+            backup_coordinator_id TEXT,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL
+        );
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_locations (
+            team_id TEXT NOT NULL,
+            location_id TEXT NOT NULL,
+            PRIMARY KEY (team_id, location_id),
+            FOREIGN KEY (team_id) REFERENCES teams(team_id) ON DELETE CASCADE
+        );
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_members (
+            team_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            PRIMARY KEY (team_id, user_id),
+            FOREIGN KEY (team_id) REFERENCES teams(team_id) ON DELETE CASCADE
+        );
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_leaves (
+            leave_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            from_date TEXT NOT NULL,
+            to_date TEXT NOT NULL,
+            reason TEXT,
+            set_by TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+    """)
+
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_team_dept ON teams(department_id);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_team_coord ON teams(coordinator_id);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_team_loc_loc ON team_locations(location_id);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_team_mem_user ON team_members(user_id);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_user_leaves_user ON user_leaves(user_id, from_date, to_date);")
+
+    # Complaints new columns for team model
+    existing_cols = _get_existing_columns(conn, "complaints")
+    team_model_cols = {
+        "awaiting_assign_since": "TEXT",
+        "assigned_by": "TEXT",
+        "assign_escalation_level": "INTEGER DEFAULT 0",
+        "marked_by": "TEXT",
+        "team_id": "TEXT",
+        "returned_reason": "TEXT",
+        "assignee_on_leave_flag": "INTEGER DEFAULT 0",
+        "assignee_removed_flag": "INTEGER DEFAULT 0",
+    }
+    for col, ctype in team_model_cols.items():
+        if col not in existing_cols:
+            conn.execute(f"ALTER TABLE complaints ADD COLUMN {col} {ctype};")
+            logger.info(f"Added column {col} to complaints table.")
+
+    # Migrate coordinator_assignments to teams if teams is empty
+    count = conn.execute("SELECT COUNT(*) FROM teams").fetchone()[0]
+    if count == 0:
+        logger.info("Migrating existing coordinator_assignments to teams table...")
+        asgn_rows = conn.execute(
+            "SELECT coordinator_id, department_id, location_id FROM coordinator_assignments"
+        ).fetchall()
+
+        from collections import defaultdict
+        pair_coords = defaultdict(list)
+        for cid, did, lid in asgn_rows:
+            if cid and did and lid:
+                if cid not in pair_coords[(did, lid)]:
+                    pair_coords[(did, lid)].append(cid)
+
+        dept_rows = conn.execute("SELECT department_id, name FROM departments").fetchall()
+        dept_names = {r[0]: r[1] for r in dept_rows}
+        loc_rows = conn.execute("SELECT location_id, name FROM locations").fetchall()
+        loc_names = {r[0]: r[1] for r in loc_rows}
+
+        team_idx = 1
+        for (did, lid), coords in pair_coords.items():
+            ranked_coords = []
+            for cid in coords:
+                cnt = conn.execute(
+                    "SELECT COUNT(*) FROM complaints WHERE department_id = ? AND location_id = ? AND assigned_to = ?",
+                    (did, lid, cid),
+                ).fetchone()[0]
+                ranked_coords.append((cnt, cid))
+
+            # Highest complaint count first, then alphabetical by ID
+            ranked_coords.sort(key=lambda x: (-x[0], x[1]))
+            primary_coord = ranked_coords[0][1]
+            backup_coord = ranked_coords[1][1] if len(ranked_coords) > 1 else None
+
+            d_name = dept_names.get(did, did)
+            l_name = loc_names.get(lid, lid)
+            team_id = f"TEAM_{team_idx:04d}"
+            team_name = f"{l_name} - {d_name}"
+            team_idx += 1
+
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO teams (team_id, name, department_id, coordinator_id, backup_coordinator_id, active, created_at)
+                VALUES (?, ?, ?, ?, ?, 1, datetime('now'))
+                """,
+                (team_id, team_name, did, primary_coord, backup_coord),
+            )
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO team_locations (team_id, location_id)
+                VALUES (?, ?)
+                """,
+                (team_id, lid),
+            )
+            for _, cid in ranked_coords:
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO team_members (team_id, user_id)
+                    VALUES (?, ?)
+                    """,
+                    (team_id, cid),
+                )
+
+        conn.execute("""
+            UPDATE complaints
+            SET awaiting_assign_since = created_at
+            WHERE awaiting_assign_since IS NULL AND status = 'Submitted'
+        """)
+        conn.execute("""
+            UPDATE complaints
+            SET team_id = (
+                SELECT t.team_id
+                FROM teams t
+                JOIN team_locations tl ON t.team_id = tl.team_id
+                WHERE t.department_id = complaints.department_id
+                  AND tl.location_id = complaints.location_id
+                  AND t.active = 1
+                LIMIT 1
+            )
+            WHERE team_id IS NULL
+        """)
+        logger.info("Migrated coordinator_assignments into teams successfully.")
+    logger.info("Team model and user leaves migrations verified.")
+
 

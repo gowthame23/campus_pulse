@@ -18,7 +18,7 @@ def get_coordinator_stats(
     department_id: Optional[str] = None,
     from_date: Optional[str] = Query(None, alias="from"),
     to_date: Optional[str] = Query(None, alias="to"),
-    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE, LocationInCharge.ROLE, Coordinator.ROLE)),
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE, LocationInCharge.ROLE, Coordinator.ROLE, "employee")),
     complaint_service=Depends(get_complaint_service),
 ):
     return complaint_service.get_coordinator_stats(

@@ -30,14 +30,17 @@ import Modal from "../../components/Modal.jsx";
 import Textarea from "../../components/Textarea.jsx";
 import Select from "../../components/Select.jsx";
 import Toast from "../../components/Toast.jsx";
+import AssignModal from "../../components/AssignModal.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
 import { complaintService } from "../../services/complaintService.js";
+import { teamService } from "../../services/teamService.js";
 import { announcementService } from "../../services/announcementService.js";
 import { notificationService } from "../../services/notificationService.js";
 import { locationService } from "../../services/locationService.js";
 import { formatDate } from "../../utils/dateFormatter.js";
 import { getStatusTone, getPriorityTone, getSlaTone } from "../../utils/statusColor.js";
+
 
 const getLocationName = (locId, locations = []) => {
   if (!locId) return "";
@@ -85,6 +88,10 @@ export default function LocationDashboard() {
   const [coordinatorStats, setCoordinatorStats] = useState([]);
   const [loadingStats, setLoadingStats] = useState(false);
 
+  // Watch List & Assign Modal State (Rule K4)
+  const [assignModalComplaint, setAssignModalComplaint] = useState(null);
+  const [filterLeaveOnly, setFilterLeaveOnly] = useState(false);
+
   const {
     data: dashboardData,
     loading,
@@ -92,7 +99,7 @@ export default function LocationDashboard() {
     reload,
   } = useAsyncData(
     async () => {
-      const [compRes, ancRes, notifRes, locRes] = await Promise.all([
+      const [compRes, ancRes, notifRes, locRes, teamsRes] = await Promise.all([
         complaintService.list().catch(() => ({ data: [] })),
         announcementService.list().catch(() => ({ data: [] })),
         notificationService
@@ -100,21 +107,34 @@ export default function LocationDashboard() {
           .then((res) => ({ data: res.data.items }))
           .catch(() => ({ data: [] })),
         locationService.list().catch(() => ({ data: [] })),
+        teamService.list({ active_only: true }).catch(() => ({ data: [] })),
       ]);
       return {
         complaints: compRes.data || [],
         announcements: ancRes.data || [],
         notifications: notifRes.data || [],
         locations: locRes.data || [],
+        teams: teamsRes.data || teamsRes || [],
       };
     },
-    { complaints: [], announcements: [], notifications: [], locations: [] },
+    { complaints: [], announcements: [], notifications: [], locations: [], teams: [] },
   );
 
   const complaints = dashboardData?.complaints || [];
   const announcements = dashboardData?.announcements || [];
   const notifications = dashboardData?.notifications || [];
   const locations = dashboardData?.locations || [];
+  const teams = dashboardData?.teams || [];
+
+  const watchListComplaints = useMemo(() => {
+    return complaints.filter((c) => {
+      const isNotClosed = !["Closed", "Closed (Auto Closed)", "Rejected"].includes(c.status);
+      if (!isNotClosed) return false;
+      if (filterLeaveOnly && !c.assignee_on_leave_flag) return false;
+      return true;
+    });
+  }, [complaints, filterLeaveOnly]);
+
 
   const locationTitle = useMemo(() => {
     return user?.location_name || getLocationName(user?.location_id, locations) || "Assigned Location";
@@ -544,6 +564,126 @@ export default function LocationDashboard() {
         </div>
       </div>
 
+      {/* Facility Watch List Section (Rule K4) */}
+      <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#101726] shadow-xs overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+              <Shield className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                Facility Watch List ({watchListComplaints.length})
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Active issues across your facility showing team and assigned worker.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={filterLeaveOnly}
+                onChange={(e) => setFilterLeaveOnly(e.target.checked)}
+                className="rounded text-blue-600"
+              />
+              Filter: Assignee on leave
+            </label>
+            <Button size="sm" variant="ghost" onClick={reload} className="text-xs">
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        <div className="p-5">
+          {watchListComplaints.length === 0 ? (
+            <div className="py-8 text-center text-slate-400 dark:text-slate-500">
+              <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-emerald-500 opacity-80" />
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                No active complaints
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                All facility complaints have been resolved.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {watchListComplaints.map((c) => {
+                const team = teams.find((t) => t.team_id === c.team_id);
+                const canWardenAssign =
+                  Number(c.assign_escalation_level || 0) >= 2 || !c.team_id || !c.assigned_to;
+
+                return (
+                  <div
+                    key={c.complaint_id}
+                    className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-300 dark:hover:border-slate-700 transition"
+                  >
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          to={`/complaints/${c.complaint_id}`}
+                          className="text-sm font-bold text-slate-900 dark:text-slate-100 hover:text-primary transition-colors"
+                        >
+                          {c.title || c.category}
+                        </Link>
+                        <Badge tone={getPriorityTone(c.priority)}>
+                          {c.priority || "Medium"}
+                        </Badge>
+                        <Badge tone={getStatusTone(c.status)}>
+                          {c.status}
+                        </Badge>
+                        {c.assignee_on_leave_flag && (
+                          <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300">
+                            Assignee on leave
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">
+                          Team: {c.team_name || team?.name || "General Maintenance"}
+                        </span>
+                        <span>•</span>
+                        <span>Worker: {c.assigned_to || "Unassigned"}</span>
+                        {c.sla_deadline && (
+                          <>
+                            <span>•</span>
+                            <span>SLA: {formatDate(c.sla_deadline)}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {canWardenAssign && (
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          onClick={() => setAssignModalComplaint(c)}
+                          className="font-bold text-xs"
+                        >
+                          Assign
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => navigate(`/complaints/${c.complaint_id}`)}
+                        className="text-xs"
+                      >
+                        View
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Coordinator Performance Stats Card */}
       <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#101726] p-5 shadow-xs space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -718,6 +858,15 @@ export default function LocationDashboard() {
           </form>
         </Modal>
       )}
+
+      {/* Assign Modal (Rule K4) */}
+      <AssignModal
+        isOpen={Boolean(assignModalComplaint)}
+        onClose={() => setAssignModalComplaint(null)}
+        complaint={assignModalComplaint}
+        onAssigned={reload}
+      />
     </div>
   );
 }
+

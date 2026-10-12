@@ -311,8 +311,14 @@ class ComplaintStatusRequest(BaseModel):
 
 
 class ComplaintAssignRequest(BaseModel):
-    coordinator_id: str
+    assigned_to: Optional[str] = None
+    coordinator_id: Optional[str] = None
+    assignee_id: Optional[str] = None
     reason: Optional[str] = None
+
+
+class ComplaintReturnRequest(BaseModel):
+    reason: str
 
 
 class ComplaintWrongLocationRequest(BaseModel):
@@ -448,6 +454,14 @@ class ComplaintResponse(BaseModel):
     admin_decided_at: Optional[str] = None
     location_name: Optional[str] = None
     department_name: Optional[str] = None
+    awaiting_assign_since: Optional[str] = None
+    assigned_by: Optional[str] = None
+    assign_escalation_level: Optional[int] = 0
+    marked_by: Optional[str] = None
+    team_id: Optional[str] = None
+    returned_reason: Optional[str] = None
+    assignee_on_leave_flag: Optional[bool] = False
+    assignee_removed_flag: Optional[bool] = False
     assigned_coordinator_name: Optional[str] = None
     assigned_coordinator_id: Optional[str] = None
     location_in_charge_name: Optional[str] = None
@@ -700,4 +714,30 @@ class CreateLocationFromSpotRequest(BaseModel):
 
 class LanguageUpdateRequest(BaseModel):
     language: str = Field(..., pattern="^(en|te|hi)$", description="Preferred language code: en, te, or hi")
+
+
+class TeamCreateRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=150)
+    department_id: str
+    coordinator_id: str
+    backup_coordinator_id: Optional[str] = None
+    location_ids: List[str] = Field(default_factory=list)
+    member_ids: List[str] = Field(default_factory=list)
+
+
+class TeamUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    department_id: Optional[str] = None
+    coordinator_id: Optional[str] = None
+    backup_coordinator_id: Optional[str] = None
+    location_ids: Optional[List[str]] = None
+    member_ids: Optional[List[str]] = None
+    active: Optional[bool] = None
+
+
+class LeaveCreateRequest(BaseModel):
+    user_id: Optional[str] = None
+    from_date: str = Field(..., description="YYYY-MM-DD")
+    to_date: str = Field(..., description="YYYY-MM-DD")
+    reason: Optional[str] = None
 

@@ -14,13 +14,14 @@ SLA_HOURS = {
     "Low": 72,
 }
 
-# Team Accept Queue Deadlines (hours before auto-assigning to least-loaded coordinator)
-ACCEPT_DEADLINE_HOURS = {
+# Assign Deadlines (hours before escalation when complaint is awaiting coordinator assignment)
+ASSIGN_DEADLINE_HOURS = {
     "Critical": 0.5,
     "High": 2,
     "Medium": 4,
     "Low": 8,
 }
+ACCEPT_DEADLINE_HOURS = ASSIGN_DEADLINE_HOURS
 
 # SLA Reminders (proactive alerts to coordinator at fractions of SLA window)
 SLA_REMINDER_FRACTIONS = (0.5, 0.9)
@@ -35,6 +36,7 @@ STATUS_IN_PROGRESS = "In Progress"                  # Coordinator accepted / sta
 STATUS_BLOCKED = "Waiting for Parts"                # Coordinator blocked with reason & expected date
 STATUS_PENDING_WARDEN = "Pending Warden Verification"  # Fixed; awaiting in-person warden sign-off
 STATUS_WAITING_STUDENT = "Waiting for Verification" # Fixed/warden-verified; awaiting student sign-off
+STATUS_WAITING_VERIFICATION = "Waiting for Verification"
 STATUS_REOPENED = "Reopened"                        # Student disputed fix; back to coordinator
 STATUS_ADMIN_REVIEW = "Admin Review"                # Reopened >= 3 times; escalated to administrator
 STATUS_CLOSED = "Closed"                            # Verified and closed
@@ -92,8 +94,10 @@ PRESET_PROGRESS_NOTES = {
 
 # Roles
 ROLE_STUDENT = "student"
+ROLE_EMPLOYEE = "employee"
 ROLE_COORDINATOR = "coordinator"
 ROLE_WARDEN = "location_in_charge"
+ROLE_LOCATION_IN_CHARGE = "location_in_charge"
 ROLE_APP_MANAGER = "app_manager"
 ROLE_ADMINISTRATOR = "administrator"
 ROLE_SUPER_ADMIN = "super_admin"
@@ -106,6 +110,7 @@ ROLE_ALIASES = {
     "warden": ROLE_WARDEN,
     "location_in_charge": ROLE_WARDEN,
     "coordinator": ROLE_COORDINATOR,
+    "employee": ROLE_EMPLOYEE,
     "student": ROLE_STUDENT,
     "super_admin": ROLE_SUPER_ADMIN,
     "supervisor": ROLE_APP_MANAGER,

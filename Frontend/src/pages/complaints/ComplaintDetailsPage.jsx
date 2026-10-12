@@ -34,8 +34,10 @@ import Modal from "../../components/Modal.jsx";
 import Select from "../../components/Select.jsx";
 import Textarea from "../../components/Textarea.jsx";
 import Toast from "../../components/Toast.jsx";
+import AssignModal from "../../components/AssignModal.jsx";
 import { getApiError } from "../../api/axios.js";
 import { useAuth } from "../../context/AuthContext.jsx";
+
 import { complaintService } from "../../services/complaintService.js";
 import { attachmentService } from "../../services/attachmentService.js";
 import { departmentService } from "../../services/departmentService.js";
@@ -127,6 +129,7 @@ export default function ComplaintDetailsPage() {
   const [adminDecisionNotes, setAdminDecisionNotes] = useState("");
   const [adminReassignCoord, setAdminReassignCoord] = useState("");
   const [submittingAdminDecision, setSubmittingAdminDecision] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
 
   // Student Rating & Feedback state
   const [feedbacks, setFeedbacks] = useState([]);
@@ -365,10 +368,13 @@ export default function ComplaintDetailsPage() {
 
   const userRole = (user?.role || "").toLowerCase();
   const isCoordinator = userRole === "coordinator";
+  const isEmployee = userRole === "employee";
+  const isWorker = isCoordinator || isEmployee;
   const isWarden = userRole === "location_in_charge" || userRole === "warden";
   const isAppManager = userRole === "app_manager";
   const isAdmin = userRole === "administrator" || userRole === "admin";
   const isStudent = userRole === "student";
+
 
   const isLocationWarden =
     isWarden &&
@@ -1444,23 +1450,37 @@ export default function ComplaintDetailsPage() {
               Action Center
             </h2>
             <div className="grid gap-3">
-              {/* Coordinator Intake / Accept Button */}
-              {isCoordinator &&
-                ["Submitted", "Pending", "Awaiting Coordinator Assignment"].includes(complaint.status) &&
-                (!complaint.assigned_to || complaint.assigned_to === user?.user_id) && (
+              {/* Assign to... Button */}
+              {(isCoordinator || isAdmin || isAppManager || (isWarden && (Number(complaint.assign_escalation_level || 0) >= 2 || !complaint.team_id))) &&
+                ["Submitted", "Pending", "Awaiting Coordinator Assignment"].includes(complaint.status) && (
                   <Button
                     type="button"
-                    onClick={handleAcceptComplaint}
+                    onClick={() => setShowAssignModal(true)}
                     variant="primary"
                     className="w-full font-bold py-2.5 text-xs flex items-center justify-center gap-1.5"
                   >
-                    <CheckCircle2 className="h-4 w-4" />
-                    Accept Complaint & Claim Ticket
+                    <User className="h-4 w-4" />
+                    Assign to...
                   </Button>
                 )}
 
-              {/* Coordinator Work Execution Controls */}
-              {isCoordinator && complaint.status === "Assigned" && (
+              {/* Reassign Button */}
+              {(isAdmin || isAppManager || isCoordinator) &&
+                !["Closed", "Closed (Auto Closed)", "Rejected"].includes(complaint.status) &&
+                complaint.assigned_to && (
+                  <Button
+                    type="button"
+                    onClick={() => setShowAssignModal(true)}
+                    variant="outline"
+                    className="w-full font-semibold py-2 text-xs flex items-center justify-center gap-1.5"
+                  >
+                    <User className="h-3.5 w-3.5" />
+                    Reassign Complaint
+                  </Button>
+                )}
+
+              {/* Worker Work Execution Controls */}
+              {(isWorker && complaint.assigned_to === user?.user_id) && complaint.status === "Assigned" && (
                 <Button
                   type="button"
                   onClick={handleStartWork}
@@ -1472,7 +1492,7 @@ export default function ComplaintDetailsPage() {
                 </Button>
               )}
 
-              {isCoordinator && complaint.status === "In Progress" && (
+              {((isWorker && complaint.assigned_to === user?.user_id) || (isCoordinator && complaint.assigned_to)) && complaint.status === "In Progress" && (
                 <div className="grid gap-2">
                   <Button
                     type="button"
@@ -1504,7 +1524,7 @@ export default function ComplaintDetailsPage() {
                 </div>
               )}
 
-              {isCoordinator && complaint.status === "Waiting for Parts" && (
+              {((isWorker && complaint.assigned_to === user?.user_id) || isCoordinator) && complaint.status === "Waiting for Parts" && (
                 <Button
                   type="button"
                   onClick={handleResumeWork}
@@ -1516,26 +1536,6 @@ export default function ComplaintDetailsPage() {
                 </Button>
               )}
 
-              {/* App Manager / Admin Assignment if unassigned */}
-              {(isAdmin || isAppManager) &&
-                ["Submitted", "Pending", "Awaiting Coordinator Assignment"].includes(complaint.status) && (
-                  <form
-                    className="grid gap-2 border-t border-slate-100 dark:border-slate-800/80 pt-2"
-                    onSubmit={handleSubmit(assignComplaint)}
-                  >
-                    <Select label="Assign Coordinator" {...register("coordinator_id")}>
-                      <option value="">Choose coordinator</option>
-                      {coordinators.map((c) => (
-                        <option key={c.user_id} value={c.user_id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </Select>
-                    <Button type="submit" variant="primary" disabled={isSubmitting} className="w-full font-bold text-xs">
-                      Assign Coordinator
-                    </Button>
-                  </form>
-                )}
 
               {/* Warden Verification Controls */}
               {complaint.status === "Pending Warden Verification" && (
@@ -2347,6 +2347,14 @@ export default function ComplaintDetailsPage() {
           action?.();
         }}
       />
+
+      <AssignModal
+        isOpen={showAssignModal}
+        onClose={() => setShowAssignModal(false)}
+        complaint={complaint}
+        onAssigned={load}
+      />
     </div>
   );
 }
+

@@ -93,11 +93,15 @@ def test_accept_complaint_transitions_to_in_progress(admin_headers, coord_header
     c_data = c_res.json()
     complaint_id = c_data["complaint_id"]
 
-    # Coordinator accepts the complaint
+    # Coordinator accepts the complaint: old accept endpoint returns 410 Gone (Part A3)
     acc_res = client.post(f"/complaints/{complaint_id}/accept", headers=coord_headers)
-    assert acc_res.status_code == 200, acc_res.text
-    acc_data = acc_res.json()
-    assert acc_data["status"] == STATUS_IN_PROGRESS
+    assert acc_res.status_code == 410
+
+    # Coordinator assigns the complaint
+    assign_res = client.post(f"/complaints/{complaint_id}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=coord_headers)
+    assert assign_res.status_code == 200, assign_res.text
+    acc_data = assign_res.json()
+    assert acc_data["status"] == "Assigned"
     assert acc_data["assigned_to"] == "USR_COORDINATOR"
 
 
@@ -148,16 +152,16 @@ def test_accept_conflict_409_when_already_accepted(admin_headers):
     assert c_res.status_code == 201
     cid = c_res.json()["complaint_id"]
 
-    # First coordinator accepts
-    res1 = client.post(f"/complaints/{cid}/accept", headers=coord_b_headers)
+    # First assigner assigns (e.g. admin or coordinator)
+    res1 = client.post(f"/complaints/{cid}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=admin_headers)
     assert res1.status_code == 200
-    assert res1.json()["status"] == STATUS_IN_PROGRESS
+    assert res1.json()["status"] == "Assigned"
 
-    # Seed coordinator USR_COORDINATOR tries to accept -> 409 Conflict
+    # Second assigner tries to assign -> 409 Conflict
     seed_coord_headers = _login("coordinator@example.com", "Coordinator@123")
-    res2 = client.post(f"/complaints/{cid}/accept", headers=seed_coord_headers)
+    res2 = client.post(f"/complaints/{cid}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=seed_coord_headers)
     assert res2.status_code == 409
-    assert "already been accepted" in res2.json()["detail"].lower()
+    assert "already assigned" in res2.json()["detail"].lower()
 
 
 def test_single_tap_progress_notes(admin_headers, coord_headers):
@@ -173,8 +177,8 @@ def test_single_tap_progress_notes(admin_headers, coord_headers):
     }, headers=student_headers)
     cid = c_res.json()["complaint_id"]
 
-    # Coordinator accepts
-    client.post(f"/complaints/{cid}/accept", headers=coord_headers)
+    # Coordinator assigns
+    client.post(f"/complaints/{cid}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=coord_headers)
 
     # Post one-tap progress note with note_code
     prog_res = client.post(f"/complaints/{cid}/progress", json={
@@ -199,8 +203,8 @@ def test_wrong_location_workflow(admin_headers, coord_headers):
     }, headers=student_headers)
     cid = c_res.json()["complaint_id"]
 
-    # Coordinator accepts
-    client.post(f"/complaints/{cid}/accept", headers=coord_headers)
+    # Coordinator assigns
+    client.post(f"/complaints/{cid}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=coord_headers)
 
     # Report wrong location to LOC_MESS_1
     wl_res = client.post(f"/complaints/{cid}/wrong-location", json={
@@ -227,8 +231,8 @@ def test_reassign_requires_mandatory_reason(admin_headers, app_mgr_headers, coor
     }, headers=student_headers)
     cid = c_res.json()["complaint_id"]
 
-    # Accept complaint
-    client.post(f"/complaints/{cid}/accept", headers=coord_headers)
+    # Coordinator assigns
+    client.post(f"/complaints/{cid}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=coord_headers)
 
     # Create another coordinator mapped to LOC_HOSTEL_1 & DEPT_HOSTEL_ELECTRICAL
     coord_c_headers, coord_c_data = _create_user(admin_headers, "coordinator", "coord_c")
@@ -242,7 +246,7 @@ def test_reassign_requires_mandatory_reason(admin_headers, app_mgr_headers, coor
 
     # Reassign WITHOUT reason -> 400 Bad Request
     re_no_reason = client.post(f"/complaints/{cid}/reassign", json={
-        "coordinator_id": coord_c_data["user_id"],
+        "assigned_to": coord_c_data["user_id"],
         "reason": "",
     }, headers=app_mgr_headers)
     assert re_no_reason.status_code == 400
@@ -250,7 +254,7 @@ def test_reassign_requires_mandatory_reason(admin_headers, app_mgr_headers, coor
 
     # Reassign WITH reason -> 200 OK
     re_with_reason = client.post(f"/complaints/{cid}/reassign", json={
-        "coordinator_id": coord_c_data["user_id"],
+        "assigned_to": coord_c_data["user_id"],
         "reason": "Primary coordinator called for emergency campus electrical maintenance",
     }, headers=app_mgr_headers)
     assert re_with_reason.status_code == 200, re_with_reason.text
@@ -269,7 +273,7 @@ def test_block_and_unblock_complaint(admin_headers, coord_headers):
         "visibility_type": "Private",
     }, headers=student_headers)
     cid = c_res.json()["complaint_id"]
-    client.post(f"/complaints/{cid}/accept", headers=coord_headers)
+    client.post(f"/complaints/{cid}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=coord_headers)
 
     # Block
     blk_res = client.post(f"/complaints/{cid}/block", json={

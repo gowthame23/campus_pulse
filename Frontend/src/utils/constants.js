@@ -1,11 +1,13 @@
 export const ROLES = {
   STUDENT: "student",
+  EMPLOYEE: "employee",
   COORDINATOR: "coordinator",
   LOCATION_IN_CHARGE: "location_in_charge",
   APP_MANAGER: "app_manager",
   ADMINISTRATOR: "administrator",
   SUPER_ADMIN: "super_admin",
 };
+
 
 export const COMPLAINT_STATUS = {
   SUBMITTED: "Submitted",
