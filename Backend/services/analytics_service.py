@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-from utils.helper import now_string
+from utils.helper import csv_safe, now_string
 
 
 class AnalyticsService:
@@ -841,7 +841,13 @@ class AnalyticsService:
     def export_report(self, report_type, fmt="csv", filters=None, user=None):
         filters = filters or {}
         output = io.StringIO()
-        writer = csv.writer(output)
+        raw_writer = csv.writer(output)
+
+        class SafeWriter:
+            def writerow(self, row):
+                raw_writer.writerow([csv_safe(cell) for cell in row])
+
+        writer = SafeWriter()
 
         if report_type == "complaints":
             analytics = self.get_complaint_analytics(filters, user)

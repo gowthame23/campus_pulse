@@ -23,6 +23,7 @@ from api.schemas import (
 from api.security import get_current_user, invalidate_user_sessions, require_roles
 from models.administrator import Administrator
 from models.app_manager import AppManager
+from utils.helper import csv_safe
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -222,21 +223,21 @@ def export_filtered_users(
         loc_name = all_locs.get(d.get("location_id"), d.get("location_id") or "")
         dept_name = all_depts.get(d.get("department_id"), d.get("department_id") or "")
         export_rows.append({
-            "User ID": d.get("user_id", ""),
-            "Name": d.get("name", ""),
-            "Email": d.get("email", ""),
-            "Role": d.get("role", ""),
-            "Status": d.get("status", ""),
-            "Phone": d.get("phone_number", ""),
-            "Roll Number": d.get("roll_number", ""),
-            "Employee ID": d.get("employee_id", ""),
-            "Program": d.get("program", ""),
-            "Year": d.get("year", ""),
-            "Department": dept_name,
-            "Current Location": loc_name,
-            "Hostel": d.get("hostel", ""),
-            "Block": d.get("block", ""),
-            "Room Number": d.get("room_number", ""),
+            "User ID": csv_safe(d.get("user_id", "")),
+            "Name": csv_safe(d.get("name", "")),
+            "Email": csv_safe(d.get("email", "")),
+            "Role": csv_safe(d.get("role", "")),
+            "Status": csv_safe(d.get("status", "")),
+            "Phone": csv_safe(d.get("phone_number", "")),
+            "Roll Number": csv_safe(d.get("roll_number", "")),
+            "Employee ID": csv_safe(d.get("employee_id", "")),
+            "Program": csv_safe(d.get("program", "")),
+            "Year": csv_safe(d.get("year", "")),
+            "Department": csv_safe(dept_name),
+            "Current Location": csv_safe(loc_name),
+            "Hostel": csv_safe(d.get("hostel", "")),
+            "Block": csv_safe(d.get("block", "")),
+            "Room Number": csv_safe(d.get("room_number", "")),
         })
 
     audit_service.log(
@@ -257,7 +258,7 @@ def export_filtered_users(
                 headers = list(export_rows[0].keys())
                 ws.append(headers)
                 for r in export_rows:
-                    ws.append([r[h] for h in headers])
+                    ws.append([csv_safe(r[h]) for h in headers])
             output = io.BytesIO()
             wb.save(output)
             output.seek(0)

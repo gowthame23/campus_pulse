@@ -170,5 +170,40 @@ def test_sec_005_certificate_endpoint_security():
     assert "<script>" not in res_valid.text
 
 
+def test_sec_008_spreadsheet_formula_injection_sanitization():
+    """SEC-008: Spreadsheet exports must neutralize formula injection characters (=, +, -, @, \\t, \\r)."""
+    import csv
+    import io
+    from fastapi.testclient import TestClient
+    from api.main import app
+    from middleware.rate_limiter import auth_limiter
+
+    client = TestClient(app)
+    auth_limiter._requests.clear()
+    auth_limiter._lockouts.clear()
+
+    # Update student name with dangerous formula injection payload
+    payload_name = "=cmd|' /C calc'!A0"
+    with sqlite3.connect(get_db_path()) as conn:
+        conn.execute("UPDATE users SET name = ? WHERE user_id = 'USR_STUDENT'", (payload_name,))
+        conn.commit()
+
+    # Login as admin
+    login_adm = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
+    token_adm = login_adm.json()["access_token"]
+    headers_adm = {"Authorization": f"Bearer {token_adm}"}
+
+    # Export users CSV
+    res_csv = client.get("/users/export?format=csv", headers=headers_adm)
+    assert res_csv.status_code == 200
+
+    csv_reader = csv.DictReader(io.StringIO(res_csv.text))
+    student_rows = [row for row in csv_reader if row.get("User ID") == "USR_STUDENT"]
+    assert len(student_rows) == 1
+    name_cell = student_rows[0].get("Name")
+    assert name_cell.startswith("'="), f"Expected formula injection to be neutralized with leading quote, got: {name_cell}"
+
+
+
 
 

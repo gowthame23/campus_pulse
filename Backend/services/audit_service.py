@@ -353,16 +353,16 @@ class AuditService:
         for l in logs:
             writer.writerow(
                 [
-                    l["audit_id"],
-                    l["created_at"],
-                    l["module"],
-                    l["entity_type"],
+                    csv_safe(l["audit_id"]),
+                    csv_safe(l["created_at"]),
+                    csv_safe(l["module"]),
+                    csv_safe(l["entity_type"]),
                     csv_safe(l["entity_id"]),
-                    l["action"],
-                    l["performed_by"],
-                    l["performed_role"],
-                    l["status"],
-                    l["ip_address"],
+                    csv_safe(l["action"]),
+                    csv_safe(l["performed_by"]),
+                    csv_safe(l["performed_role"]),
+                    csv_safe(l["status"]),
+                    csv_safe(l["ip_address"]),
                     csv_safe(l["description"]),
                 ]
             )
