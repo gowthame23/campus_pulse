@@ -57,3 +57,80 @@ def test_sec_007_personal_email_cannot_login_and_placeholder_works():
     assert res_placeholder.json()["role"] == "administrator"
 
 
+def test_sec_006_safety_report_idor_prevention():
+    """SEC-006: Close safety report IDOR. Non-admins must provide case_code and match reporter identity."""
+    from fastapi.testclient import TestClient
+    from api.main import app
+    from middleware.rate_limiter import auth_limiter
+
+    client = TestClient(app)
+    auth_limiter._requests.clear()
+    auth_limiter._lockouts.clear()
+
+    # Login Student A
+    res_a = client.post("/auth/login", json={"username": "student@example.com", "password": "Student@123"})
+    token_a = res_a.json()["access_token"]
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+
+    # Login Student B
+    res_b = client.post("/auth/login", json={"username": "student2@campus.edu", "password": "Student@123"})
+    token_b = res_b.json()["access_token"]
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+
+    # Login Warden
+    res_w = client.post("/auth/login", json={"username": "warden@example.com", "password": "warden@123"})
+    token_w = res_w.json()["access_token"]
+    headers_w = {"Authorization": f"Bearer {token_w}"}
+
+    # Login Admin
+    res_adm = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
+    token_adm = res_adm.json()["access_token"]
+    headers_adm = {"Authorization": f"Bearer {token_adm}"}
+
+    # Enable safety reports if disabled
+    with sqlite3.connect(get_db_path()) as conn:
+        conn.execute("UPDATE system_settings SET setting_value = 'true' WHERE setting_key = 'safety_reports_enabled'")
+        conn.commit()
+
+    with client:
+        # Student A creates a safety report
+        create_res = client.post(
+            "/safety-reports",
+            json={"category": "Harassment", "description": "Confidential report by Student A"},
+            headers=headers_a,
+        )
+        assert create_res.status_code == 201
+        data = create_res.json()
+        report_id = data["report_id"]
+        case_code = data["case_code"]
+
+        # Student B cannot view it with report_id alone (must be 403 or 404)
+        idor_res_report_id = client.get(f"/safety-reports/{report_id}", headers=headers_b)
+        assert idor_res_report_id.status_code in (403, 404), f"Expected 403 or 404 for Student B with report_id alone, got {idor_res_report_id.status_code}"
+
+        # Student B cannot view it even if guessing or passing case_code (must be 403)
+        idor_res_case_code = client.get(f"/safety-reports/{case_code}", headers=headers_b)
+        assert idor_res_case_code.status_code == 403, f"Expected 403 for Student B accessing Student A's case_code, got {idor_res_case_code.status_code}"
+
+        # Student A with correct case_code CAN view and post messages
+        view_res_a = client.get(f"/safety-reports/{case_code}", headers=headers_a)
+        assert view_res_a.status_code == 200
+        assert view_res_a.json()["report_id"] == report_id
+
+        msg_res_a = client.post(
+            f"/safety-reports/{case_code}/messages",
+            json={"body": "Follow-up message from reporter"},
+            headers=headers_a,
+        )
+        assert msg_res_a.status_code == 200
+
+        # Warden cannot view it (403)
+        warden_res = client.get(f"/safety-reports/{case_code}", headers=headers_w)
+        assert warden_res.status_code == 403
+
+        # Admin CAN view it
+        admin_res = client.get(f"/safety-reports/{case_code}", headers=headers_adm)
+        assert admin_res.status_code == 200
+
+
+
