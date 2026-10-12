@@ -26,6 +26,7 @@ import Badge from "../../components/Badge.jsx";
 import Modal from "../../components/Modal.jsx";
 import Textarea from "../../components/Textarea.jsx";
 import Toast from "../../components/Toast.jsx";
+import SetupChecklistWidget from "../../components/SetupChecklistWidget.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
 import { complaintService } from "../../services/complaintService.js";
@@ -250,6 +251,9 @@ export default function AdminDashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Setup Checklist (Part 3.4) */}
+      <SetupChecklistWidget />
 
       {/* 4 Key Metrics Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">

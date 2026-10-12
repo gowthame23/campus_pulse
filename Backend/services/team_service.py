@@ -204,6 +204,15 @@ class TeamService:
             t["acting_coordinator_name"] = acting_coord.name if acting_coord else None
             return t
 
+    def get_team_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        if not name:
+            return None
+        with self._connect() as conn:
+            row = conn.execute("SELECT team_id FROM teams WHERE LOWER(name) = ? LIMIT 1", (name.strip().lower(),)).fetchone()
+            if row:
+                return self.get_team(row[0])
+        return None
+
     def list_teams(self, active_only: bool = True) -> List[Dict[str, Any]]:
         query = "SELECT * FROM teams WHERE 1=1"
         if active_only:

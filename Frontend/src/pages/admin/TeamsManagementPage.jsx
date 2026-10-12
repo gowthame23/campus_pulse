@@ -11,14 +11,18 @@ import {
   MapPin,
   Building,
   Shield,
+  Upload,
 } from "lucide-react";
 import Button from "../../components/Button.jsx";
 import Modal from "../../components/Modal.jsx";
 import Badge from "../../components/Badge.jsx";
+import BulkImportModal from "../../components/BulkImportModal.jsx";
+import CredentialSlipModal from "../../components/CredentialSlipModal.jsx";
 import { teamService } from "../../services/teamService.js";
 import { departmentService } from "../../services/departmentService.js";
 import { locationService } from "../../services/locationService.js";
 import { userService } from "../../services/userService.js";
+import { setupService } from "../../services/setupService.js";
 
 export default function TeamsManagementPage() {
   const [teams, setTeams] = useState([]);
@@ -28,6 +32,8 @@ export default function TeamsManagementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [slipData, setSlipData] = useState(null);
 
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -194,6 +200,14 @@ export default function TeamsManagementPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowBulkImport(true)}
+            className="flex items-center gap-1.5 text-xs font-bold border-indigo-200 text-indigo-700 dark:border-indigo-800 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+          >
+            <Upload className="h-4 w-4" />
+            Bulk Import Teams
+          </Button>
           <Button variant="primary" onClick={handleOpenCreate} className="flex items-center gap-1.5 text-xs font-bold">
             <Plus className="h-4 w-4" />
             New Team
@@ -448,6 +462,24 @@ export default function TeamsManagementPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Bulk Import Teams Modal (Part 3.2c) */}
+      <BulkImportModal
+        isOpen={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        type="teams"
+        onSuccess={() => {
+          loadAllData();
+          setSuccess("Teams imported successfully.");
+        }}
+      />
+
+      {/* Credential Slip Modal */}
+      <CredentialSlipModal
+        isOpen={Boolean(slipData)}
+        onClose={() => setSlipData(null)}
+        credentialData={slipData}
+      />
     </div>
   );
 }

@@ -24,9 +24,11 @@ class Location:
         archived_by_role=None,
         archived_by=None,
         app_manager_id=None,
+        parent_id=None,
     ):
         self.location_id = location_id or generate_id("LOC")
         self.name = name
+        self.parent_id = parent_id
         self.in_charge_id = in_charge_id
         self.app_manager_id = app_manager_id
         self.active = active
@@ -65,6 +67,7 @@ class Location:
             "archived": self.archived,
             "archived_by_role": self.archived_by_role,
             "archived_by": self.archived_by,
+            "parent_id": self.parent_id,
         }
 
     @classmethod
@@ -80,6 +83,7 @@ class Location:
             data.get("archived_by_role"),
             data.get("archived_by"),
             app_manager_id=data.get("app_manager_id"),
+            parent_id=data.get("parent_id"),
         )
 
 

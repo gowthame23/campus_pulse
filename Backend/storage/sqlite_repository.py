@@ -1751,6 +1751,7 @@ class SQLiteRepository:
             "app_manager_id": row["app_manager_id"] if "app_manager_id" in row.keys() else None,
             "active": bool(row["active"]) if "active" in row.keys() else True,
             "archived": bool(row["archived"]) if "archived" in row.keys() else False,
+            "parent_id": row["parent_id"] if "parent_id" in row.keys() else None,
         }
 
     def _row_to_complaint(self, row):

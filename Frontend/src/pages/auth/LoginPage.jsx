@@ -41,8 +41,13 @@ export default function LoginPage() {
   const onSubmit = async (values) => {
     setError("");
     clearSessionMessage();
+    const identity = (values.email || values.username || "").trim();
     try {
-      const user = await login(values);
+      const user = await login({
+        username: identity,
+        email: identity,
+        password: values.password,
+      });
       const target = user.first_login
         ? "/change-password"
         : location.state?.from?.pathname || "/";
@@ -51,7 +56,7 @@ export default function LoginPage() {
       const isNetworkErr = err?.message === "Network Error" || !err?.response;
       const fallbackMsg = isNetworkErr
         ? "Cannot connect to backend server (http://127.0.0.1:8000). Please ensure backend is running."
-        : "Invalid email or password.";
+        : "Invalid email, phone number, or password.";
       setError(getApiError(err, fallbackMsg));
     }
   };
@@ -113,19 +118,28 @@ export default function LoginPage() {
         </div>
 
         <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
-          {/* Email field */}
+          {/* Email or Phone field */}
           <Input
             id="email"
-            label="College Email"
-            type="email"
-            placeholder="name@campus.edu"
-            autoComplete="email"
+            label="College Email or Phone"
+            type="text"
+            placeholder="name@campus.edu or 10-digit phone"
+            autoComplete="username"
             error={errors.email?.message}
             {...register("email", {
-              required: "Email address is required.",
-              pattern: {
-                value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                message: "Invalid email address format.",
+              required: "Email address or phone number is required.",
+              validate: (val) => {
+                const trimmed = (val || "").trim();
+                if (!trimmed) return "Email address or phone number is required.";
+                if (trimmed.includes("@")) {
+                  const emailPattern = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+                  return emailPattern.test(trimmed) || "Invalid email address format.";
+                }
+                const digits = trimmed.replace(/[\s\-\(\)\.]/g, "").replace(/^\+91|^91/, "");
+                if (/^\d{10,15}$/.test(digits) || /^[A-Za-z0-9_-]+$/.test(trimmed)) {
+                  return true;
+                }
+                return "Enter a valid email address or 10-digit mobile number.";
               },
             })}
           />

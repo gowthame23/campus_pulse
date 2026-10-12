@@ -22,6 +22,8 @@ import {
   User,
   Users,
   Shield,
+  Key,
+  Phone,
 } from "lucide-react";
 import Button from "../../components/Button.jsx";
 import EmptyState from "../../components/EmptyState.jsx";
@@ -33,6 +35,7 @@ import AssignModal from "../../components/AssignModal.jsx";
 import LeaveModal from "../../components/LeaveModal.jsx";
 import FixerOfTheMonthWidget from "../../components/FixerOfTheMonthWidget.jsx";
 import PinnedEmergenciesBanner from "../../components/PinnedEmergenciesBanner.jsx";
+import CredentialSlipModal from "../../components/CredentialSlipModal.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
 import { complaintService } from "../../services/complaintService.js";
@@ -41,6 +44,7 @@ import { notificationService } from "../../services/notificationService.js";
 import { locationService } from "../../services/locationService.js";
 import { departmentService } from "../../services/departmentService.js";
 import { teamService } from "../../services/teamService.js";
+import { setupService } from "../../services/setupService.js";
 import { leaveService } from "../../services/leaveService.js";
 import { formatDate } from "../../utils/dateFormatter.js";
 import { getStatusTone, getPriorityTone } from "../../utils/statusColor.js";
@@ -374,6 +378,53 @@ export default function CoordinatorDashboard() {
     }
   };
 
+  const [teamMembersList, setTeamMembersList] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [slipData, setSlipData] = useState(null);
+
+  useEffect(() => {
+    if (activeTab === "team_members") {
+      loadAllTeamMembers();
+    }
+  }, [activeTab, myPrimaryTeams, actingTeams]);
+
+  const loadAllTeamMembers = async () => {
+    setLoadingMembers(true);
+    try {
+      const allMembers = [];
+      for (const t of [...myPrimaryTeams, ...actingTeams]) {
+        const res = await teamService.getMembers(t.team_id);
+        const mList = res.data || res || [];
+        mList.forEach((m) => {
+          allMembers.push({ ...m, team_id: t.team_id, team_name: t.name });
+        });
+      }
+      const unique = [];
+      const seen = new Set();
+      for (const m of allMembers) {
+        if (!seen.has(m.user_id)) {
+          seen.add(m.user_id);
+          unique.push(m);
+        }
+      }
+      setTeamMembersList(unique);
+    } catch (err) {
+      console.error("Failed to load team members:", err);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const handleResetWorkerPassword = async (member) => {
+    try {
+      const res = await setupService.resetTeamMemberPassword(member.team_id, member.user_id);
+      setSlipData(res);
+    } catch (err) {
+      setToastTone("danger");
+      setToastMessage(err.response?.data?.detail || "Failed to reset worker password.");
+    }
+  };
+
   const teamNameDisplay = myPrimaryTeams.length > 0 ? myPrimaryTeams.map((t) => t.name).join(", ") : "Maintenance Team";
 
   return (
@@ -536,6 +587,19 @@ export default function CoordinatorDashboard() {
           >
             <TrendingUp className="h-4 w-4" />
             Stats & Performance
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("team_members")}
+            className={`flex items-center gap-2 px-6 py-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "team_members"
+                ? "border-blue-600 text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900"
+                : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+            }`}
+          >
+            <Users className="h-4 w-4" />
+            Team Workforce
           </button>
         </div>
 
@@ -958,6 +1022,88 @@ export default function CoordinatorDashboard() {
             </div>
           </div>
         )}
+
+        {/* TAB 5: TEAM WORKFORCE (Members & Worker Passwords, Part 3.5e) */}
+        {activeTab === "team_members" && (
+          <div className="p-5 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  Team Members & Workforce
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Manage worker accounts, coverage, and reset temporary passwords for in-person handoff.
+                </p>
+              </div>
+              <Button size="sm" variant="ghost" onClick={loadAllTeamMembers} className="text-xs">
+                Refresh Workforce
+              </Button>
+            </div>
+
+            {loadingMembers ? (
+              <div className="p-8 text-center text-xs text-slate-500">Loading team workforce...</div>
+            ) : teamMembersList.length === 0 ? (
+              <EmptyState
+                title="No Workers in Team"
+                description="Your team does not have any workers assigned yet. Please contact your App Manager or Admin to assign workers to your team."
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 font-bold border-y border-slate-200 dark:border-slate-700">
+                    <tr>
+                      <th className="py-2.5 px-3">Name</th>
+                      <th className="py-2.5 px-3">Role</th>
+                      <th className="py-2.5 px-3">Phone</th>
+                      <th className="py-2.5 px-3">Team</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {teamMembersList.map((m) => (
+                      <tr key={m.user_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                        <td className="py-3 px-3 font-bold text-slate-900 dark:text-slate-100">
+                          {m.name}
+                        </td>
+                        <td className="py-3 px-3 text-slate-600 dark:text-slate-300">
+                          Employee
+                        </td>
+                        <td className="py-3 px-3 text-slate-700 dark:text-slate-300 font-mono">
+                          {m.phone || "—"}
+                        </td>
+                        <td className="py-3 px-3 text-slate-500">
+                          {m.team_name}
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            m.on_leave
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-emerald-100 text-emerald-800"
+                          }`}>
+                            {m.on_leave ? "On Leave" : "Available"}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleResetWorkerPassword(m)}
+                            className="text-xs font-bold border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                            title="Generate and print login slip with CP-XXXX temporary password"
+                          >
+                            <Key className="h-3.5 w-3.5 mr-1 text-amber-600" />
+                            Reset Password Slip
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ASSIGN MODAL (Rule K3) */}
@@ -977,6 +1123,13 @@ export default function CoordinatorDashboard() {
         isOpen={showLeaveModal}
         onClose={() => setShowLeaveModal(false)}
         onLeaveChanged={reload}
+      />
+
+      {/* Credential Slip Modal for Worker Login Slip (Part 3.5e) */}
+      <CredentialSlipModal
+        isOpen={Boolean(slipData)}
+        onClose={() => setSlipData(null)}
+        credentialData={slipData}
       />
 
       {/* MARK DONE MODAL */}
