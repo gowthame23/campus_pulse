@@ -35,11 +35,12 @@ Every physical hostel or campus zone must have an assigned Warden. Wardens recei
 2. Edit each location and assign the corresponding Warden (`in_charge_id`).
 3. Note: A warden cannot accept or fix complaints, nor can they verify issues they reported.
 
-### Step 4: Clear Coverage Gaps
+### Step 4: Clear Coverage Gaps & Frequent Spot Suggestions
 1. Navigate to **Coverage Gaps** (`/admin/locations` or API `GET /locations/coverage-gaps`).
 2. Review any locations marked with:
    - 🔴 **Missing Warden**: No in-charge assigned. Assign a warden immediately.
    - 🟡 **Missing Coordinator**: A department at this location has no assigned coordinator. Complaints filed here will generate coverage gap alerts until a coordinator is mapped.
+3. Review student frequent-spot suggestions (`exact_spot`) to identify recurring problem zones (e.g., "Room 204 Fan", "3rd Floor Water Cooler", "Mess Wash Basin").
 
 ---
 
@@ -51,8 +52,10 @@ Every physical hostel or campus zone must have an assigned Warden. Wardens recei
    - `High` and `Critical` tickets enter `Pending Verification`. The location warden must inspect the physical repair in person.
    - Approximately **10% of Medium and Low** tickets are randomly selected for spot checks.
    - The warden submits `Warden Verified` (moves to `Fixed` for student) or `Not Fixed` (returns ticket to `In Progress` with explanation).
+   - Wardens never fix complaints and cannot be assigned complaints.
 3. **Student Closeout & Auto-Close**:
    - The student receives an alert and can confirm resolution (`Closed`).
+   - Students can submit a 1–5 star rating and optional thank-you note via `POST /complaints/{id}/feedback`.
    - If the student does not respond within **48 hours**, the system automatically closes the ticket (a warning reminder is sent at **24 hours**).
 
 ### 2.2 Reopens and Admin Review (Dispute Resolution)
@@ -61,6 +64,28 @@ Every physical hostel or campus zone must have an assigned Warden. Wardens recei
 - The Administrator reviews the audit log, photos, and chat history, then issues an official decision via `POST /complaints/{id}/admin-decision`:
   - `Confirm Resolved`: Finalizes closure of the dispute.
   - `Reassign`: Returns the issue to the department queue with administrative directives.
+
+### 2.3 Campus Health Map & TV Display Mode
+1. The **Campus Health Map** (`/admin/health-map`) renders color-coded health cards for every physical campus building:
+   - 🟢 **Green**: 0 active critical complaints, <=2 open tickets.
+   - 🟡 **Yellow**: Moderate pending tickets.
+   - 🔴 **Red**: Urgent attention needed (>0 critical or >5 pending tickets).
+2. **Pattern Alerts**: Triggered automatically when >=5 complaints occur at a single building within a rolling 21-day window.
+3. **TV Display Mode**: Available at `/health-map/tv` for kiosk screens in administration lobbies or warden offices. Features large-card visual layout, automated scrolling, dark theme, and silent real-time refresh.
+
+### 2.4 Fixer of the Month & Recognition
+1. Fixers receive feedback ratings and thank-you messages from students upon resolution.
+2. The system automatically tabulates the **Fixer of the Month** based on completed resolution volume and average student star rating.
+3. Viewable on the coordinator performance dashboard (`/coordinator/performance`), student portals, and downloadable as an official PDF/certificate data payload (`GET /recognitions/fixer-of-the-month/certificate`).
+
+### 2.5 Sealed Safety Reports Administration
+1. **Institution Toggle**: Administrators can enable or disable Sealed Safety Reports under System Settings (`/admin/settings`).
+2. **Identity Sealing**: Reporters receive a unique `SAFE-XXXX` tracking code. Their real identity is strictly encrypted and stored in an isolated `safety_report_identity` table, inaccessible to general staff.
+3. **Two-Way Anonymous Messaging**: Admins communicate with the reporter through an anonymous thread without exposing their identity.
+4. **Status Lifecycle**: Admins transition reports between `Submitted` $\rightarrow$ `Investigating` $\rightarrow$ `Action Taken` or `Dismissed`.
+5. **Strict Anti-Abuse Unsealing**:
+   - The reporter identity can **ONLY** be unsealed if the administrator formally flags the report as `false_misuse` and inputs a mandatory written audit justification.
+   - Every unsealing attempt is permanently recorded in the append-only `audit_logs` table.
 
 ---
 
