@@ -67,7 +67,7 @@ export default function ResponsiblePersonnelCard({
         <div className="pb-3 border-b border-slate-100 dark:border-slate-800/80">
           <div className="flex items-center justify-between mb-1">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Location In-Charge (Warden)
+              Warden
             </span>
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300">
               Verification Authority

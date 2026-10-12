@@ -38,7 +38,7 @@ export default function ActivateAccountPage() {
         setUserInfo(response.data);
       } catch (err) {
         setVerifyError(
-          err?.response?.data?.detail || "Invalid or expired activation link. Please request a new activation link from your administrator."
+          err?.response?.data?.detail || "Invalid or expired activation link. Please request a new activation link from your Admin."
         );
       } finally {
         setVerifying(false);

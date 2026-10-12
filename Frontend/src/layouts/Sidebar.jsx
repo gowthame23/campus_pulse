@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
-import { ROLES } from "../utils/constants.js";
+import { ROLES, getRoleDisplayName } from "../utils/constants.js";
 
 export default function Sidebar({ isOpen, onClose }) {
   const { user } = useAuth();
@@ -42,17 +42,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
   const roleTitle = useMemo(() => {
     if (!user) return "";
-    const role = (user.role || "").toLowerCase();
-    if (role === ROLES.LOCATION_IN_CHARGE) {
-      const locName = (user.location_name || user.location_id || "").toLowerCase();
-      if (locName.includes("hostel")) return "Hostel Warden";
-      if (locName.includes("mess")) return "Mess Supervisor";
-      if (locName.includes("sac") || locName.includes("activity")) return "SAC In-Charge";
-      if (locName.includes("sport")) return "Sports In-Charge";
-      if (locName.includes("academic")) return "Academic Block Supervisor";
-      return "Warden / Location In-Charge";
-    }
-    return user.role ? user.role.replace("_", " ") : "";
+    return getRoleDisplayName(user.role);
   }, [user]);
 
   const navSections = useMemo(() => {

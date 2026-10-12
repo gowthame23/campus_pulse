@@ -79,7 +79,7 @@ export default function AnnouncementPage() {
           setAdminContact({
             available: false,
             message:
-              "Administrator contact email is currently unavailable. Please visit the campus administrative office.",
+              "Admin contact email is currently unavailable. Please visit the campus administrative office.",
           });
         })
         .finally(() => {
@@ -149,7 +149,7 @@ export default function AnnouncementPage() {
     e.preventDefault();
     if (!canCreate) {
       setError(
-        "Only Administrators, App Managers, and Location Wardens are authorized to publish official broadcast announcements.",
+        "Only Admins, App Managers, and Wardens are authorized to publish official broadcast announcements.",
       );
       return;
     }
@@ -291,7 +291,7 @@ export default function AnnouncementPage() {
               <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 italic">
                 <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 <span>
-                  {adminContact?.message || (loadingContact ? "Loading contact..." : "Administrator contact information unavailable.")}
+                  {adminContact?.message || (loadingContact ? "Loading contact..." : "Admin contact information unavailable.")}
                 </span>
               </div>
             )}

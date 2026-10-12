@@ -834,7 +834,7 @@ class AuthService:
                     and existing_user.roll_number != clean_roll
                 ):
                     raise ValueError(
-                        "Roll Number is immutable and can only be modified by an Administrator."
+                        "Roll Number is immutable and can only be modified by an Admin."
                     )
 
         # 5. Employee ID Validation (Staff)
@@ -864,7 +864,7 @@ class AuthService:
                     and existing_user.employee_id != clean_emp
                 ):
                     raise ValueError(
-                        "Employee ID is immutable and can only be modified by an Administrator."
+                        "Employee ID is immutable and can only be modified by an Admin."
                     )
 
     def save_user(self, user):
@@ -1042,8 +1042,8 @@ class AuthService:
         # regardless of creator role.
         if target_role == "administrator":
             raise PermissionError(
-                "Cannot create another Administrator account. The system "
-                "must always have exactly one active Administrator."
+                "Cannot create another Admin account. The system "
+                "must always have exactly one active Admin."
             )
 
         # App Managers cannot create other App Manager accounts.
@@ -1344,7 +1344,7 @@ class AuthService:
             raise ValueError("User not found.")
         p_role = (performer.role or "").lower()
         if p_role == "app_manager" and user.role in ("administrator", "app_manager"):
-            raise PermissionError("App Managers are not authorized to manage Administrator or App Manager accounts.")
+            raise PermissionError("App Managers are not authorized to manage Admin or App Manager accounts.")
 
         valid_statuses = (
             User.STATUS_ACTIVE,
@@ -1363,7 +1363,7 @@ class AuthService:
         if new_status == User.STATUS_ACTIVE:
             prev_deactivator_role = (getattr(user, "deactivated_by_role", "") or "").lower()
             if prev_deactivator_role in ("administrator", "admin") and p_role == "app_manager":
-                raise PermissionError("This account was deactivated by an Administrator. Only an Administrator can reactivate it.")
+                raise PermissionError("This account was deactivated by an Admin. Only an Admin can reactivate it.")
 
         old_status = user.status
         user.status = new_status
@@ -1418,7 +1418,7 @@ class AuthService:
         is_admin = p_role == "administrator"
 
         if not is_self and p_role == "app_manager" and user.role in ("administrator", "app_manager"):
-            raise PermissionError("App Managers are not authorized to manage Administrator or App Manager accounts.")
+            raise PermissionError("App Managers are not authorized to manage Admin or App Manager accounts.")
 
         if not is_self and not is_admin and p_role != "app_manager":
             raise PermissionError("You are not authorized to edit this profile.")
@@ -1622,7 +1622,7 @@ class AuthService:
         if p_role == "app_manager":
             if user.role in ("administrator", "app_manager"):
                 raise PermissionError(
-                    "App Managers cannot delete Administrator or App Manager accounts."
+                    "App Managers cannot delete Admin or App Manager accounts."
                 )
         elif p_role != "administrator":
             raise PermissionError("Your role is not authorized to delete accounts.")

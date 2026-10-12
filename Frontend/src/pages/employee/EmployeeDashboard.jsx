@@ -113,6 +113,12 @@ export default function EmployeeDashboard() {
   };
 
   const myTeam = teams.find((t) => t.member_ids?.includes(user?.user_id));
+  const coveringTeam = teams.find(
+    (t) =>
+      t.backup_coordinator_id === user?.user_id &&
+      t.acting_coordinator_id === user?.user_id &&
+      t.coordinator_on_leave
+  );
 
   // Handler: Start Job
   const handleStartJob = async (job) => {
@@ -262,7 +268,10 @@ export default function EmployeeDashboard() {
         <div>
           <div className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Wrench className="h-5 w-5 text-blue-600" />
-            {user?.name || "Worker"}
+            {user?.name || "Employee"}
+            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium">
+              Employee
+            </span>
           </div>
           <div className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
             Team: <span className="font-medium text-slate-700 dark:text-slate-300">{myTeam?.name || "Campus Maintenance"}</span>
@@ -288,6 +297,16 @@ export default function EmployeeDashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Rule 1.5: Acting Coordinator Coverage Banner */}
+      {coveringTeam && (
+        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 rounded-2xl p-4 flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+          <div className="text-sm">
+            You are covering for <span className="font-bold">{coveringTeam.coordinator_name || "Coordinator"}</span> until <span className="font-bold">{coveringTeam.coordinator_leave_until || "leave ends"}</span>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800">

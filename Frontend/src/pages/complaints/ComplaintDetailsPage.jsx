@@ -897,13 +897,13 @@ export default function ComplaintDetailsPage() {
         adminDecisionChoice === "Reopen" ? adminReassignCoord : null,
       );
       setMessage(
-        `Administrator review decision applied: ${adminDecisionChoice}.`,
+        `Admin review decision applied: ${adminDecisionChoice}.`,
       );
       setShowAdminDecisionModal(false);
       setAdminDecisionNotes("");
       load();
     } catch (err) {
-      setError(getApiError(err, "Failed to apply administrator decision."));
+      setError(getApiError(err, "Failed to apply admin decision."));
     } finally {
       setSubmittingAdminDecision(false);
     }
@@ -2238,7 +2238,7 @@ export default function ComplaintDetailsPage() {
             <p className="text-xs text-slate-500">
               Please explain why the issue is not satisfactory. Reopening returns the ticket for coordinator rework.
               <span className="block mt-1 font-bold text-slate-700 dark:text-slate-300">
-                Cycle {(complaint?.reopen_count || 0) + 1} of 3. (After 3 reopens, the complaint escalates to Administrator Review).
+                Cycle {(complaint?.reopen_count || 0) + 1} of 3. (After 3 reopens, the complaint escalates to Admin Review).
               </span>
             </p>
             <Textarea
@@ -2274,7 +2274,7 @@ export default function ComplaintDetailsPage() {
         <Modal
           isOpen={showAdminDecisionModal}
           onClose={() => setShowAdminDecisionModal(false)}
-          title="⚖️ Administrator Review Decision"
+          title="⚖️ Admin Review Decision"
         >
           <form onSubmit={handleAdminDecisionSubmit} className="space-y-4">
             <p className="text-xs text-slate-500">
@@ -2306,7 +2306,7 @@ export default function ComplaintDetailsPage() {
             )}
 
             <Textarea
-              label="Administrator Decision Notes"
+              label="Admin Decision Notes"
               value={adminDecisionNotes}
               onChange={(e) => setAdminDecisionNotes(e.target.value)}
               placeholder="State the findings of your investigation and rationale for this decision..."

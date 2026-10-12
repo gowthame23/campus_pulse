@@ -351,7 +351,7 @@ export default function SafetyReportsAdminPage() {
                       }`}
                     >
                       <div className="flex items-center justify-between gap-4 text-[10px] opacity-75 font-bold">
-                        <span>{msg.sender_type === "admin" ? "🛡️ You (Administrator)" : "🔒 Student (Sealed Identity)"}</span>
+                        <span>{msg.sender_type === "admin" ? "🛡️ You (Admin)" : "🔒 Student (Sealed Identity)"}</span>
                         <span>{formatDate(msg.created_at)}</span>
                       </div>
                       <p className="whitespace-pre-wrap">{msg.body}</p>
@@ -458,7 +458,7 @@ export default function SafetyReportsAdminPage() {
               <span className="font-bold block mb-1">Deliberate False Misuse Warning:</span>
               Reporter identities may ONLY be unsealed if the complaint was determined to be a
               deliberate false report or harassment. Every unseal event is permanently recorded in the
-              administrator audit trail.
+              admin audit trail.
             </div>
 
             <div>

@@ -31,6 +31,7 @@ import {
   Filter,
   Archive,
   FileText,
+  Wrench,
 } from "lucide-react";
 import Button from "../../components/Button.jsx";
 import Card from "../../components/Card.jsx";
@@ -50,7 +51,7 @@ import { departmentService } from "../../services/departmentService.js";
 import { locationService } from "../../services/locationService.js";
 import { programService } from "../../services/programService.js";
 import { userService } from "../../services/userService.js";
-import { ROLES } from "../../utils/constants.js";
+import { ROLES, getRoleDisplayName } from "../../utils/constants.js";
 import { matchesSearch } from "../../utils/search.js";
 import apiClient, { getApiError } from "../../api/axios.js";
 
@@ -147,15 +148,17 @@ export default function UserManagementPage() {
     if (currentUser?.role === ROLES.ADMINISTRATOR) {
       return [
         { value: ROLES.APP_MANAGER, label: "App Manager" },
-        { value: ROLES.LOCATION_IN_CHARGE, label: "Location In-Charge (Warden / Supervisor)" },
         { value: ROLES.COORDINATOR, label: "Coordinator" },
+        { value: ROLES.EMPLOYEE, label: "Employee" },
+        { value: ROLES.LOCATION_IN_CHARGE, label: "Warden" },
         { value: ROLES.STUDENT, label: "Student" },
       ];
     }
     if (currentUser?.role === ROLES.APP_MANAGER) {
       return [
-        { value: ROLES.LOCATION_IN_CHARGE, label: "Location In-Charge (Warden / Supervisor)" },
         { value: ROLES.COORDINATOR, label: "Coordinator" },
+        { value: ROLES.EMPLOYEE, label: "Employee" },
+        { value: ROLES.LOCATION_IN_CHARGE, label: "Warden" },
         { value: ROLES.STUDENT, label: "Student" },
       ];
     }
@@ -176,10 +179,11 @@ export default function UserManagementPage() {
 
   const roleTabs = useMemo(() => [
     { id: "all", label: "All Roles", icon: Users },
-    { id: ROLES.ADMINISTRATOR, label: "Administrator", icon: Shield },
+    { id: ROLES.ADMINISTRATOR, label: "Admin", icon: Shield },
     { id: ROLES.APP_MANAGER, label: "App Manager", icon: UserCheck },
     { id: ROLES.COORDINATOR, label: "Coordinator", icon: Users },
-    { id: ROLES.LOCATION_IN_CHARGE, label: "Hostel Warden / Supervisor", icon: MapPin },
+    { id: ROLES.EMPLOYEE, label: "Employee", icon: Wrench },
+    { id: ROLES.LOCATION_IN_CHARGE, label: "Warden", icon: MapPin },
     { id: ROLES.STUDENT, label: "Student", icon: User },
   ], []);
 
@@ -518,7 +522,7 @@ export default function UserManagementPage() {
         currentRole === ROLES.APP_MANAGER
       ) {
         setError(
-          "This account was deactivated by an Administrator and cannot be reactivated by an App Manager."
+          "This account was deactivated by an Admin and cannot be reactivated by an App Manager."
         );
         return;
       }
@@ -614,23 +618,8 @@ export default function UserManagementPage() {
       key: "role",
       header: "Role",
       render: (row) => {
-        const role = (row.role || "").toLowerCase();
-        if (role === ROLES.LOCATION_IN_CHARGE) {
-          const locName = (row.location_name || row.location_id || "").toLowerCase();
-          if (locName.includes("hostel"))
-            return <span className="capitalize font-medium">Hostel Warden</span>;
-          if (locName.includes("mess"))
-            return <span className="capitalize font-medium">Mess Supervisor</span>;
-          if (locName.includes("sac") || locName.includes("activity"))
-            return <span className="capitalize font-medium">SAC In-Charge</span>;
-          if (locName.includes("sport"))
-            return <span className="capitalize font-medium">Sports In-Charge</span>;
-          if (locName.includes("academic"))
-            return <span className="capitalize font-medium">Academic Block Supervisor</span>;
-          return <span className="capitalize font-medium">General Supervisor</span>;
-        }
         return (
-          <span className="capitalize font-medium">{row.role?.replace("_", " ")}</span>
+          <span className="capitalize font-medium">{getRoleDisplayName(row.role)}</span>
         );
       },
     },
@@ -827,7 +816,7 @@ export default function UserManagementPage() {
               className={`!h-9 px-2 text-xs font-bold ${isBlockedReactivation ? "opacity-50 cursor-not-allowed" : ""}`}
               title={
                 isBlockedReactivation
-                  ? "Deactivated by Administrator - App Manager cannot reactivate"
+                  ? "Deactivated by Admin - App Manager cannot reactivate"
                   : isUserActive
                   ? "Disable Account"
                   : "Enable Account"

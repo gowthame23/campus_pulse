@@ -181,6 +181,27 @@ class TeamService:
             t["location_ids"] = [r[0] for r in loc_rows]
             mem_rows = conn.execute("SELECT user_id FROM team_members WHERE team_id = ?", (team_id,)).fetchall()
             t["member_ids"] = [r[0] for r in mem_rows]
+
+            today = date.today().isoformat()
+            coord_id = t.get("coordinator_id")
+            coord_leave_row = None
+            coord_name = None
+            if coord_id and self.auth_service:
+                coord_user = self.auth_service.get_user(coord_id)
+                if coord_user:
+                    coord_name = coord_user.name
+                coord_leave_row = conn.execute(
+                    "SELECT to_date FROM user_leaves WHERE user_id = ? AND date(from_date) <= date(?) AND date(?) <= date(to_date) ORDER BY to_date DESC LIMIT 1",
+                    (coord_id, today, today),
+                ).fetchone()
+
+            t["coordinator_name"] = coord_name
+            t["coordinator_on_leave"] = bool(coord_leave_row)
+            t["coordinator_leave_until"] = coord_leave_row[0] if coord_leave_row else None
+
+            acting_coord = self.get_acting_coordinator(t)
+            t["acting_coordinator_id"] = acting_coord.user_id if acting_coord else None
+            t["acting_coordinator_name"] = acting_coord.name if acting_coord else None
             return t
 
     def list_teams(self, active_only: bool = True) -> List[Dict[str, Any]]:
@@ -189,6 +210,7 @@ class TeamService:
             query += " AND active = 1"
         query += " ORDER BY name ASC"
 
+        today = date.today().isoformat()
         with self._connect() as conn:
             rows = conn.execute(query).fetchall()
             teams = []
@@ -198,6 +220,26 @@ class TeamService:
                 t["location_ids"] = [lr[0] for lr in loc_rows]
                 mem_rows = conn.execute("SELECT user_id FROM team_members WHERE team_id = ?", (t["team_id"],)).fetchall()
                 t["member_ids"] = [mr[0] for mr in mem_rows]
+
+                coord_id = t.get("coordinator_id")
+                coord_leave_row = None
+                coord_name = None
+                if coord_id and self.auth_service:
+                    coord_user = self.auth_service.get_user(coord_id)
+                    if coord_user:
+                        coord_name = coord_user.name
+                    coord_leave_row = conn.execute(
+                        "SELECT to_date FROM user_leaves WHERE user_id = ? AND date(from_date) <= date(?) AND date(?) <= date(to_date) ORDER BY to_date DESC LIMIT 1",
+                        (coord_id, today, today),
+                    ).fetchone()
+
+                t["coordinator_name"] = coord_name
+                t["coordinator_on_leave"] = bool(coord_leave_row)
+                t["coordinator_leave_until"] = coord_leave_row[0] if coord_leave_row else None
+
+                acting_coord = self.get_acting_coordinator(t)
+                t["acting_coordinator_id"] = acting_coord.user_id if acting_coord else None
+                t["acting_coordinator_name"] = acting_coord.name if acting_coord else None
                 teams.append(t)
             return teams
 

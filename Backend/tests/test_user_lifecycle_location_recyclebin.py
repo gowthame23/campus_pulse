@@ -132,7 +132,7 @@ def test_reactivation_hierarchy_rule():
     # App Manager attempts to reactivate the account -> Should be 403 Forbidden
     react_res = client.patch(f"/users/{user_id}/status", json={"status": "Active"}, headers=app_mgr_headers)
     assert react_res.status_code == 403
-    assert "deactivated by an Administrator" in react_res.json()["detail"] or "Only an Administrator can reactivate" in react_res.json()["detail"]
+    assert "deactivated by an Admin" in react_res.json()["detail"] or "deactivated by an Administrator" in react_res.json()["detail"] or "Only an Admin can reactivate" in react_res.json()["detail"]
 
     # Administrator reactivates the account -> Success
     admin_react_res = client.patch(f"/users/{user_id}/status", json={"status": "Active"}, headers=admin_headers)

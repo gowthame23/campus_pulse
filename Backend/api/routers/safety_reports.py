@@ -149,7 +149,7 @@ def get_safety_report_by_case_code(
     if user_role in ("coordinator", "location_in_charge", "warden", "app_manager"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Staff members other than Administrator are not permitted to view safety reports.",
+            detail="Staff members other than Admin are not permitted to view safety reports.",
         )
 
     db = complaint_service.repository
@@ -208,7 +208,7 @@ def send_safety_report_message(
     if user_role in ("coordinator", "location_in_charge", "warden", "app_manager"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Staff members other than Administrator are not permitted to participate in safety reports.",
+            detail="Staff members other than Admin are not permitted to participate in safety reports.",
         )
 
     is_admin = user_role == Administrator.ROLE.lower()

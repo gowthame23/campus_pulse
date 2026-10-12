@@ -1136,7 +1136,7 @@ def report_wrong_location(
     if not (is_assignee or is_warden or is_mgr_or_admin):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the assigned coordinator, location warden, App Manager, or Administrator can report a wrong location.",
+            detail="Only the assigned coordinator, Warden, App Manager, or Admin can report a wrong location.",
         )
 
     old_location_id = complaint.location_id

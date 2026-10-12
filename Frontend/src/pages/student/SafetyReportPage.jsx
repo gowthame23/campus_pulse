@@ -173,7 +173,7 @@ export default function SafetyReportPage() {
         </Link>
         <PageHeader
           title="Confidential Safety Reporting"
-          description="Direct and sealed reporting channel exclusively to campus executive administrators."
+          description="Direct and sealed reporting channel exclusively to campus executive admins."
         />
       </div>
 
@@ -240,7 +240,7 @@ export default function SafetyReportPage() {
               Report Submitted Securely
             </h3>
             <p className="text-xs text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-              Your identity is completely sealed. Campus administrators have been alerted. Save your
+              Your identity is completely sealed. Campus admins have been alerted. Save your
               unique confidential Case Code to check replies anonymously:
             </p>
 
@@ -277,7 +277,7 @@ export default function SafetyReportPage() {
                 Confidentiality & Non-Retaliation Policy
               </div>
               <p className="text-[11px] leading-relaxed text-blue-900/90 dark:text-blue-300">
-                Reports are private and go only to the administrator. Genuine reports are never penalised,
+                Reports are private and go only to the admin. Genuine reports are never penalised,
                 even if they cannot be proven. Deliberately false reports may lead to action.
               </p>
             </div>
@@ -413,7 +413,7 @@ export default function SafetyReportPage() {
                     }`}
                   >
                     <div className="flex items-center justify-between gap-4 text-[10px] font-bold opacity-75">
-                      <span>{msg.sender_type === "admin" ? "🛡️ Campus Administrator" : "🔒 You (Anonymous)"}</span>
+                      <span>{msg.sender_type === "admin" ? "🛡️ Campus Admin" : "🔒 You (Anonymous)"}</span>
                       <span>{formatDate(msg.created_at)}</span>
                     </div>
                     <p className="whitespace-pre-wrap">{msg.body}</p>
@@ -425,7 +425,7 @@ export default function SafetyReportPage() {
               <form onSubmit={handleSendReply} className="flex gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                 <input
                   type="text"
-                  placeholder="Send confidential reply to administrator..."
+                  placeholder="Send confidential reply to admin..."
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                   className="h-10 flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs text-slate-900 dark:text-slate-100 outline-none focus:border-primary"

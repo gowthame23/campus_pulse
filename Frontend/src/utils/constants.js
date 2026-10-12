@@ -8,6 +8,28 @@ export const ROLES = {
   SUPER_ADMIN: "super_admin",
 };
 
+// Rule 1.1 & 1.3: Canonical User-Facing Display Names
+// Admin | App Manager | Coordinator | Employee | Warden | Student (Super Admin platform-level)
+export const ROLE_DISPLAY_NAMES = {
+  administrator: "Admin",
+  admin: "Admin",
+  app_manager: "App Manager",
+  manager: "App Manager",
+  supervisor: "App Manager",
+  coordinator: "Coordinator",
+  employee: "Employee",
+  location_in_charge: "Warden",
+  warden: "Warden",
+  student: "Student",
+  super_admin: "Super Admin",
+};
+
+export const getRoleDisplayName = (role) => {
+  if (!role) return "";
+  const clean = String(role).trim().toLowerCase();
+  return ROLE_DISPLAY_NAMES[clean] || role;
+};
+
 
 export const COMPLAINT_STATUS = {
   SUBMITTED: "Submitted",

@@ -195,7 +195,7 @@ export default function AdminDashboard() {
 
   if (loading)
     return (
-      <Loader label="Loading administrator dashboard..." variant="skeleton" />
+      <Loader label="Loading admin dashboard..." variant="skeleton" />
     );
   if (error)
     return <EmptyState title="Dashboard Unavailable" description={error} />;
@@ -215,7 +215,7 @@ export default function AdminDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            Good morning, {user?.name || "Administrator"}
+            Good morning, {user?.name || "Admin"}
           </h1>
           <p className="text-xs font-normal text-slate-500 dark:text-slate-400 mt-1">
             Institutional Operations & System Governance • {complaints.length} tickets and {usersCount} campus members

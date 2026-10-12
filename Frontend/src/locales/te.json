@@ -83,6 +83,16 @@
     "case_code": "రహస్య కేస్ కోడ్",
     "safe_tip": "అడ్మిన్ స్పందనలను చూడటానికి ఈ కోడ్‌ను భద్రపరుచుకోండి.",
     "status": "నివేదిక స్థితి"
+  },
+
+  "roles": {
+    "admin": "Admin",
+    "app_manager": "App Manager",
+    "coordinator": "Coordinator",
+    "employee": "Employee",
+    "warden": "Warden",
+    "student": "Student",
+    "super_admin": "Super Admin"
   }
 }
 
