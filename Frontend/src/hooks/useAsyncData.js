@@ -5,16 +5,16 @@ export function useAsyncData(loader, dependencies = []) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  const reload = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError("");
     try {
       const result = await loader();
       setData(result);
     } catch (err) {
-      setError(err?.response?.data?.detail || "Unable to load data.");
+      if (!silent) setError(err?.response?.data?.detail || "Unable to load data.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, Array.isArray(dependencies) ? dependencies : []);
 

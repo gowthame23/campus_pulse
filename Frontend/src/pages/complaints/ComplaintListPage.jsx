@@ -183,6 +183,19 @@ export default function ComplaintListPage() {
     }
   }, [activeLocationTab, availableDepartments, selectedDepartment]);
 
+  // Live real-time updates via WebSocket events, reconnects, or poll fallback
+  useEffect(() => {
+    const handleLiveSync = () => reload(true);
+    window.addEventListener("campus-pulse-ws-event", handleLiveSync);
+    window.addEventListener("campus-pulse-reconnected", handleLiveSync);
+    window.addEventListener("campus-pulse-poll", handleLiveSync);
+    return () => {
+      window.removeEventListener("campus-pulse-ws-event", handleLiveSync);
+      window.removeEventListener("campus-pulse-reconnected", handleLiveSync);
+      window.removeEventListener("campus-pulse-poll", handleLiveSync);
+    };
+  }, [reload]);
+
   const getLocationCount = (locId) => {
     const rawData = data || [];
     const scopedData = rawData.filter((c) => {

@@ -396,8 +396,8 @@ export default function ComplaintDetailsPage() {
   const canChangePriority =
     user && (isAdmin || isAppManager || isLocationWarden);
 
-  async function load() {
-    setLoading(true);
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
     setError("");
     try {
       const [
@@ -428,14 +428,35 @@ export default function ComplaintDetailsPage() {
       setCoordinators(userList.filter((u) => (u.role || "").toLowerCase() === "coordinator"));
       setSelectedPriority(complaintResponse.data.priority || "Medium");
     } catch (err) {
-      setError(getApiError(err, "Unable to load complaint."));
+      if (!silent) setError(getApiError(err, "Unable to load complaint."));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
   useEffect(() => {
     load();
+  }, [complaintId, user?.role]);
+
+  // Live real-time updates via WebSocket events, reconnects, or poll fallback
+  useEffect(() => {
+    const handleWsEvent = (evt) => {
+      const detail = evt?.detail;
+      if (!detail || !detail.complaint_id || detail.complaint_id === complaintId) {
+        load(true);
+      }
+    };
+    const handleLiveSync = () => load(true);
+
+    window.addEventListener("campus-pulse-ws-event", handleWsEvent);
+    window.addEventListener("campus-pulse-reconnected", handleLiveSync);
+    window.addEventListener("campus-pulse-poll", handleLiveSync);
+
+    return () => {
+      window.removeEventListener("campus-pulse-ws-event", handleWsEvent);
+      window.removeEventListener("campus-pulse-reconnected", handleLiveSync);
+      window.removeEventListener("campus-pulse-poll", handleLiveSync);
+    };
   }, [complaintId, user?.role]);
 
   useEffect(() => {

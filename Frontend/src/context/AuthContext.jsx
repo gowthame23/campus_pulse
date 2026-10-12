@@ -106,6 +106,7 @@ export function AuthProvider({ children }) {
     let ws = null;
     let isCancelled = false;
     let reconnectTimeout = null;
+    let reconnectAttempts = 0;
 
     async function connect() {
       if (isCancelled) return;
@@ -136,6 +137,11 @@ export function AuthProvider({ children }) {
         ws = new WebSocket(fullWsUrl);
 
         ws.addEventListener("open", () => {
+          if (reconnectAttempts > 0) {
+            // Reconnected after a drop: notify all views to refetch
+            window.dispatchEvent(new CustomEvent("campus-pulse-reconnected"));
+          }
+          reconnectAttempts = 0;
           try {
             ws.send("ping");
           } catch {}
@@ -147,6 +153,9 @@ export function AuthProvider({ children }) {
             window.dispatchEvent(
               new CustomEvent("campus-pulse-notification", { detail: payload }),
             );
+            window.dispatchEvent(
+              new CustomEvent("campus-pulse-ws-event", { detail: payload }),
+            );
           } catch {
             window.dispatchEvent(
               new CustomEvent("campus-pulse-notification", {
@@ -157,23 +166,39 @@ export function AuthProvider({ children }) {
         });
 
         ws.addEventListener("close", (evt) => {
-          // On non-normal close, reconnect after delay using a newly fetched single-use ticket
+          // On non-normal close, reconnect with exponential backoff using a newly fetched single-use ticket
           if (!isCancelled && evt.code !== 1000) {
-            reconnectTimeout = setTimeout(connect, 5000);
+            reconnectAttempts++;
+            const backoffDelay = Math.min(30000, 1000 * Math.pow(2, Math.min(reconnectAttempts, 5)));
+            reconnectTimeout = setTimeout(connect, backoffDelay);
           }
         });
       } catch {
         if (!isCancelled) {
-          reconnectTimeout = setTimeout(connect, 10000);
+          reconnectAttempts++;
+          const backoffDelay = Math.min(30000, 1000 * Math.pow(2, Math.min(reconnectAttempts, 5)));
+          reconnectTimeout = setTimeout(connect, backoffDelay);
         }
       }
     }
+
+    // Fallback polling interval every 30s if socket is down
+    const fallbackPollTimer = setInterval(() => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        window.dispatchEvent(new CustomEvent("campus-pulse-poll"));
+      } else {
+        try {
+          ws.send("ping");
+        } catch {}
+      }
+    }, 30000);
 
     connect();
 
     return () => {
       isCancelled = true;
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      clearInterval(fallbackPollTimer);
       try {
         if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
           ws.close(1000, "Component unmounted");
