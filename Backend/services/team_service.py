@@ -79,10 +79,68 @@ class TeamService:
         if caller_user:
             is_self = caller_user.user_id == user_id
             c_role = (caller_user.role or "").lower()
-            is_admin_mgr = c_role in (ROLE_ADMINISTRATOR, ROLE_APP_MANAGER)
-            is_warden = c_role == ROLE_WARDEN
+            is_admin_mgr = c_role in (ROLE_ADMINISTRATOR, ROLE_APP_MANAGER, "administrator", "app_manager", "admin")
+            is_warden = c_role in (ROLE_WARDEN, "warden", "location_in_charge")
             if not (is_self or is_admin_mgr or is_warden):
                 raise PermissionError("You are not authorized to set leave for this user.")
+
+            if is_warden and not is_self:
+                warden_locs = set()
+                if getattr(caller_user, "location_id", None):
+                    warden_locs.add(caller_user.location_id)
+                assigned = getattr(caller_user, "assigned_locations", None)
+                if isinstance(assigned, list):
+                    warden_locs.update(assigned)
+                elif isinstance(assigned, str):
+                    try:
+                        import json
+                        parsed = json.loads(assigned)
+                        if isinstance(parsed, list):
+                            warden_locs.update(parsed)
+                    except Exception:
+                        if assigned:
+                            warden_locs.add(assigned)
+
+                with self._connect() as conn:
+                    w_rows = conn.execute(
+                        "SELECT location_id FROM locations WHERE in_charge_id = ?",
+                        (caller_user.user_id,)
+                    ).fetchall()
+                    for wr in w_rows:
+                        warden_locs.add(wr[0])
+
+                    t_locs = conn.execute("""
+                        SELECT DISTINCT tl.location_id
+                        FROM team_locations tl
+                        JOIN teams t ON t.team_id = tl.team_id
+                        WHERE (t.coordinator_id = ? OR t.backup_coordinator_id = ? OR t.team_id IN (
+                            SELECT team_id FROM team_members WHERE user_id = ?
+                        ))
+                    """, (user_id, user_id, user_id)).fetchall()
+                    target_locs = {r[0] for r in t_locs}
+
+                    ca_locs = conn.execute(
+                        "SELECT DISTINCT location_id FROM coordinator_assignments WHERE coordinator_id = ? AND (status IS NULL OR status = 'Active')",
+                        (user_id,)
+                    ).fetchall()
+                    target_locs.update(r[0] for r in ca_locs)
+
+                    u_row = conn.execute("SELECT location_id FROM users WHERE user_id = ?", (user_id,)).fetchone()
+                    if u_row and u_row[0]:
+                        target_locs.add(u_row[0])
+                    sp_row = conn.execute("SELECT assigned_locations FROM staff_profiles WHERE user_id = ?", (user_id,)).fetchone()
+                    if sp_row and sp_row[0]:
+                        try:
+                            import json
+                            p_locs = json.loads(sp_row[0])
+                            if isinstance(p_locs, list):
+                                target_locs.update(p_locs)
+                        except Exception:
+                            target_locs.add(sp_row[0])
+
+                user_covers_warden_loc = bool(target_locs & warden_locs) or ("ALL" in target_locs and bool(warden_locs))
+                if not user_covers_warden_loc:
+                    raise PermissionError("Wardens can only set leave for members covering their assigned locations.")
 
         leave_id = f"LV_{uuid.uuid4().hex[:8].upper()}"
         now_str = datetime.now().isoformat()

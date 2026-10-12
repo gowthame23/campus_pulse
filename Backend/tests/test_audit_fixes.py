@@ -204,6 +204,63 @@ def test_sec_008_spreadsheet_formula_injection_sanitization():
     assert name_cell.startswith("'="), f"Expected formula injection to be neutralized with leading quote, got: {name_cell}"
 
 
+def test_sec_009_warden_leave_permissions_scoped_to_location():
+    """SEC-009: Warden can set leave ONLY for members who cover warden's assigned locations."""
+    import sqlite3
+    import pytest
+    from models.location_in_charge import LocationInCharge
+    from services.team_service import TeamService
+
+    db_path = get_db_path()
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("INSERT OR IGNORE INTO locations (location_id, name, location_type, in_charge_id, active) VALUES ('LOC_TEST_H1', 'Test Hostel 1', 'hostel', 'USR_WARDEN_TEST_1', 1)")
+        conn.execute("INSERT OR IGNORE INTO locations (location_id, name, location_type, in_charge_id, active) VALUES ('LOC_TEST_H2', 'Test Hostel 2', 'hostel', 'USR_WARDEN_TEST_2', 1)")
+        conn.execute("INSERT OR IGNORE INTO users (user_id, name, email, password, role, location_id, status, active) VALUES ('USR_WARDEN_TEST_1', 'Warden H1', 'wardenh1@example.com', 'pwd', 'location_in_charge', 'LOC_TEST_H1', 'Active', 1)")
+        conn.execute("INSERT OR IGNORE INTO users (user_id, name, email, password, role, location_id, status, active) VALUES ('USR_COORD_TEST_1', 'Coord H1', 'coordh1@example.com', 'pwd', 'coordinator', 'LOC_TEST_H1', 'Active', 1)")
+        conn.execute("INSERT OR IGNORE INTO users (user_id, name, email, password, role, location_id, status, active) VALUES ('USR_COORD_TEST_2', 'Coord H2', 'coordh2@example.com', 'pwd', 'coordinator', 'LOC_TEST_H2', 'Active', 1)")
+
+        conn.execute("INSERT OR IGNORE INTO teams (team_id, name, department_id, coordinator_id, active, created_at) VALUES ('TEAM_TEST_H1', 'Team H1', 'DEP_ELEC', 'USR_COORD_TEST_1', 1, '2026-10-12')")
+        conn.execute("INSERT OR IGNORE INTO team_locations (team_id, location_id) VALUES ('TEAM_TEST_H1', 'LOC_TEST_H1')")
+
+        conn.execute("INSERT OR IGNORE INTO teams (team_id, name, department_id, coordinator_id, active, created_at) VALUES ('TEAM_TEST_H2', 'Team H2', 'DEP_PLUMB', 'USR_COORD_TEST_2', 1, '2026-10-12')")
+        conn.execute("INSERT OR IGNORE INTO team_locations (team_id, location_id) VALUES ('TEAM_TEST_H2', 'LOC_TEST_H2')")
+        conn.commit()
+
+    team_service = TeamService(db_path=db_path)
+    warden_user = LocationInCharge(
+        user_id="USR_WARDEN_TEST_1",
+        name="Warden H1",
+        email="wardenh1@example.com",
+        password="pwd",
+        location_id="LOC_TEST_H1",
+    )
+    warden_user.assigned_locations = ["LOC_TEST_H1"]
+
+    # 1. Warden of H1 tries to set leave for Coordinator covering only H2 -> must raise PermissionError
+    with pytest.raises(PermissionError) as exc_info:
+        team_service.set_leave(
+            user_id="USR_COORD_TEST_2",
+            from_date="2026-11-01",
+            to_date="2026-11-05",
+            reason="Vacation",
+            set_by="USR_WARDEN_TEST_1",
+            caller_user=warden_user,
+        )
+    assert "location" in str(exc_info.value).lower()
+
+    # 2. Warden of H1 sets leave for Coordinator covering H1 -> succeeds
+    res_success = team_service.set_leave(
+        user_id="USR_COORD_TEST_1",
+        from_date="2026-11-01",
+        to_date="2026-11-05",
+        reason="Vacation",
+        set_by="USR_WARDEN_TEST_1",
+        caller_user=warden_user,
+    )
+    assert res_success["user_id"] == "USR_COORD_TEST_1"
+
+
+
 
 
 
