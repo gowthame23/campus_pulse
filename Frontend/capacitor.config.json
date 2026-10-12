@@ -1,0 +1,10 @@
+{
+  "appId": "edu.campuspulse.app",
+  "appName": "Campus Pulse",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  }
+}
+

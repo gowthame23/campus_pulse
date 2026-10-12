@@ -59,12 +59,7 @@ class ConnectionManager:
                 self.active_connections[key].discard(dead)
 
     def push_sync(self, target_id: str, message: dict):
-        """Thread-safe synchronous push, callable from any thread — in
-        particular from FastAPI's sync `def` route handlers, which run in a
-        threadpool rather than on the main event loop. Uses the loop
-        captured by set_loop() rather than asyncio.get_event_loop(), which
-        raises RuntimeError (or returns a loop that isn't running) when
-        called from such a worker thread."""
+        """Thread-safe synchronous push to a specific target_id (user_id or role)."""
         loop = self._loop
         if loop is None or loop.is_closed():
             try:
@@ -76,9 +71,7 @@ class ConnectionManager:
                     loop = None
 
         if loop is None or loop.is_closed():
-            logger.debug(
-                f"WS push to '{target_id}' deferred: no active event loop running."
-            )
+            logger.debug(f"WS push to '{target_id}' deferred: no active event loop running.")
             return
 
         try:
@@ -90,5 +83,44 @@ class ConnectionManager:
                 loop.run_until_complete(self.broadcast_to_target(target_id, message))
         except Exception as err:
             logger.warning(f"WS push to '{target_id}' failed: {err}")
+
+    async def broadcast_all(self, message: dict):
+        """Broadcasts a message to all currently connected WebSocket clients across all roles."""
+        all_conns = set()
+        for conns in self.active_connections.values():
+            all_conns.update(conns)
+        to_remove = set()
+        for connection in all_conns:
+            try:
+                await connection.send_json(message)
+            except Exception as e:
+                logger.error(f"Failed to send WS broadcast: {e}")
+                to_remove.add(connection)
+        for dead in to_remove:
+            for conns in self.active_connections.values():
+                conns.discard(dead)
+
+    def broadcast_sync(self, message: dict):
+        """Thread-safe synchronous push to all connected WebSocket clients."""
+        loop = self._loop
+        if loop is None or loop.is_closed():
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = None
+
+        if loop is None or loop.is_closed():
+            return
+
+        try:
+            if loop.is_running():
+                asyncio.run_coroutine_threadsafe(self.broadcast_all(message), loop)
+            else:
+                loop.run_until_complete(self.broadcast_all(message))
+        except Exception as err:
+            logger.warning(f"WS broadcast_sync failed: {err}")
 
 manager = ConnectionManager()

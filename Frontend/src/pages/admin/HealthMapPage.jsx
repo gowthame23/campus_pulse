@@ -55,7 +55,31 @@ export default function HealthMapPage({ tvModeOverride = false }) {
     const timer = setInterval(() => {
       loadData(true);
     }, 60000);
-    return () => clearInterval(timer);
+
+    const handleWsEvent = (evt) => {
+      const type = evt?.detail?.event || evt?.detail?.type;
+      if (
+        !type ||
+        type === "health_map_changed" ||
+        type === "complaint_created" ||
+        type === "complaint_updated" ||
+        type === "complaint_resolved"
+      ) {
+        loadData(true);
+      }
+    };
+    const handleLiveSync = () => loadData(true);
+
+    window.addEventListener("campus-pulse-ws-event", handleWsEvent);
+    window.addEventListener("campus-pulse-reconnected", handleLiveSync);
+    window.addEventListener("campus-pulse-poll", handleLiveSync);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("campus-pulse-ws-event", handleWsEvent);
+      window.removeEventListener("campus-pulse-reconnected", handleLiveSync);
+      window.removeEventListener("campus-pulse-poll", handleLiveSync);
+    };
   }, []);
 
   const summary = data.summary || {};

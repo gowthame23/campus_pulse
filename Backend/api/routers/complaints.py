@@ -53,6 +53,22 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/complaints", tags=["complaints"])
 
 
+def _broadcast_complaint_event(event_type: str, complaint, extra: dict = None):
+    try:
+        from utils.websocket_manager import manager
+        payload = {
+            "type": event_type,
+            "event": event_type,
+            "complaint_id": getattr(complaint, "complaint_id", str(complaint)),
+            "status": getattr(complaint, "status", None),
+            "location_id": getattr(complaint, "location_id", None),
+            **(extra or {}),
+        }
+        manager.broadcast_sync(payload)
+    except Exception as err:
+        logger.debug(f"WS broadcast error: {err}")
+
+
 def _build_format_caches(complaint_service):
     try:
         all_locs = complaint_service.auth_service.list_locations()
@@ -796,6 +812,8 @@ def create_complaint(
             urgent_reason=payload.urgent_reason,
             exact_spot=payload.exact_spot,
         )
+        _broadcast_complaint_event("complaint_created", complaint)
+        _broadcast_complaint_event("health_map_changed", complaint)
         return _format_complaint(complaint, complaint_service)
     except PermissionError as p_err:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
@@ -856,6 +874,8 @@ def accept_complaint(
             loc = complaint_service.auth_service.get_location(complaint.location_id)
             if loc and getattr(loc, "in_charge_id", None):
                 manager.push_sync(loc.in_charge_id, event)
+            _broadcast_complaint_event("complaint_accepted", complaint, {"assigned_to": current_user.user_id})
+            _broadcast_complaint_event("complaint_updated", complaint)
         except Exception:
             pass
         return _format_complaint(complaint, complaint_service)
@@ -881,16 +901,7 @@ def start_work_on_complaint(
     _ensure_visible(complaint, current_user, complaint_service)
     try:
         complaint = complaint_service.start_work(complaint_id, current_user.user_id)
-        try:
-            from utils.websocket_manager import manager
-            event = {
-                "event": "complaint_status_changed",
-                "complaint_id": complaint_id,
-                "status": "In Progress",
-            }
-            manager.push_sync(complaint.created_by, event)
-        except Exception:
-            pass
+        _broadcast_complaint_event("complaint_updated", complaint)
         return _format_complaint(complaint, complaint_service)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
@@ -919,6 +930,7 @@ def record_complaint_progress(
             photo_url=payload.photo_url,
             note_code=payload.note_code,
         )
+        _broadcast_complaint_event("complaint_updated", complaint)
         return _format_complaint(complaint, complaint_service)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
@@ -943,6 +955,7 @@ def block_complaint(
         complaint = complaint_service.block_complaint(
             complaint_id, current_user.user_id, payload.reason, payload.expected_date
         )
+        _broadcast_complaint_event("complaint_updated", complaint)
         return _format_complaint(complaint, complaint_service)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
@@ -964,6 +977,7 @@ def unblock_complaint(
     _ensure_visible(complaint, current_user, complaint_service)
     try:
         complaint = complaint_service.unblock_complaint(complaint_id, current_user.user_id)
+        _broadcast_complaint_event("complaint_updated", complaint)
         return _format_complaint(complaint, complaint_service)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
@@ -1215,6 +1229,8 @@ def resolve_complaint(
             skip_photo=bool(payload.skip_photo or payload.photo_skipped),
             photo_skip_reason=payload.photo_skip_reason,
         )
+        _broadcast_complaint_event("complaint_updated", complaint)
+        _broadcast_complaint_event("health_map_changed", complaint)
         return _format_complaint(complaint, complaint_service)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
@@ -1245,6 +1261,8 @@ def warden_verify_complaint(
             approved=payload.approved,
             photo_mismatch=bool(payload.photo_mismatch),
         )
+        _broadcast_complaint_event("complaint_updated", complaint)
+        _broadcast_complaint_event("health_map_changed", complaint)
         return _format_complaint(complaint, complaint_service)
     except PermissionError as p_err:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
@@ -1261,6 +1279,8 @@ def verify_complaint(
 ):
     try:
         complaint = complaint_service.verify_fixed(complaint_id, current_user)
+        _broadcast_complaint_event("complaint_updated", complaint)
+        _broadcast_complaint_event("health_map_changed", complaint)
         return _format_complaint(complaint, complaint_service)
     except PermissionError as p_err:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
@@ -1279,6 +1299,8 @@ def reopen_complaint(
         complaint = complaint_service.reopen_complaint(
             complaint_id, current_user, payload.reason
         )
+        _broadcast_complaint_event("complaint_updated", complaint)
+        _broadcast_complaint_event("health_map_changed", complaint)
         return _format_complaint(complaint, complaint_service)
     except PermissionError as p_err:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
@@ -1303,6 +1325,8 @@ def admin_decision_on_complaint(
         complaint = complaint_service.admin_decision(
             complaint_id, current_user, payload.decision, payload.notes, reassign_target
         )
+        _broadcast_complaint_event("complaint_updated", complaint)
+        _broadcast_complaint_event("health_map_changed", complaint)
         return _format_complaint(complaint, complaint_service)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
@@ -1820,6 +1844,8 @@ def mark_affected(
 
     try:
         complaint = complaint_service.add_affected_student(complaint_id, current_user.user_id)
+        _broadcast_complaint_event("affected_changed", complaint, {"affected_count": getattr(complaint, "affected_count", 1)})
+        _broadcast_complaint_event("complaint_updated", complaint)
         return _format_complaint(complaint, complaint_service)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1838,6 +1864,8 @@ def unmark_affected(
 
     try:
         complaint = complaint_service.remove_affected_student(complaint_id, current_user.user_id)
+        _broadcast_complaint_event("affected_changed", complaint, {"affected_count": getattr(complaint, "affected_count", 0)})
+        _broadcast_complaint_event("complaint_updated", complaint)
         return _format_complaint(complaint, complaint_service)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

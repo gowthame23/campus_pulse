@@ -172,10 +172,21 @@ export default function PublicComplaintsPage() {
 
   useEffect(() => {
     fetchData();
+
+    const handleLiveSync = () => fetchData(true);
+    window.addEventListener("campus-pulse-ws-event", handleLiveSync);
+    window.addEventListener("campus-pulse-reconnected", handleLiveSync);
+    window.addEventListener("campus-pulse-poll", handleLiveSync);
+
+    return () => {
+      window.removeEventListener("campus-pulse-ws-event", handleLiveSync);
+      window.removeEventListener("campus-pulse-reconnected", handleLiveSync);
+      window.removeEventListener("campus-pulse-poll", handleLiveSync);
+    };
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [locRes, deptRes, compRes] = await Promise.all([
         locationService.list().catch(() => ({ data: [] })),
@@ -191,12 +202,14 @@ export default function PublicComplaintsPage() {
       );
       setComplaints(pubComps);
     } catch (err) {
-      setToast({
-        type: "error",
-        message: "Failed to load public complaints data.",
-      });
+      if (!silent) {
+        setToast({
+          type: "error",
+          message: "Failed to load public complaints data.",
+        });
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 

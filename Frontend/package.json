@@ -10,9 +10,14 @@
     "test": "vitest run",
     "test:unit": "vitest run",
     "typecheck": "vite build",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "cap:sync": "cap sync",
+    "cap:build": "vite build && cap sync"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
     "@vitejs/plugin-react": "6.0.3",
     "axios": "1.18.1",
     "lucide-react": "1.23.0",

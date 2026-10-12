@@ -203,6 +203,19 @@ export default function CoordinatorDashboard() {
     { complaints: [], announcements: [], notifications: [], locations: [], departments: [] },
   );
 
+  // Live real-time updates via WebSocket events, reconnects, or poll fallback
+  useEffect(() => {
+    const handleLiveSync = () => reload(true);
+    window.addEventListener("campus-pulse-ws-event", handleLiveSync);
+    window.addEventListener("campus-pulse-reconnected", handleLiveSync);
+    window.addEventListener("campus-pulse-poll", handleLiveSync);
+    return () => {
+      window.removeEventListener("campus-pulse-ws-event", handleLiveSync);
+      window.removeEventListener("campus-pulse-reconnected", handleLiveSync);
+      window.removeEventListener("campus-pulse-poll", handleLiveSync);
+    };
+  }, [reload]);
+
   const complaints = dashboardData?.complaints || [];
   const announcements = dashboardData?.announcements || [];
   const notifications = dashboardData?.notifications || [];
