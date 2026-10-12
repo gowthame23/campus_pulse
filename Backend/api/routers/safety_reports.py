@@ -146,7 +146,7 @@ def get_safety_report_by_case_code(
 
     # Block staff members other than administrator
     user_role = (current_user.role or "").lower()
-    if user_role in ("coordinator", "location_in_charge", "warden", "app_manager"):
+    if user_role in ("coordinator", "location_in_charge", "warden", "app_manager", "employee", "supervisor", "security_in_charge"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Staff members other than Admin are not permitted to view safety reports.",
@@ -154,13 +154,27 @@ def get_safety_report_by_case_code(
 
     db = complaint_service.repository
     with db.get_connection() as conn:
-        report = conn.execute("""
-            SELECT report_id, case_code, category, description, status, outcome, outcome_notes, created_at, closed_at
-            FROM safety_reports
-            WHERE case_code = ? OR report_id = ?
-        """, (case_code, case_code)).fetchone()
+        if is_admin:
+            report = conn.execute("""
+                SELECT report_id, case_code, category, description, status, outcome, outcome_notes, created_at, closed_at
+                FROM safety_reports
+                WHERE case_code = ? OR report_id = ?
+            """, (case_code, case_code)).fetchone()
+        else:
+            report = conn.execute("""
+                SELECT report_id, case_code, category, description, status, outcome, outcome_notes, created_at, closed_at
+                FROM safety_reports
+                WHERE case_code = ?
+            """, (case_code,)).fetchone()
 
         if not report:
+            if not is_admin:
+                id_exists = conn.execute("SELECT 1 FROM safety_reports WHERE report_id = ?", (case_code,)).fetchone()
+                if id_exists:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Confidential case_code is required to access safety reports.",
+                    )
             raise HTTPException(status_code=404, detail="Safety report not found.")
 
         report_dict = dict(report)
@@ -175,12 +189,19 @@ def get_safety_report_by_case_code(
         """, (rep_id,)).fetchall()
         report_dict["messages"] = [dict(m) for m in messages]
 
-        # Check identity status
+        # Check identity status & authorization for non-admin
         identity_row = conn.execute("""
             SELECT reporter_user_id, revealed, revealed_at, revealed_by, reveal_reason
             FROM safety_report_identity
             WHERE report_id = ?
         """, (rep_id,)).fetchone()
+
+        if not is_admin:
+            if not identity_row or identity_row["reporter_user_id"] != current_user.user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not authorized to view this safety report.",
+                )
 
         report_dict["is_revealed"] = bool(identity_row and identity_row["revealed"])
         if is_admin and identity_row and identity_row["revealed"]:
@@ -205,7 +226,7 @@ def send_safety_report_message(
 ):
     """Send an anonymous two-way message on a safety report case."""
     user_role = (current_user.role or "").lower()
-    if user_role in ("coordinator", "location_in_charge", "warden", "app_manager"):
+    if user_role in ("coordinator", "location_in_charge", "warden", "app_manager", "employee", "supervisor", "security_in_charge"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Staff members other than Admin are not permitted to participate in safety reports.",
@@ -216,14 +237,38 @@ def send_safety_report_message(
 
     db = complaint_service.repository
     with db.get_connection() as conn:
-        report = conn.execute("""
-            SELECT report_id, status
-            FROM safety_reports
-            WHERE case_code = ? OR report_id = ?
-        """, (case_code, case_code)).fetchone()
+        if is_admin:
+            report = conn.execute("""
+                SELECT report_id, status
+                FROM safety_reports
+                WHERE case_code = ? OR report_id = ?
+            """, (case_code, case_code)).fetchone()
+        else:
+            report = conn.execute("""
+                SELECT report_id, status
+                FROM safety_reports
+                WHERE case_code = ?
+            """, (case_code,)).fetchone()
 
         if not report:
+            if not is_admin:
+                id_exists = conn.execute("SELECT 1 FROM safety_reports WHERE report_id = ?", (case_code,)).fetchone()
+                if id_exists:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Confidential case_code is required to participate in safety reports.",
+                    )
             raise HTTPException(status_code=404, detail="Safety report not found.")
+
+        if not is_admin:
+            identity_row = conn.execute("""
+                SELECT reporter_user_id FROM safety_report_identity WHERE report_id = ?
+            """, (report["report_id"],)).fetchone()
+            if not identity_row or identity_row["reporter_user_id"] != current_user.user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not authorized to message on this safety report.",
+                )
 
         if report["status"] == "closed":
             raise HTTPException(status_code=400, detail="Cannot send messages on a closed safety report.")
