@@ -1,0 +1,88 @@
+{
+  "app_title": "कैंपस पल्स",
+  "welcome": "कैंपस पल्स में आपका स्वागत है",
+  "choose_language": "अपनी पसंदीदा भाषा चुनें",
+  "speech_tip": "सुझाव: टाइप करने के बजाय बोलने के लिए अपने कीबोर्ड पर 🎤 दबाएं",
+  "continue": "आगे बढ़ें",
+  "select_language": "भाषा",
+  "english": "English",
+  "telugu": "తెలుగు",
+  "hindi": "हिन्दी",
+
+  "complaints": "शिकायतें",
+  "new_complaint": "शिकायत दर्ज करें",
+  "public_complaints": "सार्वजनिक मुद्दे",
+  "title": "शीर्षक",
+  "category": "श्रेणी",
+  "location": "स्थान",
+  "exact_spot": "सटीक स्थान (जैसे: कमरा 302, वॉशरूम सिंक 2)",
+  "description": "विवरण",
+  "urgent": "अति आवश्यक",
+  "urgent_reason": "आवश्यकता का कारण",
+  "submit": "शिकायत दर्ज करें",
+  "search_locations": "स्थान खोजें...",
+  "recent_places": "हाल के स्थान",
+  "outside_hostel_warning": "आप {home} में रहते हैं। क्या आप {selected} के लिए शिकायत दर्ज करना चाहते हैं?",
+
+  "status": "स्थिति",
+  "priority": "प्राथमिकता",
+  "submitted": "दर्ज की गई",
+  "assigned": "सौंपी गई",
+  "in_progress": "प्रगति पर है",
+  "waiting_for_parts": "पुर्जों की प्रतीक्षा",
+  "pending_warden": "वार्डन सत्यापन लंबित",
+  "waiting_verification": "सत्यापन की प्रतीक्षा",
+  "closed": "समाधान हुआ",
+  "auto_closed": "स्वतः बंद",
+  "reopened": "पुनः खोला गया",
+
+  "categories": {
+    "electrical": "बिजली",
+    "plumbing": "नलसाजी",
+    "carpentry": "बढ़ईगीरी",
+    "housekeeping": "सफाई व्यवस्था",
+    "internet": "वाई-फ़ाई और इंटरनेट",
+    "mess": "मेस और भोजन",
+    "general": "सामान्य रखरखाव"
+  },
+
+  "feedback": {
+    "rate_fix": "समाधान का मूल्यांकन करें",
+    "thank_you_note": "समन्वयक को धन्यवाद संदेश भेजें (वैकल्पिक)",
+    "submit_feedback": "प्रतिक्रिया सबमिट करें",
+    "feedback_success": "धन्यवाद! आपकी प्रतिक्रिया दर्ज कर ली गई है।",
+    "star": "स्टार",
+    "stars": "स्टार"
+  },
+
+  "recognitions": {
+    "fixer_of_the_month": "महीने का सर्वश्रेष्ठ फिक्सर",
+    "leaderboard": "लीडरबोर्ड",
+    "score": "स्कोर",
+    "on_time": "समय पर समाधान दर",
+    "reopen_free": "बिना दोबारा खोले समाधान दर",
+    "satisfaction": "संतुष्टि",
+    "badges": "बैज",
+    "certificate": "प्रमाणपत्र"
+  },
+
+  "health_map": {
+    "title": "कैंपस स्वास्थ्य मानचित्र",
+    "overall_health": "कैंपस स्थिति",
+    "healthy": "स्वस्थ",
+    "warning": "चेतावनी",
+    "critical": "गंभीर",
+    "open_issues": "लंबित शिकायतें",
+    "overdue": "समय सीमा पार",
+    "pattern_detected": "आवर्ती समस्या चेतावनी"
+  },
+
+  "safety_reports": {
+    "title": "सुरक्षा रिपोर्ट",
+    "anonymous_report": "गुमनाम सुरक्षा रिपोर्ट दर्ज करें",
+    "case_code": "गोपनीय केस कोड",
+    "safe_tip": "एडमिन के जवाब देखने के लिए इस कोड को सुरक्षित रखें।",
+    "status": "रिपोर्ट स्थिति"
+  }
+}
+

@@ -182,6 +182,8 @@ class UserResponse(BaseModel):
     designation: Optional[str] = None
     assigned_locations: Optional[List[str]] = []
     assigned_categories: Optional[List[str]] = []
+    language: Optional[str] = "en"
+    safety_blocked_until: Optional[str] = None
 
 
 class UserActivityResponse(BaseModel):
@@ -297,6 +299,7 @@ class ComplaintCreateRequest(BaseModel):
     priority: Optional[str] = None
     is_urgent: bool = False
     urgent_reason: Optional[str] = None
+    exact_spot: Optional[str] = None
 
 
 class ComplaintAffectedRequest(BaseModel):
@@ -428,6 +431,7 @@ class ComplaintResponse(BaseModel):
     is_spot_check: Optional[bool] = False
     is_urgent: Optional[bool] = False
     urgent_reason: Optional[str] = None
+    exact_spot: Optional[str] = None
     affected_upgraded: Optional[bool] = False
     auto_assigned: Optional[bool] = False
     blocked_reason: Optional[str] = None
@@ -663,3 +667,37 @@ class AttachmentResponse(BaseModel):
     exif_taken_at: Optional[str] = None
     kind: Optional[str] = None
     flags: Optional[Any] = None
+
+
+class ComplaintFeedbackRequest(BaseModel):
+    rating: int = Field(..., ge=-1, le=5)
+    thank_you_note: Optional[str] = ""
+
+
+class SafetyReportCreateRequest(BaseModel):
+    category: str = Field(..., max_length=100)
+    description: str = Field(..., max_length=5000)
+
+
+class SafetyReportMessageRequest(BaseModel):
+    body: str = Field(..., max_length=3000)
+
+
+class SafetyReportDecisionRequest(BaseModel):
+    outcome: str = Field(..., description="action_taken | could_not_confirm | not_a_safety_issue | false_misuse")
+    notes: Optional[str] = ""
+
+
+class SafetyReportRevealRequest(BaseModel):
+    reason: str = Field(..., min_length=5, description="Mandatory reason for reveal under false_misuse")
+
+
+class CreateLocationFromSpotRequest(BaseModel):
+    location_id: str
+    exact_spot: str
+    child_name: Optional[str] = None
+
+
+class LanguageUpdateRequest(BaseModel):
+    language: str = Field(..., pattern="^(en|te|hi)$", description="Preferred language code: en, te, or hi")
+

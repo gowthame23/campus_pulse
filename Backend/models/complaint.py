@@ -106,6 +106,7 @@ class Complaint:
         reopen_notes=None,
         resolution_proof_url=None,
         affected_upgraded=False,
+        exact_spot=None,
     ):
         self.complaint_id = complaint_id or generate_id("CMP")
         self.archived = bool(archived)
@@ -179,6 +180,7 @@ class Complaint:
         self.reopen_notes = reopen_notes
         self.resolution_proof_url = resolution_proof_url
         self.affected_upgraded = bool(affected_upgraded)
+        self.exact_spot = exact_spot
 
     def add_history(self, message):
         self.updated_at = now_string()
@@ -317,5 +319,6 @@ class Complaint:
             reopen_notes=data.get("reopen_notes"),
             resolution_proof_url=data.get("resolution_proof_url"),
             affected_upgraded=data.get("affected_upgraded", False),
+            exact_spot=data.get("exact_spot"),
         )
         return c

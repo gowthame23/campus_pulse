@@ -11,6 +11,7 @@ export const analyticsService = {
   getHostels: (params) => apiClient.get("/analytics/hostels", { params }),
   getUsers: () => apiClient.get("/analytics/users"),
   getNotifications: () => apiClient.get("/analytics/notifications"),
+  getHealthMap: () => apiClient.get("/dashboard/health-map"),
   exportReport: (reportType, format = "csv", params = {}) =>
     apiClient.get("/analytics/export", {
       params: { report_type: reportType, format, ...params },

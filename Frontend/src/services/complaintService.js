@@ -65,5 +65,7 @@ export const complaintService = {
   getCoordinatorStats: (params = {}) => apiClient.get("/coordinators/stats", { params }),
   getCoverageGaps: () => apiClient.get("/departments/coverage-gaps"),
   getWsTicket: () => apiClient.post("/api/ws-ticket"),
+  getFeedback: (complaintId) => apiClient.get(`/complaints/${complaintId}/feedback`),
+  submitFeedback: (complaintId, payload) => apiClient.post(`/complaints/${complaintId}/feedback`, payload),
 };
 
