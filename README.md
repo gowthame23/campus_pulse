@@ -74,7 +74,34 @@ flowchart TD
   - SQLite3 (WAL mode, foreign keys enabled)
   - PyJWT 2.10.1 & Passlib / bcrypt 4.2.1
   - pywebpush 2.0.1 (W3C Push API / VAPID protocol)
-- **Verified Route Count**: **296 total routes** across 23 domain routers (290 application endpoints + 2 WebSockets + 4 OpenAPI/docs routes).
+- **Capacitor Mobile App**:
+  - Capacitor 8.5.3 (Android native shell, app ID: `edu.campuspulse.app`)
+- **Verified Route Count**: **318 total routes** across 26 domain routers (312 application endpoints + 2 WebSockets + 4 OpenAPI/docs routes).
+- **Automated Test Suites**: **218 passing backend tests** (2 skipped) + **22 passing frontend tests** (0 failures).
+
+---
+
+## 🌟 Key Platform Features (Phases 1–6)
+
+1. **Deterministic Auto-Routing & Accept Queue**: Complaints are classified via deterministic keyword rules and routed directly to coordinators mapped to that department and location. Multiple coordinators share an atomic accept queue.
+2. **Coordinators Are the Only Fixers**: Wardens supervise, inspect High/Critical tickets, and spot-check; wardens never fix complaints and cannot be assigned tickets.
+3. **Transparent SLA Escalations**: Critical (12h), High (24h), Medium (48h), Low (72h). Automated notifications escalate to Coordinator, Warden, App Manager, and Administrator.
+4. **Fast Complaint Form**: Category icon grid, recent places quick-select pills, outside-hostel guidance, live duplicate search, and `exact_spot` field.
+5. **Multi-Language Support**: Full UI localization in English, Telugu, and Hindi, with language picker on first login and speech-to-text hints.
+6. **Campus Health Map & TV Mode**: Real-time status cards (green/yellow/red) for campus buildings, pattern detection alerts (>=5 complaints in 21 days), and full-screen TV view at `/health-map/tv`.
+7. **Fixer Recognition**: 1-5 star ratings, thank-you notes, monthly Fixer of the Month calculation, public badge widget, and downloadable certificates.
+8. **Sealed Safety Reports**: Admin-toggled anonymous reporting with secure `SAFE-XXXX` tracking, 2-way anonymous messaging, and unsealing restricted solely to administrator-flagged misuse with mandatory written justification.
+9. **Real-Time Everywhere & PWA**: WebSocket updates with exponential backoff reconnecting, 30s background polling fallback, Web Push notifications via VAPID, offline fallback page, and installable PWA.
+10. **Android Mobile App**: Full Capacitor Android wrapper ready to build and run on mobile devices.
+
+---
+
+## 🔍 System Reality Check & Architectural Decisions
+
+- **Routing Engine**: Deterministic keyword matching and department mapping. Does not rely on external cloud AI or LLM APIs.
+- **Notification Delivery**: In-app WebSockets and W3C Web Push (via VAPID/pywebpush). No SMS/Twilio dependency.
+- **Tenancy**: Single institution per deployment instance.
+- **Database Architecture**: Pilot runs on SQLite (WAL mode, single Uvicorn worker). Enterprise scaling target migrates to PostgreSQL, Redis pub/sub backplane, and S3 object storage.
 
 ---
 
@@ -90,10 +117,11 @@ CampusPulse/
 │   ├── scripts/             # Administrative, cleanup, and maintenance scripts
 │   ├── services/            # Business logic (complaints, auth, notifications, push, etc.)
 │   ├── storage/             # SQLite database, schema repository, and migrations
-│   └── tests/               # Pytest automated test suites (196 passing tests)
+│   └── tests/               # Pytest automated test suites (218 passing tests)
 ├── Frontend/                # React 19 Single Page Application
+│   ├── android/             # Capacitor Android native project
 │   ├── public/              # Static assets, PWA icons, offline page, push service worker
-│   └── src/                 # React components, dashboard pages, and context providers
+│   └── src/                 # React components, dashboard pages, locales, and context providers
 └── docs/                    # Technical architecture, manuals, and data models
 ```
 

@@ -1,7 +1,7 @@
 # Campus Pulse — Consolidated REST API Reference & Permissions Inventory
 
 > **Document Type:** Complete REST API Specification & Endpoint Directory  
-> **Status:** Verified against FastAPI Route Registry (296 Endpoints: 290 application endpoints across 23 routers + 2 WebSockets + 4 OpenAPI/docs routes)  
+> **Status:** Verified against FastAPI Route Registry (318 Endpoints: 312 application endpoints across 26 routers + 2 WebSockets + 4 OpenAPI/docs routes)  
 > **Repository:** Campus Pulse (`CampusPulse_co`)  
 
 ---

@@ -4,7 +4,7 @@ Base URL: `http://localhost:8000`
 Interactive OpenAPI UI: `http://localhost:8000/docs`  
 ReDoc UI: `http://localhost:8000/redoc`
 
-**Verified Endpoint Count:** **296 Total Routes** (290 application endpoints across 23 routers + 2 WebSockets + 4 OpenAPI/docs routes).
+**Verified Endpoint Count:** **318 Total Routes** (312 application endpoints across 26 routers + 2 WebSockets + 4 OpenAPI/docs routes).
 
 ---
 
@@ -27,7 +27,7 @@ ReDoc UI: `http://localhost:8000/redoc`
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/complaints` | Authenticated | Fetch complaints filtered by role, location, department, status, and SLA timeline. |
-| `POST` | `/complaints` | Student, Warden | File a new complaint with location, department, description, and optional attachments. |
+| `POST` | `/complaints` | Student, Warden | File a new complaint with location, department, exact spot, description, and optional attachments. |
 | `GET` | `/complaints/{id}` | Authenticated | Retrieve full complaint details, history timeline, resolution notes, and attachments. |
 | `POST` | `/complaints/{id}/accept` | Coordinator | Atomically accept an unassigned complaint from the department/location queue (409 Conflict if already claimed). |
 | `POST` | `/complaints/{id}/start-work` | Coordinator | Transition status to `In Progress` and log start timestamp. |
@@ -41,10 +41,48 @@ ReDoc UI: `http://localhost:8000/redoc`
 | `POST` | `/complaints/{id}/admin-decision` | Administrator | Final administrative decision on a disputed ticket (`Confirm Resolved` or `Reassign`). |
 | `POST` | `/complaints/{id}/assign` | App Mgr, Admin | Manually reassign a complaint to a specific coordinator. |
 | `POST` | `/complaints/{id}/escalate` | Staff | Manually escalate complaint priority or notify management. |
+| `POST` | `/complaints/{id}/feedback` | Student | Submit 1–5 star rating and optional thank-you note upon closing complaint. |
+| `GET` | `/complaints/{id}/feedback` | Authenticated | Retrieve feedback rating and thank-you message for a complaint. |
+| `POST` | `/complaints/{id}/affected` | Student | Add caller to affected student count for communal complaints. |
+| `DELETE` | `/complaints/{id}/affected` | Student | Remove caller from affected student count. |
 
 ---
 
-## 3. Web Push Notifications (`/push`)
+## 3. Recognitions & Fixer of the Month (`/recognitions`)
+
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/recognitions/fixer-of-the-month` | Authenticated | Get current Fixer of the Month (highest rating + completed volume). |
+| `GET` | `/recognitions/fixer-of-the-month/certificate` | Authenticated | Generate / download Fixer of the Month certificate data. |
+| `GET` | `/recognitions/leaderboard` | Authenticated | Get ranked coordinator leaderboard based on speed, resolution rate, and student ratings. |
+
+---
+
+## 4. Campus Health Map & Analytics (`/analytics`)
+
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/analytics/health-map` | Authenticated | Real-time health cards per location (green/yellow/red) with 21-day pattern alerts (>=5 complaints). |
+| `GET` | `/analytics/overview` | Admin, Mgr | Systemwide KPI overview (open, overdue, resolution times, SLA compliance). |
+| `GET` | `/analytics/trends` | Admin, Mgr | Monthly and weekly complaint trend breakdowns. |
+
+---
+
+## 5. Sealed Safety Reports (`/safety-reports`)
+
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/safety-reports/enabled` | Public | Check if Sealed Safety Reports are currently enabled by Institution Administrator. |
+| `POST` | `/safety-reports` | Authenticated | Submit sealed report; returns anonymous tracking code `SAFE-XXXX`. Identity sealed in separate table. |
+| `GET` | `/safety-reports` | Admin | List sealed reports (status, date, category; reporter identity remains sealed). |
+| `GET` | `/safety-reports/{report_code}/status` | Public / Token | Track report progress using anonymous `SAFE-XXXX` code. |
+| `POST` | `/safety-reports/{report_code}/message`| Student / Admin | 2-way anonymous communication thread between reporter and administration. |
+| `POST` | `/safety-reports/{report_code}/status` | Admin | Update status (`Investigating`, `Action Taken`, `Dismissed`). |
+| `POST` | `/safety-reports/{report_code}/unseal` | Admin | Unseal reporter identity strictly on flagged `false_misuse` with mandatory written audit reason. |
+
+---
+
+## 6. Web Push Notifications (`/push`)
 
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
@@ -54,7 +92,7 @@ ReDoc UI: `http://localhost:8000/redoc`
 
 ---
 
-## 4. Location & Organization Coverage (`/locations` & `/departments`)
+## 7. Location & Organization Coverage (`/locations` & `/departments`)
 
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
@@ -66,7 +104,7 @@ ReDoc UI: `http://localhost:8000/redoc`
 
 ---
 
-## 5. User Lifecycle & Coordinator Assignment (`/users`)
+## 8. User Lifecycle & Coordinator Assignment (`/users`)
 
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
@@ -78,7 +116,7 @@ ReDoc UI: `http://localhost:8000/redoc`
 
 ---
 
-## 6. Real-Time Communications & WebSockets
+## 9. Real-Time Communications & WebSockets
 
 - **Notifications WebSocket**: `ws://localhost:8000/notifications/ws?ticket=<single_use_ticket>`
   - Real-time in-app alerts for status updates, assignments, verifications, and escalations.
