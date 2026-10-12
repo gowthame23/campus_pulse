@@ -115,6 +115,14 @@ class Complaint:
         returned_reason=None,
         assignee_on_leave_flag=False,
         assignee_removed_flag=False,
+        is_emergency=False,
+        emergency_category=None,
+        reached=None,
+        reached_at=None,
+        acknowledged_by=None,
+        acknowledged_at=None,
+        emergency_outcome=None,
+        emergency_realert_sent=False,
     ):
         self.complaint_id = complaint_id or generate_id("CMP")
         self.archived = bool(archived)
@@ -197,6 +205,14 @@ class Complaint:
         self.returned_reason = returned_reason
         self.assignee_on_leave_flag = bool(assignee_on_leave_flag)
         self.assignee_removed_flag = bool(assignee_removed_flag)
+        self.is_emergency = bool(is_emergency)
+        self.emergency_category = emergency_category
+        self.reached = reached
+        self.reached_at = reached_at
+        self.acknowledged_by = acknowledged_by
+        self.acknowledged_at = acknowledged_at
+        self.emergency_outcome = emergency_outcome
+        self.emergency_realert_sent = bool(emergency_realert_sent)
 
     def add_history(self, message):
         self.updated_at = now_string()
@@ -344,5 +360,13 @@ class Complaint:
             returned_reason=data.get("returned_reason"),
             assignee_on_leave_flag=data.get("assignee_on_leave_flag", False),
             assignee_removed_flag=data.get("assignee_removed_flag", False),
+            is_emergency=data.get("is_emergency", False),
+            emergency_category=data.get("emergency_category"),
+            reached=data.get("reached"),
+            reached_at=data.get("reached_at"),
+            acknowledged_by=data.get("acknowledged_by"),
+            acknowledged_at=data.get("acknowledged_at"),
+            emergency_outcome=data.get("emergency_outcome"),
+            emergency_realert_sent=data.get("emergency_realert_sent", False),
         )
         return c

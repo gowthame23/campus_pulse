@@ -329,6 +329,30 @@ export default function StageTimeline({ complaint, coordinatorUser, wardenUser, 
     <div className="space-y-5">
       {/* Top Banner: Public Affected Count & Reopen Status */}
       <div className="flex flex-wrap items-center gap-2.5">
+        {Boolean(complaint.is_emergency) && (
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-red-300 dark:border-red-900 bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-200 text-xs font-bold">
+            <span>🚨</span>
+            <span>Emergency: {complaint.emergency_category || "Critical"}</span>
+          </div>
+        )}
+        {Boolean(complaint.is_emergency) && complaint.reached !== null && complaint.reached !== undefined && (
+          <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold ${
+            complaint.reached ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"
+            : "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
+          }`}>
+            <span>📞</span>
+            <span>{complaint.reached ? "Called: Yes" : "Called: No answer"}</span>
+          </div>
+        )}
+        {Boolean(complaint.is_emergency && complaint.acknowledged_by) && (
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 text-xs font-bold">
+            <span>⚡</span>
+            <span>
+              {complaint.acknowledged_by} is on it
+              {complaint.acknowledged_at ? ` at ${new Date(complaint.acknowledged_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}
+            </span>
+          </div>
+        )}
         {(complaint.affected_count > 0 || complaint.visibility_type === "Community") && (
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 text-xs font-bold">
             <span>👥</span>

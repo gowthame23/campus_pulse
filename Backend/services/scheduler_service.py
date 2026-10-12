@@ -156,4 +156,17 @@ def create_scheduler(complaint_service, config_service):
 
     scheduler.register_task("Prune Expired Rate Limits", prune_rate_limits)
 
+    # Task 4: Emergency 10-minute unacknowledged check
+    def check_unacknowledged_emergencies():
+        try:
+            from api.dependencies import _get_services_for_db
+            svcs = _get_services_for_db(db_path)
+            if "emergency" in svcs:
+                svcs["emergency"].check_unacknowledged_emergencies()
+        except Exception as e:
+            logger.error(f"Emergency unacknowledged check failed: {e}")
+
+    scheduler.register_task("Emergency 10-min Unacknowledged Check", check_unacknowledged_emergencies)
+
     return scheduler
+

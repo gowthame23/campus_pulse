@@ -46,6 +46,7 @@ def run_migrations(db_path: str = "storage/campus_pulse.db"):
         _migrate_lost_found_items_table(conn)
         _migrate_phase5_tables(conn)
         _migrate_teams_and_leaves(conn)
+        _migrate_emergency_tables(conn)
         _normalize_priorities_and_deadlines(conn)
         _reroute_warden_assigned_open_complaints(conn)
 
@@ -148,6 +149,14 @@ def _migrate_complaints_table(conn: sqlite3.Connection):
         "resolution_proof_url": "TEXT",
         "affected_upgraded": "INTEGER DEFAULT 0",
         "exact_spot": "TEXT",
+        "is_emergency": "INTEGER DEFAULT 0",
+        "emergency_category": "TEXT",
+        "reached": "INTEGER",
+        "reached_at": "TEXT",
+        "acknowledged_by": "TEXT",
+        "acknowledged_at": "TEXT",
+        "emergency_outcome": "TEXT",
+        "emergency_realert_sent": "INTEGER DEFAULT 0",
     }
 
     for col_name, col_type in new_columns.items():
@@ -661,5 +670,78 @@ def _migrate_teams_and_leaves(conn: sqlite3.Connection):
         """)
         logger.info("Migrated coordinator_assignments into teams successfully.")
     logger.info("Team model and user leaves migrations verified.")
+
+
+def _migrate_emergency_tables(conn: sqlite3.Connection):
+    """Ensure emergency_categories, emergency_contacts, and emergency_strikes tables exist."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS emergency_categories (
+            category_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            department_id TEXT,
+            is_active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
+    """)
+
+    # Seed default emergency categories if empty
+    cnt = conn.execute("SELECT COUNT(*) FROM emergency_categories").fetchone()[0]
+    if cnt == 0:
+        depts = conn.execute("SELECT department_id, name FROM departments").fetchall()
+        dept_by_name = {row["name"].lower(): row["department_id"] for row in depts}
+
+        elec_id = next((did for name, did in dept_by_name.items() if "elec" in name), None)
+        plumb_id = next((did for name, did in dept_by_name.items() if "plumb" in name or "water" in name), None)
+        lift_id = next((did for name, did in dept_by_name.items() if "lift" in name or "maint" in name or "gen" in name), None)
+        other_id = next((did for name, did in dept_by_name.items() if "gen" in name or "other" in name), None)
+
+        default_cats = [
+            ("EM_CAT_01", "Electrical", elec_id, 1, 1),
+            ("EM_CAT_02", "Plumbing / Water", plumb_id, 1, 2),
+            ("EM_CAT_03", "Lift", lift_id, 1, 3),
+            ("EM_CAT_04", "Fire / Smoke", None, 1, 4),
+            ("EM_CAT_05", "Medical", None, 1, 5),
+            ("EM_CAT_06", "Other", other_id, 1, 6),
+        ]
+        now = datetime.now().isoformat()
+        for cid, cname, did, act, sort_ord in default_cats:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO emergency_categories (category_id, name, department_id, is_active, sort_order, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (cid, cname, did, act, sort_ord, now),
+            )
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS emergency_contacts (
+            contact_id TEXT PRIMARY KEY,
+            department_id TEXT,
+            location_id TEXT,
+            user_id TEXT,
+            name TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            sort_order INTEGER DEFAULT 0,
+            active INTEGER DEFAULT 1,
+            night_only INTEGER DEFAULT 0,
+            day_only INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_emergency_contacts_dept ON emergency_contacts(department_id, active);")
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS emergency_strikes (
+            strike_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            complaint_id TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_emergency_strikes_user ON emergency_strikes(user_id, created_at);")
+
+    logger.info("Emergency tables and schema migration verified.")
+
 
 

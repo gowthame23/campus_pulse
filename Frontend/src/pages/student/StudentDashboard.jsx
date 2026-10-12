@@ -24,6 +24,7 @@ import Card from "../../components/Card.jsx";
 import Modal from "../../components/Modal.jsx";
 import Toast from "../../components/Toast.jsx";
 import FixerOfTheMonthWidget from "../../components/FixerOfTheMonthWidget.jsx";
+import EmergencyButton from "../../components/EmergencyButton.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
 import { complaintService } from "../../services/complaintService.js";
@@ -232,6 +233,7 @@ export default function StudentDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
+          <EmergencyButton userLocationId={user?.location_id} />
           <Button
             onClick={() => navigate("/complaints/create")}
             variant="primary"

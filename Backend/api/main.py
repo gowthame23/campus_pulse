@@ -227,6 +227,7 @@ from api.routers import (
     complaints,
     dashboard,
     departments,
+    emergency,
     feedback,
     issues,
     leaves,
@@ -250,6 +251,7 @@ from api.routers import (
 )
 
 app.include_router(setup.router)
+app.include_router(emergency.router)
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(departments.router)

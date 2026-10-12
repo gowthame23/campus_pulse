@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Button from "../components/Button.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import EmergencyButton from "../components/EmergencyButton.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { complaintService } from "../services/complaintService.js";
@@ -390,7 +391,11 @@ export default function Navbar({ onMenuClick }) {
         </div>
 
         {/* Right Section: Actions & Dropdown */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {user?.role === ROLES.STUDENT && (
+            <EmergencyButton compact userLocationId={user?.location_id} />
+          )}
+
           {(user?.role === ROLES.STUDENT || user?.role === ROLES.LOCATION_IN_CHARGE) && (
             <Link to="/complaints/new">
               <Button size="sm" className="font-bold text-xs gap-1 hidden sm:flex min-h-9">
