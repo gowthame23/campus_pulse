@@ -314,7 +314,7 @@ def get_location_coordinator_assignments(
 def assign_location_coordinator(
     location_id: str,
     payload: AssignLocationCoordinatorRequest,
-    current_user=Depends(require_roles(Administrator.ROLE)),
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
     auth_service=Depends(get_auth_service),
 ):
     loc = auth_service.get_location(location_id)
@@ -342,7 +342,7 @@ def assign_location_coordinator(
 @router.delete("/{location_id}/coordinator")
 def unassign_location_coordinator(
     location_id: str,
-    current_user=Depends(require_roles(Administrator.ROLE)),
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
     auth_service=Depends(get_auth_service),
 ):
     try:

@@ -62,7 +62,7 @@ def get_entity_timeline(
     audit_service=Depends(get_audit_service),
 ):
     """Returns chronological entity timeline events for Administrator activity timeline."""
-    return audit_service.get_entity_timeline(entity_type, entity_id)
+    return audit_service.get_entity_timeline(entity_type, entity_id, user=current_user)
 
 
 @router.get("/export")
@@ -115,7 +115,7 @@ def get_audit_log(
     current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
     audit_service=Depends(get_audit_service),
 ):
-    log = audit_service.get_log(audit_id)
+    log = audit_service.get_log(audit_id, user=current_user)
     if not log:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Audit log record not found."
