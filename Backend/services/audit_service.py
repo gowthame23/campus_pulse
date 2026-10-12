@@ -218,6 +218,9 @@ class AuditService:
                 loc_id = getattr(user, "location_id", "") or ""
                 query += " AND (description LIKE ? OR entity_id = ? OR target_id = ?)"
                 params.extend([f"%{loc_id}%", loc_id, loc_id])
+            if u_role != "administrator":
+                # Safety report audit entries are administrator only per Section 3.4 & 5.5
+                query += " AND LOWER(COALESCE(module, '')) NOT LIKE '%safety%' AND LOWER(COALESCE(entity_type, '')) NOT LIKE '%safety%'"
 
         if q:
             term = f"%{q.strip()}%"
@@ -260,15 +263,27 @@ class AuditService:
             rows = conn.execute(query, params).fetchall()
             return [self._row_to_dict(r) for r in rows]
 
-    def get_log(self, audit_id):
+    def get_log(self, audit_id, user=None):
         with self._connect() as conn:
             row = conn.execute(
                 "SELECT * FROM audit_logs WHERE audit_id = ? OR log_id = ?",
                 (audit_id, audit_id),
             ).fetchone()
-            return self._row_to_dict(row) if row else None
+            d = self._row_to_dict(row) if row else None
+            if d and user:
+                u_role = (user.role or "").lower()
+                if u_role != "administrator":
+                    mod = (d.get("module") or "").lower()
+                    etype = (d.get("entity_type") or "").lower()
+                    if "safety" in mod or "safety" in etype:
+                        return None
+            return d
 
-    def get_entity_timeline(self, entity_type, entity_id):
+    def get_entity_timeline(self, entity_type, entity_id, user=None):
+        if user:
+            u_role = (user.role or "").lower()
+            if u_role != "administrator" and "safety" in (entity_type or "").lower():
+                return []
         query = "SELECT * FROM audit_logs WHERE (LOWER(entity_type) = LOWER(?) OR LOWER(module) = LOWER(?)) AND (entity_id = ? OR target_id = ?) ORDER BY created_at ASC"
         with self._connect() as conn:
             rows = conn.execute(

@@ -40,3 +40,4 @@ scratch/
 .idea/
 .DS_Store
 Thumbs.db
+full_prompt_dump.txt
