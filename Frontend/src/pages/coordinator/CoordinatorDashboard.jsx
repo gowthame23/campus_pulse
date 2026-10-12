@@ -26,6 +26,7 @@ import {
   Phone,
 } from "lucide-react";
 import Button from "../../components/Button.jsx";
+import ActionPill from "../../components/ActionPill.jsx";
 import EmptyState from "../../components/EmptyState.jsx";
 import StatCard from "../../components/StatCard.jsx";
 import Badge from "../../components/Badge.jsx";
@@ -37,6 +38,7 @@ import FixerOfTheMonthWidget from "../../components/FixerOfTheMonthWidget.jsx";
 import PinnedEmergenciesBanner from "../../components/PinnedEmergenciesBanner.jsx";
 import CredentialSlipModal from "../../components/CredentialSlipModal.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useLanguage } from "../../context/LanguageContext.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
 import { complaintService } from "../../services/complaintService.js";
 import { announcementService } from "../../services/announcementService.js";
@@ -65,6 +67,7 @@ const PRESET_WORKER_NOTES = [
 
 export default function CoordinatorDashboard() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState("to_assign"); // "to_assign" | "team_board" | "my_jobs" | "stats"
@@ -484,6 +487,33 @@ export default function CoordinatorDashboard() {
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
+      </div>
+
+      {/* Main Action Pills Block */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+        <ActionPill
+          icon={Clock}
+          label={t("pills.to_assign", "To assign")}
+          count={toAssignComplaints.length}
+          active={activeTab === "to_assign"}
+          onClick={() => setActiveTab("to_assign")}
+          tone="amber"
+        />
+        <ActionPill
+          icon={Users}
+          label={t("pills.team_board", "Team board")}
+          active={activeTab === "team_board"}
+          onClick={() => setActiveTab("team_board")}
+          tone="purple"
+        />
+        <ActionPill
+          icon={Wrench}
+          label={t("pills.my_jobs", "My jobs")}
+          count={myJobs.length}
+          active={activeTab === "my_jobs"}
+          onClick={() => setActiveTab("my_jobs")}
+          tone="blue"
+        />
       </div>
 
       {/* 4 Summary Stat Cards */}

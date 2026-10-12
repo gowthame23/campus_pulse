@@ -22,6 +22,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import Button from "../../components/Button.jsx";
+import ActionPill from "../../components/ActionPill.jsx";
 import EmptyState from "../../components/EmptyState.jsx";
 import Loader from "../../components/Loader.jsx";
 import StatCard from "../../components/StatCard.jsx";
@@ -33,6 +34,7 @@ import Toast from "../../components/Toast.jsx";
 import AssignModal from "../../components/AssignModal.jsx";
 import PinnedEmergenciesBanner from "../../components/PinnedEmergenciesBanner.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useLanguage } from "../../context/LanguageContext.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
 import { complaintService } from "../../services/complaintService.js";
 import { teamService } from "../../services/teamService.js";
@@ -64,6 +66,7 @@ const getLocationName = (locId, locations = []) => {
 
 export default function LocationDashboard() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   const [toastMessage, setToastMessage] = useState("");
@@ -336,6 +339,33 @@ export default function LocationDashboard() {
         </div>
       </div>
 
+      {/* Main Action Pills Block */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+        <ActionPill
+          icon={UserCheck}
+          label={t("pills.needs_verification", "Needs verification")}
+          count={needsMyVerificationComplaints.length}
+          onClick={() => {
+            const el = document.getElementById("verification-section");
+            if (el) el.scrollIntoView({ behavior: "smooth" });
+          }}
+          tone="purple"
+        />
+        <ActionPill
+          icon={AlertTriangle}
+          label={t("pills.overdue", "Overdue")}
+          count={overdueComplaints.length}
+          onClick={() => navigate("/complaints", { state: { sla: "Overdue" } })}
+          tone="rose"
+        />
+        <ActionPill
+          icon={Megaphone}
+          label={t("pills.post_notice", "Post notice")}
+          to="/announcements"
+          tone="emerald"
+        />
+      </div>
+
       {/* Top Alerts Panel */}
       {(overdueComplaints.length > 0 || blockedTooLongComplaints.length > 0 || unclaimedComplaints.length > 0 || photoSkipComplaints.length > 0) && (
         <div className="space-y-2">
@@ -412,7 +442,7 @@ export default function LocationDashboard() {
       </div>
 
       {/* Needs My Verification Section */}
-      <div className="rounded-xl border border-purple-200/80 dark:border-purple-900/60 bg-white dark:bg-[#101726] shadow-xs overflow-hidden">
+      <div id="verification-section" className="rounded-xl border border-purple-200/80 dark:border-purple-900/60 bg-white dark:bg-[#101726] shadow-xs overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-purple-100 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">

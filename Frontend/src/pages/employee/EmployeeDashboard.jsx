@@ -19,9 +19,11 @@ import {
   X,
 } from "lucide-react";
 import Button from "../../components/Button.jsx";
+import ActionPill from "../../components/ActionPill.jsx";
 import Modal from "../../components/Modal.jsx";
 import LeaveModal from "../../components/LeaveModal.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useLanguage } from "../../context/LanguageContext.jsx";
 import { complaintService } from "../../services/complaintService.js";
 import { locationService } from "../../services/locationService.js";
 import { teamService } from "../../services/teamService.js";
@@ -37,6 +39,7 @@ const PRESET_WORKER_NOTES = [
 
 export default function EmployeeDashboard() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [complaints, setComplaints] = useState([]);
   const [locations, setLocations] = useState([]);
   const [teams, setTeams] = useState([]);
@@ -307,6 +310,19 @@ export default function EmployeeDashboard() {
           </div>
         </div>
       )}
+
+      {/* Main Action Pill Block */}
+      <div className="flex items-center gap-3">
+        <ActionPill
+          icon={Wrench}
+          label={t("pills.my_jobs", "My jobs")}
+          count={complaints.filter((c) => !["Closed", "Closed (Auto Closed)", "Rejected"].includes(c.status)).length}
+          active={activeTab === "jobs"}
+          onClick={() => setActiveTab("jobs")}
+          tone="blue"
+          className="max-w-xs"
+        />
+      </div>
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800">
