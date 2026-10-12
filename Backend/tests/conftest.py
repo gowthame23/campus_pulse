@@ -15,14 +15,20 @@ BASE_DB_PATH = os.path.join(ROOT, "storage", "campus_pulse.db")
 os.environ["DATABASE_PATH"] = TEST_DB_PATH
 
 
-def pytest_configure(config):
-    """Set up isolated test database in writable storage directory before test execution."""
-    try:
-        if os.path.exists(TEST_DB_PATH):
+def _cleanup_isolated_db():
+    for ext in ["", "-wal", "-shm", "-journal"]:
+        target = TEST_DB_PATH + ext
+        if os.path.exists(target):
             try:
-                os.remove(TEST_DB_PATH)
+                os.remove(target)
             except Exception:
                 pass
+
+
+def pytest_configure(config):
+    """Set up isolated test database in writable storage directory before test execution."""
+    _cleanup_isolated_db()
+    try:
         if os.path.exists(BASE_DB_PATH):
             shutil.copy2(BASE_DB_PATH, TEST_DB_PATH)
         os.environ["DATABASE_PATH"] = TEST_DB_PATH
@@ -34,8 +40,11 @@ def pytest_configure(config):
 
 def pytest_unconfigure(config):
     """Clean up isolated test database file when pytest finishes."""
-    if os.path.exists(TEST_DB_PATH):
-        try:
-            os.remove(TEST_DB_PATH)
-        except Exception:
-            pass
+    try:
+        from api.dependencies import _service_cache
+        _service_cache.clear()
+    except Exception:
+        pass
+    import gc
+    gc.collect()
+    _cleanup_isolated_db()
