@@ -14,8 +14,10 @@ import {
   RotateCcw,
   ShieldAlert,
   Check,
+  Search,
 } from "lucide-react";
 import Button from "../../components/Button.jsx";
+import ActionPill from "../../components/ActionPill.jsx";
 import EmptyState from "../../components/EmptyState.jsx";
 import Loader from "../../components/Loader.jsx";
 import StatCard from "../../components/StatCard.jsx";
@@ -26,6 +28,7 @@ import Toast from "../../components/Toast.jsx";
 import FixerOfTheMonthWidget from "../../components/FixerOfTheMonthWidget.jsx";
 import EmergencyButton from "../../components/EmergencyButton.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useLanguage } from "../../context/LanguageContext.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
 import { complaintService } from "../../services/complaintService.js";
 import { announcementService } from "../../services/announcementService.js";
@@ -98,6 +101,7 @@ const getLocationName = (locId, locations = []) => {
 
 export default function StudentDashboard() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState("need_attention");
@@ -234,24 +238,37 @@ export default function StudentDashboard() {
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
           <EmergencyButton userLocationId={user?.location_id} />
-          <Button
-            onClick={() => navigate("/complaints/create")}
-            variant="primary"
-            size="md"
-            className="font-medium shrink-0 flex items-center gap-1.5"
-          >
-            <Plus className="h-4 w-4" />
-            Report a Problem
-          </Button>
-          <Button
-            onClick={() => navigate("/complaints")}
-            variant="outline"
-            size="md"
-            className="font-medium shrink-0"
-          >
-            All Complaints
-          </Button>
         </div>
+      </div>
+
+      {/* Main Action Pills Block (Max 4) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+        <ActionPill
+          icon={Plus}
+          label={t("pills.report_problem", "Report a problem")}
+          to="/complaints/create"
+          tone="blue"
+        />
+        <ActionPill
+          icon={Search}
+          label={t("pills.lost_found", "Lost & Found")}
+          to="/lost-found"
+          tone="amber"
+        />
+        <ActionPill
+          icon={FileText}
+          label={t("pills.my_complaints", "My complaints")}
+          count={activeComplaints.length}
+          to="/complaints"
+          tone="indigo"
+        />
+        <ActionPill
+          icon={Megaphone}
+          label={t("pills.notices", "Notices")}
+          count={announcements.length}
+          to="/announcements"
+          tone="emerald"
+        />
       </div>
 
       {/* 3 Key Metrics Row */}

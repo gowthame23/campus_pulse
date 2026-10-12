@@ -115,6 +115,21 @@
     "outcome_misuse": "दुरुपयोग",
     "shortcut_paused": "आपातकालीन शॉर्टकट {date} तक रोका गया है",
     "emergency_numbers": "आपातकालीन नंबर"
+  },
+  "pills": {
+    "report_problem": "समस्या दर्ज करें",
+    "lost_found": "खोया-पाया",
+    "my_complaints": "मेरी शिकायतें",
+    "notices": "सूचनाएं",
+    "my_jobs": "मेरे कार्य",
+    "to_assign": "आवंटित करने हेतु",
+    "team_board": "टीम बोर्ड",
+    "needs_verification": "सत्यापन आवश्यक",
+    "overdue": "अतिदेय",
+    "post_notice": "सूचना पोस्ट करें",
+    "all_complaints": "सभी शिकायतें",
+    "teams_setup": "टीमें और सेटअप",
+    "reports": "रिपोर्ट्स"
   }
 }
 

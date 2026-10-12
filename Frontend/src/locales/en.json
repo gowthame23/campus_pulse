@@ -114,6 +114,21 @@
     "outcome_misuse": "Misuse",
     "shortcut_paused": "Emergency shortcut paused until {date}",
     "emergency_numbers": "Emergency numbers"
+  },
+  "pills": {
+    "report_problem": "Report a problem",
+    "lost_found": "Lost & Found",
+    "my_complaints": "My complaints",
+    "notices": "Notices",
+    "my_jobs": "My jobs",
+    "to_assign": "To assign",
+    "team_board": "Team board",
+    "needs_verification": "Needs verification",
+    "overdue": "Overdue",
+    "post_notice": "Post notice",
+    "all_complaints": "All complaints",
+    "teams_setup": "Teams & setup",
+    "reports": "Reports"
   }
 }
 

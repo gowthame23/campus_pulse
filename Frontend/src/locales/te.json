@@ -115,6 +115,21 @@
     "outcome_misuse": "దుర్వినియోగం",
     "shortcut_paused": "అత్యవసర షార్ట్‌కట్ {date} వరకు నిలిపివేయబడింది",
     "emergency_numbers": "అత్యవసర నంబర్లు"
+  },
+  "pills": {
+    "report_problem": "సమస్యను నివేదించండి",
+    "lost_found": "కోల్పోయినవి & దొరికినవి",
+    "my_complaints": "నా ఫిర్యాదులు",
+    "notices": "నోటీసులు",
+    "my_jobs": "నా పనులు",
+    "to_assign": "కేటాయించాల్సినవి",
+    "team_board": "టీమ్ బోర్డ్",
+    "needs_verification": "ధృవీకరణ అవసరం",
+    "overdue": "గడువు ముగిసినవి",
+    "post_notice": "నోటీసు పోస్ట్ చేయండి",
+    "all_complaints": "అన్ని ఫిర్యాదులు",
+    "teams_setup": "జట్లు & సెటప్",
+    "reports": "నివేదికలు"
   }
 }
 

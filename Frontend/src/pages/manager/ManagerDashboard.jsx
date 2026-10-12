@@ -14,8 +14,10 @@ import {
   Layers,
   UserCheck,
   TrendingUp,
+  Users,
 } from "lucide-react";
 import Button from "../../components/Button.jsx";
+import ActionPill from "../../components/ActionPill.jsx";
 import EmptyState from "../../components/EmptyState.jsx";
 import Loader from "../../components/Loader.jsx";
 import StatCard from "../../components/StatCard.jsx";
@@ -25,12 +27,14 @@ import Textarea from "../../components/Textarea.jsx";
 import Toast from "../../components/Toast.jsx";
 import SetupChecklistWidget from "../../components/SetupChecklistWidget.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useLanguage } from "../../context/LanguageContext.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
 import { complaintService } from "../../services/complaintService.js";
 import { announcementService } from "../../services/announcementService.js";
 import { notificationService } from "../../services/notificationService.js";
 import { userService } from "../../services/userService.js";
 import { locationService } from "../../services/locationService.js";
+import { setupService } from "../../services/setupService.js";
 import { formatDate } from "../../utils/dateFormatter.js";
 import { getStatusTone, getPriorityTone, getSlaTone } from "../../utils/statusColor.js";
 
@@ -62,6 +66,7 @@ const getLocationName = (locId, locations = []) => {
 
 export default function ManagerDashboard() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   const [toastMessage, setToastMessage] = useState("");
@@ -80,7 +85,7 @@ export default function ManagerDashboard() {
     reload,
   } = useAsyncData(
     async () => {
-      const [compRes, ancRes, notifRes, locRes, userRes] = await Promise.all([
+      const [compRes, ancRes, notifRes, locRes, userRes, setupRes] = await Promise.all([
         complaintService.list().catch(() => ({ data: [] })),
         announcementService.list().catch(() => ({ data: [] })),
         notificationService
@@ -89,6 +94,7 @@ export default function ManagerDashboard() {
           .catch(() => ({ data: [] })),
         locationService.list().catch(() => ({ data: [] })),
         userService.list().catch(() => ({ data: [] })),
+        setupService.getChecklist().catch(() => null),
       ]);
       return {
         complaints: compRes.data || [],
@@ -96,10 +102,23 @@ export default function ManagerDashboard() {
         notifications: notifRes.data || [],
         locations: locRes.data || [],
         users: userRes.data || [],
+        setupChecklist: setupRes || null,
       };
     },
-    { complaints: [], announcements: [], notifications: [], locations: [], users: [] },
+    { complaints: [], announcements: [], notifications: [], locations: [], users: [], setupChecklist: null },
   );
+
+  const setupGapsCount = useMemo(() => {
+    const s = dashboardData?.setupChecklist;
+    if (!s || s.is_complete) return 0;
+    return (
+      (s.uncovered_places?.length || 0) +
+      (s.teams_no_backup?.length || 0) +
+      (s.locations_no_warden?.length || 0) +
+      (s.staff_no_phone?.length || 0) +
+      (s.departments_few_emergency_contacts?.length || 0)
+    );
+  }, [dashboardData]);
 
   const complaints = dashboardData?.complaints || [];
   const announcements = dashboardData?.announcements || [];
@@ -201,16 +220,31 @@ export default function ManagerDashboard() {
           >
             Coverage Gaps
           </Button>
-          <Button
-            onClick={() => navigate("/complaints")}
-            variant="primary"
-            size="md"
-            className="font-medium shrink-0 flex items-center gap-1.5"
-          >
-            <FileText className="h-4 w-4" />
-            Manage Complaints
-          </Button>
         </div>
+      </div>
+
+      {/* Main Action Pills Block (Max 4) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+        <ActionPill
+          icon={FileText}
+          label={t("pills.all_complaints", "All complaints")}
+          count={activeProblems.length}
+          to="/complaints"
+          tone="blue"
+        />
+        <ActionPill
+          icon={Users}
+          label={t("pills.teams_setup", "Teams & setup")}
+          count={setupGapsCount}
+          to="/admin/teams"
+          tone="emerald"
+        />
+        <ActionPill
+          icon={TrendingUp}
+          label={t("pills.reports", "Reports")}
+          to="/reports"
+          tone="purple"
+        />
       </div>
 
       {/* Setup Checklist (Part 3.4) */}
