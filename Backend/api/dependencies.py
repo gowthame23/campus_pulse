@@ -20,6 +20,7 @@ from services.location_service import LocationService
 from services.lost_found_service import LostFoundService
 from services.notification_service import NotificationService
 from services.report_service import ReportService
+from services.team_service import TeamService
 from services.validation_service import ValidationService
 
 
@@ -73,7 +74,8 @@ def _get_services_for_db(path: str = None):
         dash_svc = DashboardService(db_path=path)
         notif_svc = NotificationService(db_path=path)
         auth_svc = AuthService(db_path=path, notification_service=notif_svc)
-        cmpl_svc = ComplaintService(auth_svc, notif_svc, db_path=path)
+        tm_svc = TeamService(db_path=path, auth_service=auth_svc, notification_service=notif_svc)
+        cmpl_svc = ComplaintService(auth_svc, notif_svc, db_path=path, team_service=tm_svc)
         anal_svc = AnalyticsService(db_path=path)
         aud_svc = AuditService(db_path=path)
         val_svc = ValidationService(auth_svc)
@@ -125,6 +127,7 @@ def _get_services_for_db(path: str = None):
             "public_complaint": pub_svc,
             "platform": plt_svc,
             "program": prg_svc,
+            "team": tm_svc,
         }
     return _service_cache[path]
 
@@ -156,6 +159,7 @@ chat_service = _default_svcs["chat"]
 classification_service = _default_svcs["classification"]
 public_complaint_service = _default_svcs["public_complaint"]
 platform_service = _default_svcs["platform"]
+team_service = _default_svcs["team"]
 
 
 def get_dashboard_service():
@@ -244,4 +248,9 @@ def get_platform_service() -> PlatformService:
 
 def get_program_service() -> ProgramService:
     return _get_services_for_db()["program"]
+
+
+def get_team_service() -> TeamService:
+    return _get_services_for_db()["team"]
+
 

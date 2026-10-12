@@ -201,8 +201,11 @@ def test_audit_logs_accessible_to_app_manager():
 
 def test_coordinator_forbidden_from_changing_priority():
     coord_headers = _get_coordinator_headers()
+    admin_headers = _get_admin_headers()
+    comps_res = client.get("/complaints", headers=admin_headers)
+    cid = comps_res.json()[0]["complaint_id"] if (comps_res.status_code == 200 and comps_res.json()) else "CP-2026-001"
     patch_res = client.patch(
-        "/complaints/CP-2026-001/priority",
+        f"/complaints/{cid}/priority",
         json={"priority": "High", "reason": "Attempt by coordinator"},
         headers=coord_headers,
     )
@@ -211,11 +214,16 @@ def test_coordinator_forbidden_from_changing_priority():
 
 
 def test_coordinator_forbidden_from_reassigning():
-    coord_headers = _get_coordinator_headers()
+    # In Team Model, coordinators assign their team's complaints (Part E).
+    # Unauthorized roles like students are forbidden from assigning.
+    student_headers = _get_student_headers()
+    admin_headers = _get_admin_headers()
+    comps_res = client.get("/complaints", headers=admin_headers)
+    cid = comps_res.json()[0]["complaint_id"] if (comps_res.status_code == 200 and comps_res.json()) else "CP-2026-001"
     assign_res = client.post(
-        "/complaints/CP-2026-001/assign",
+        f"/complaints/{cid}/assign",
         json={"coordinator_id": "USR_COORDINATOR"},
-        headers=coord_headers,
+        headers=student_headers,
     )
     assert assign_res.status_code == 403
 

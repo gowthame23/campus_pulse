@@ -97,8 +97,10 @@ export default function Sidebar({ isOpen, onClose }) {
           title: "MANAGEMENT",
           items: [
             { to: "/admin/users", label: "Users", icon: Users },
+            { to: "/admin/teams", label: "Teams", icon: Layers },
             { to: "/admin/locations", label: "Locations", icon: MapPin },
-            { to: "/admin/departments", label: "Departments", icon: Layers },
+            { to: "/admin/departments", label: "Departments", icon: Building },
+            { to: "/admin/coverage-gaps", label: "Coverage Gaps", icon: Activity },
             { to: "/admin/issues", label: "Issues Taxonomy", icon: Tag },
           ],
         },
@@ -147,8 +149,10 @@ export default function Sidebar({ isOpen, onClose }) {
           title: "MANAGEMENT",
           items: [
             { to: "/admin/users", label: "Users", icon: Users },
+            { to: "/admin/teams", label: "Teams", icon: Layers },
             { to: "/admin/locations", label: "Locations", icon: MapPin },
-            { to: "/admin/departments", label: "Departments", icon: Layers },
+            { to: "/admin/departments", label: "Departments", icon: Building },
+            { to: "/admin/coverage-gaps", label: "Coverage Gaps", icon: Activity },
           ],
         },
         {
@@ -226,7 +230,24 @@ export default function Sidebar({ isOpen, onClose }) {
       ];
     }
 
-    // 6. STUDENT (Default)
+    // 6. EMPLOYEE (Worker)
+    if (role === ROLES.EMPLOYEE) {
+      return [
+        {
+          title: "WORK",
+          items: [
+            { to: "/employee", label: "My Jobs", icon: Home },
+            { to: "/notifications", label: "Notifications", icon: Bell },
+          ],
+        },
+        {
+          title: "ACCOUNT",
+          items: [{ to: "/profile", label: "Profile", icon: User }],
+        },
+      ];
+    }
+
+    // 7. STUDENT (Default)
     return [
       {
         title: "MAIN",

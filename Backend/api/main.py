@@ -229,6 +229,7 @@ from api.routers import (
     departments,
     feedback,
     issues,
+    leaves,
     locations,
     lost_found,
     master,
@@ -244,6 +245,7 @@ from api.routers import (
     settings,
     setup,
     supervisor,
+    teams,
     users,
 )
 
@@ -274,5 +276,8 @@ app.include_router(supervisor.router)
 app.include_router(master.router)
 app.include_router(programs.router)
 app.include_router(push.router)
+app.include_router(teams.router)
+app.include_router(leaves.router)
 
 app.include_router(platform.router)
+

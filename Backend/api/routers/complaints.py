@@ -29,6 +29,7 @@ from api.schemas import (
     ComplaintReopenRequest,
     ComplaintResolveRequest,
     ComplaintResponse,
+    ComplaintReturnRequest,
     ComplaintStatusRequest,
     ComplaintUpdateRequest,
     ComplaintWrongLocationRequest,
@@ -43,8 +44,10 @@ from models.administrator import Administrator
 from models.app_manager import AppManager
 from models.complaint import Complaint
 from models.coordinator import Coordinator
+from models.employee import Employee
 from models.location_in_charge import LocationInCharge
 from models.student import Student
+from services.complaint_service import ComplaintConflictError
 from utils.helper import csv_safe, generate_id, now_string, parse_date
 from utils.logger import get_logger
 
@@ -187,13 +190,41 @@ def _visible_complaints(current_user, complaint_service, include_archived=False)
             ):
                 visible.append(c)
 
+    elif u_role == "employee":
+        acting_team_ids = set()
+        if hasattr(complaint_service, "team_service"):
+            for t in complaint_service.team_service.list_teams(active_only=True):
+                acting = complaint_service.team_service.get_acting_coordinator(t)
+                if acting and acting.user_id == current_user.user_id:
+                    acting_team_ids.add(t["team_id"])
+        for c in all_complaints:
+            if (
+                c.assigned_to == current_user.user_id
+                or c.created_by == current_user.user_id
+                or (getattr(c, "team_id", None) and c.team_id in acting_team_ids)
+            ):
+                visible.append(c)
+
     elif u_role == "coordinator":
+        user_teams = complaint_service.team_service.get_user_teams(current_user.user_id)
+        coord_teams = [
+            t for t in complaint_service.team_service.list_teams(active_only=True)
+            if t.get("coordinator_id") == current_user.user_id or t.get("backup_coordinator_id") == current_user.user_id
+        ]
+        my_team_ids = {t["team_id"] for t in (user_teams + coord_teams)}
+
         assignments = complaint_service.auth_service.list_coordinator_assignments(coordinator_id=current_user.user_id) or []
         has_assignments = len(assignments) > 0
         coord_dept_obj = dept_map.get(current_user.department_id) if current_user.department_id else None
         coord_loc_id = coord_dept_obj.location_id if coord_dept_obj else None
 
         for c in all_complaints:
+            if c.assigned_to == current_user.user_id:
+                visible.append(c)
+                continue
+            if getattr(c, "team_id", None) and c.team_id in my_team_ids:
+                visible.append(c)
+                continue
             is_assigned = False
             c_loc = loc_map.get(c.location_id)
             c_loc_id = c_loc.location_id if c_loc else c.location_id
@@ -222,8 +253,6 @@ def _visible_complaints(current_user, complaint_service, include_archived=False)
                     break
 
             if is_assigned:
-                visible.append(c)
-            elif c.assigned_to == current_user.user_id:
                 visible.append(c)
             else:
                 if not has_assignments:
@@ -912,7 +941,7 @@ def record_complaint_progress(
     complaint_id: str,
     payload: ComplaintProgressRequest,
     current_user=Depends(
-        require_roles(Coordinator.ROLE, Administrator.ROLE)
+        require_roles(Coordinator.ROLE, Administrator.ROLE, Employee.ROLE)
     ),
     complaint_service=Depends(get_complaint_service),
 ):
@@ -941,7 +970,7 @@ def block_complaint(
     complaint_id: str,
     payload: ComplaintBlockRequest,
     current_user=Depends(
-        require_roles(Coordinator.ROLE, Administrator.ROLE)
+        require_roles(Coordinator.ROLE, Administrator.ROLE, Employee.ROLE)
     ),
     complaint_service=Depends(get_complaint_service),
 ):
@@ -965,7 +994,7 @@ def block_complaint(
 def unblock_complaint(
     complaint_id: str,
     current_user=Depends(
-        require_roles(Coordinator.ROLE, Administrator.ROLE)
+        require_roles(Coordinator.ROLE, Administrator.ROLE, Employee.ROLE)
     ),
     complaint_service=Depends(get_complaint_service),
 ):
@@ -1006,9 +1035,7 @@ def close_complaint(
 def assign_complaint(
     complaint_id: str,
     payload: ComplaintAssignRequest,
-    current_user=Depends(
-        require_roles(AppManager.ROLE, Administrator.ROLE)
-    ),
+    current_user=Depends(get_current_user),
     complaint_service=Depends(get_complaint_service),
     audit_service=Depends(get_audit_service),
 ):
@@ -1020,34 +1047,19 @@ def assign_complaint(
 
     _ensure_visible(complaint, current_user, complaint_service)
 
-    target_user = complaint_service.auth_service.get_user(payload.coordinator_id)
-    if not target_user or (target_user.role or "").lower() != "coordinator":
+    target_id = payload.assigned_to or payload.assignee_id or payload.coordinator_id
+    if not target_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Target assignee must be a Coordinator.",
-        )
-
-    # Check if target coordinator is mapped to this location and department
-    if not complaint_service.auth_service.is_coordinator_assigned(
-        payload.coordinator_id, complaint.location_id, complaint.department_id
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Coordinator {target_user.name} is not mapped to this location and department.",
-        )
-
-    # Reassign check: if already assigned, reason is mandatory
-    is_reassign = bool(complaint.assigned_to and complaint.assigned_to != payload.coordinator_id)
-    if is_reassign and (not payload.reason or not payload.reason.strip()):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A mandatory reason is required when reassigning a complaint.",
+            detail="Target assignee is required.",
         )
 
     old_assigned = complaint.assigned_to
+    is_reassign = bool(old_assigned and old_assigned != target_id)
+
     try:
         complaint = complaint_service.assign_work(
-            complaint_id, payload.coordinator_id, reason=payload.reason, actor_id=current_user.user_id
+            complaint_id, target_id, reason=payload.reason, actor_id=current_user.user_id
         )
         action_name = "REASSIGN_COMPLAINT" if is_reassign else "ASSIGN_COMPLAINT"
         audit_service.log(
@@ -1055,9 +1067,46 @@ def assign_complaint(
             action_name,
             complaint_id,
             old_value={"assigned_to": old_assigned},
-            new_value={"assigned_to": payload.coordinator_id, "reason": payload.reason},
+            new_value={"assigned_to": target_id, "reason": payload.reason},
         )
         return _format_complaint(complaint, complaint_service)
+    except ComplaintConflictError as c_err:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(c_err))
+    except PermissionError as p_err:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@router.post("/{complaint_id}/return", response_model=ComplaintResponse)
+def return_complaint_to_coordinator(
+    complaint_id: str,
+    payload: ComplaintReturnRequest,
+    current_user=Depends(get_current_user),
+    complaint_service=Depends(get_complaint_service),
+    audit_service=Depends(get_audit_service),
+):
+    complaint = complaint_service.get_complaint(complaint_id)
+    if not complaint:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
+        )
+
+    _ensure_visible(complaint, current_user, complaint_service)
+
+    try:
+        complaint = complaint_service.return_to_coordinator(
+            complaint_id, current_user.user_id, reason=payload.reason
+        )
+        audit_service.log(
+            current_user.user_id,
+            "RETURN_COMPLAINT",
+            complaint_id,
+            new_value={"reason": payload.reason},
+        )
+        return _format_complaint(complaint, complaint_service)
+    except PermissionError as p_err:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
@@ -1115,7 +1164,7 @@ def update_status(
     complaint_id: str,
     payload: ComplaintStatusRequest,
     current_user=Depends(
-        require_roles(Coordinator.ROLE, Administrator.ROLE)
+        require_roles(Coordinator.ROLE, Administrator.ROLE, Employee.ROLE)
     ),
     complaint_service=Depends(get_complaint_service),
 ):
@@ -1126,11 +1175,19 @@ def update_status(
         )
 
     u_role = current_user.role.lower()
-    if u_role == "coordinator" and complaint.assigned_to != current_user.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only change status for complaints assigned to you.",
-        )
+    if u_role in ("coordinator", "employee") and complaint.assigned_to != current_user.user_id:
+        is_coord = False
+        if u_role == "coordinator" and complaint.team_id and hasattr(complaint_service, "team_service"):
+            team = complaint_service.team_service.get_team(complaint.team_id)
+            if team:
+                acting = complaint_service.team_service.get_acting_coordinator(team)
+                if acting and acting.user_id == current_user.user_id:
+                    is_coord = True
+        if not is_coord:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only change status for complaints assigned to you or in your team.",
+            )
 
     if payload.status == Complaint.ASSIGNED:
         if complaint.status not in (
@@ -1143,9 +1200,10 @@ def update_status(
                 detail="Can only transition to Assigned from Pending, Submitted, or Reopened status.",
             )
         try:
-            if u_role == "coordinator":
-                complaint = complaint_service.accept_complaint(
-                    complaint_id, current_user.user_id
+            if u_role in ("coordinator", "employee"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Please assign this complaint using the assign endpoint.",
                 )
             else:
                 complaint.status = Complaint.ASSIGNED
@@ -1163,7 +1221,7 @@ def update_status(
                 detail="Can only transition to In Progress from Assigned or Reopened status.",
             )
         try:
-            if u_role == "coordinator":
+            if u_role in ("coordinator", "employee"):
                 complaint = complaint_service.start_work(
                     complaint_id, current_user.user_id
                 )
@@ -1190,7 +1248,7 @@ def resolve_complaint(
     complaint_id: str,
     payload: ComplaintResolveRequest,
     current_user=Depends(
-        require_roles(Coordinator.ROLE, Administrator.ROLE)
+        require_roles(Coordinator.ROLE, Administrator.ROLE, Employee.ROLE)
     ),
     complaint_service=Depends(get_complaint_service),
 ):
@@ -1210,15 +1268,26 @@ def resolve_complaint(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Complaint must be In Progress or Assigned before it can be resolved.",
         )
-    # Coordinator can only resolve their own assigned complaints
-    if (
-        current_user.role == Coordinator.ROLE
-        and complaint.assigned_to != current_user.user_id
-    ):
+
+    u_role = current_user.role.lower()
+    if u_role == "employee" and complaint.assigned_to != current_user.user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only resolve complaints assigned to you.",
         )
+    if u_role == "coordinator" and complaint.assigned_to != current_user.user_id:
+        is_team_coord = False
+        if complaint.team_id and hasattr(complaint_service, "team_service"):
+            team = complaint_service.team_service.get_team(complaint.team_id)
+            if team:
+                acting = complaint_service.team_service.get_acting_coordinator(team)
+                if acting and acting.user_id == current_user.user_id:
+                    is_team_coord = True
+        if not is_team_coord:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only resolve complaints assigned to you or in your team.",
+            )
     try:
         complaint = complaint_service.mark_resolved(
             complaint_id,

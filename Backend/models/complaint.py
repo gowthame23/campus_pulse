@@ -107,6 +107,14 @@ class Complaint:
         resolution_proof_url=None,
         affected_upgraded=False,
         exact_spot=None,
+        awaiting_assign_since=None,
+        assigned_by=None,
+        assign_escalation_level=0,
+        marked_by=None,
+        team_id=None,
+        returned_reason=None,
+        assignee_on_leave_flag=False,
+        assignee_removed_flag=False,
     ):
         self.complaint_id = complaint_id or generate_id("CMP")
         self.archived = bool(archived)
@@ -181,6 +189,14 @@ class Complaint:
         self.resolution_proof_url = resolution_proof_url
         self.affected_upgraded = bool(affected_upgraded)
         self.exact_spot = exact_spot
+        self.awaiting_assign_since = awaiting_assign_since
+        self.assigned_by = assigned_by
+        self.assign_escalation_level = int(assign_escalation_level or 0)
+        self.marked_by = marked_by
+        self.team_id = team_id
+        self.returned_reason = returned_reason
+        self.assignee_on_leave_flag = bool(assignee_on_leave_flag)
+        self.assignee_removed_flag = bool(assignee_removed_flag)
 
     def add_history(self, message):
         self.updated_at = now_string()
@@ -320,5 +336,13 @@ class Complaint:
             resolution_proof_url=data.get("resolution_proof_url"),
             affected_upgraded=data.get("affected_upgraded", False),
             exact_spot=data.get("exact_spot"),
+            awaiting_assign_since=data.get("awaiting_assign_since"),
+            assigned_by=data.get("assigned_by"),
+            assign_escalation_level=data.get("assign_escalation_level", 0),
+            marked_by=data.get("marked_by"),
+            team_id=data.get("team_id"),
+            returned_reason=data.get("returned_reason"),
+            assignee_on_leave_flag=data.get("assignee_on_leave_flag", False),
+            assignee_removed_flag=data.get("assignee_removed_flag", False),
         )
         return c

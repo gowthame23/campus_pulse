@@ -142,8 +142,8 @@ def test_workflow_4_full_lifecycle():
     }, headers=std_headers)
     cid = c_res.json()["complaint_id"]
 
-    # 2. Staff accepts/starts work
-    accept_res = client.post(f"/complaints/{cid}/accept", json={}, headers=admin_headers)
+    # 2. Staff assigns/starts work
+    accept_res = client.post(f"/complaints/{cid}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=admin_headers)
 
     # 3. Admin resolves complaint
     res_res = client.post(f"/complaints/{cid}/resolve", json={"notes": "Repaired fuse box."}, headers=admin_headers)
@@ -217,8 +217,8 @@ def test_workflow_4_complaint_deletion_ownership_and_status_controls():
     assert del_b_res.status_code == 403
     assert "only delete your own complaints" in del_b_res.json()["detail"].lower()
 
-    # 4. Admin advances complaint to In Progress
-    client.post(f"/complaints/{cid}/accept", json={}, headers=admin_headers)
+    # 4. Admin advances complaint to Assigned
+    client.post(f"/complaints/{cid}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=admin_headers)
 
     # 5. Student A attempts to delete own complaint while in Assigned/In Progress status -> MUST RETURN 400 BAD REQUEST
     del_a_inprogress = client.delete(f"/complaints/{cid}", headers=std_headers)

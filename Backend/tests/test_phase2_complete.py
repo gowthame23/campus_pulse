@@ -129,7 +129,7 @@ def test_photo_skip_streak_and_forced_check(admin_headers, coord_headers, warden
         headers=student_headers,
     ).json()["complaint_id"]
 
-    client.post(f"/complaints/{c1}/accept", headers=coord_headers)
+    client.post(f"/complaints/{c1}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=coord_headers)
     res_skip1 = client.put(
         f"/complaints/{c1}/resolve",
         json={"skip_photo": True, "notes": "Socket fixed, no after photo needed."},
@@ -155,7 +155,7 @@ def test_photo_skip_streak_and_forced_check(admin_headers, coord_headers, warden
         headers=student_headers,
     ).json()["complaint_id"]
 
-    client.post(f"/complaints/{c2}/accept", headers=coord_headers)
+    client.post(f"/complaints/{c2}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=coord_headers)
     res_skip2 = client.put(
         f"/complaints/{c2}/resolve",
         json={"skip_photo": True, "notes": "Replaced switch."},
@@ -182,7 +182,7 @@ def test_photo_skip_streak_and_forced_check(admin_headers, coord_headers, warden
         headers=student_headers,
     ).json()["complaint_id"]
 
-    client.post(f"/complaints/{c3}/accept", headers=coord_headers)
+    client.post(f"/complaints/{c3}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=coord_headers)
     fail_skip = client.put(
         f"/complaints/{c3}/resolve",
         json={"skip_photo": True, "photo_skip_reason": ""},
@@ -220,7 +220,7 @@ def test_photo_skip_streak_and_forced_check(admin_headers, coord_headers, warden
         headers=student_headers,
     ).json()["complaint_id"]
 
-    client.post(f"/complaints/{c4}/accept", headers=coord_headers)
+    client.post(f"/complaints/{c4}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=coord_headers)
     _upload_image(c4, coord_headers)
     res_real = client.put(
         f"/complaints/{c4}/resolve",
@@ -275,7 +275,7 @@ def test_warden_verification_flow_and_photo_mismatch(admin_headers, coord_header
         headers=student_headers,
     ).json()["complaint_id"]
 
-    client.post(f"/complaints/{c}/accept", headers=coord_headers)
+    client.post(f"/complaints/{c}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=coord_headers)
     client.put(f"/complaints/{c}/resolve", json={"notes": "Checked wiring."}, headers=coord_headers)
 
     # 1. Reject by warden -> moves back to In Progress with unchanged deadline
@@ -338,7 +338,7 @@ def test_spot_check_determinism(admin_headers, coord_headers):
         headers=student_headers,
     ).json()["complaint_id"]
 
-    client.post(f"/complaints/{cA}/accept", headers=coord_headers)
+    client.post(f"/complaints/{cA}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=coord_headers)
     resA = client.put(f"/complaints/{cA}/resolve", json={"notes": "Fixed A"}, headers=coord_headers)
     assert resA.json()["status"] == STATUS_PENDING_WARDEN
     assert resA.json()["is_spot_check"] is True
@@ -359,7 +359,7 @@ def test_spot_check_determinism(admin_headers, coord_headers):
         headers=student_headers,
     ).json()["complaint_id"]
 
-    client.post(f"/complaints/{cB}/accept", headers=coord_headers)
+    client.post(f"/complaints/{cB}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=coord_headers)
     resB = client.put(f"/complaints/{cB}/resolve", json={"notes": "Fixed B"}, headers=coord_headers)
     assert resB.json()["status"] == STATUS_WAITING_STUDENT
     assert resB.json()["is_spot_check"] is False
@@ -388,7 +388,9 @@ def test_admin_review_and_decisions(admin_headers, coord_headers, warden_headers
     ).json()["complaint_id"]
 
     def _resolve_and_approve():
-        client.post(f"/complaints/{c}/accept", headers=coord_headers)
+        comp = client.get(f"/complaints/{c}", headers=admin_headers).json()
+        if not comp.get("assigned_to"):
+            client.post(f"/complaints/{c}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=coord_headers)
         client.put(f"/complaints/{c}/resolve", json={"notes": "Cycle resolved"}, headers=coord_headers)
         client.post(f"/complaints/{c}/warden-verify", json={"approved": True, "notes": "Approved"}, headers=warden_headers)
 
@@ -495,7 +497,7 @@ def test_affected_student_confirmation_after_24_hours(admin_headers, coord_heade
     # Affected student marks affected
     client.post(f"/complaints/{c}/affected", headers=aff_headers)
 
-    client.post(f"/complaints/{c}/accept", headers=coord_headers)
+    client.post(f"/complaints/{c}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=coord_headers)
     client.put(f"/complaints/{c}/resolve", json={"notes": "Filter replaced."}, headers=coord_headers)
 
     # Complaint is in Waiting for Verification

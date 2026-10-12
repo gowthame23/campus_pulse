@@ -666,10 +666,10 @@ def reset_user_password(
         )
 
     if current_user.role == AppManager.ROLE:
-        if target_user.role not in ("coordinator", "location_in_charge", "student"):
+        if target_user.role not in ("coordinator", "location_in_charge", "student", "employee"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="App Managers can only reset passwords for Coordinators, Location In-charges, or Students.",
+                detail="App Managers can only reset passwords for Coordinators, Employees, Location In-charges, or Students.",
             )
     elif current_user.role == Administrator.ROLE:
         if target_user.role not in (Administrator.ROLE, AppManager.ROLE):
