@@ -1,3 +1,5 @@
+import html
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -5,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import HTMLResponse
 
 from api.dependencies import get_auth_service, get_complaint_service
-from api.security import get_current_user
+from api.security import get_current_user, require_roles
 from core.constants import STATUS_CLOSED, STATUS_AUTO_CLOSED
 from models.administrator import Administrator
 from models.app_manager import AppManager
@@ -224,18 +226,40 @@ def get_coordinator_badges(
     }
 
 
+MONTH_REGEX = re.compile(r"^\d{4}-\d{2}$")
+
+
 @router.get("/certificate", response_class=HTMLResponse)
 def get_winner_certificate(
     coordinator_id: str = Query(...),
     month: str = Query(...),
+    current_user=Depends(
+        require_roles(
+            Administrator.ROLE,
+            AppManager.ROLE,
+            LocationInCharge.ROLE,
+            Coordinator.ROLE,
+            "admin",
+            "app_manager",
+            "warden",
+            "coordinator",
+        )
+    ),
     auth_service=Depends(get_auth_service),
 ):
     """Printable Fixer of the Month HTML certificate."""
+    if not month or not MONTH_REGEX.match(month):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid month format. Expected YYYY-MM.",
+        )
+
     user = auth_service.get_user(coordinator_id)
     if not user:
         raise HTTPException(status_code=404, detail="Coordinator not found.")
 
-    coord_name = user.name
+    coord_name = html.escape(user.name or "Coordinator")
+    safe_month = html.escape(month)
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -321,7 +345,7 @@ def get_winner_certificate(
     <h2>CAMPUS PULSE EXCELLENCE AWARD</h2>
     <h1>Fixer of the Month</h1>
     <div class="recipient">{coord_name}</div>
-    <p>In recognition of outstanding dedication, rapid turnaround, and exceptional service to the campus community for the month of <strong>{month}</strong>.</p>
+    <p>In recognition of outstanding dedication, rapid turnaround, and exceptional service to the campus community for the month of <strong>{safe_month}</strong>.</p>
     <div class="footer">
       <div>
         <div class="sig-line">Director of Campus Facilities</div>

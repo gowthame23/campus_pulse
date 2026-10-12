@@ -133,4 +133,42 @@ def test_sec_006_safety_report_idor_prevention():
         assert admin_res.status_code == 200
 
 
+def test_sec_005_certificate_endpoint_security():
+    """SEC-005: /recognitions/certificate must require authentication, validate month format, and escape HTML."""
+    from fastapi.testclient import TestClient
+    from api.main import app
+    from middleware.rate_limiter import auth_limiter
+
+    client = TestClient(app)
+    auth_limiter._requests.clear()
+    auth_limiter._lockouts.clear()
+
+    # 1. Unauthenticated request must return 401
+    res_unauth = client.get("/recognitions/certificate?coordinator_id=USR_COORDINATOR&month=2026-08")
+    assert res_unauth.status_code == 401, f"Expected 401 for unauthenticated request, got {res_unauth.status_code}"
+
+    # Authenticate as admin
+    login_adm = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
+    token_adm = login_adm.json()["access_token"]
+    headers_adm = {"Authorization": f"Bearer {token_adm}"}
+
+    # 2. Malicious or invalid month parameter must return 400
+    res_xss = client.get(
+        "/recognitions/certificate?coordinator_id=USR_COORDINATOR&month=<script>alert(1)</script>",
+        headers=headers_adm,
+    )
+    assert res_xss.status_code == 400, f"Expected 400 for XSS month input, got {res_xss.status_code}"
+
+    # 3. Authenticated request with valid month returns 200 HTML with all inputs escaped
+    res_valid = client.get(
+        "/recognitions/certificate?coordinator_id=USR_COORDINATOR&month=2026-08",
+        headers=headers_adm,
+    )
+    assert res_valid.status_code == 200
+    assert "Fixer of the Month" in res_valid.text
+    assert "2026-08" in res_valid.text
+    assert "<script>" not in res_valid.text
+
+
+
 
