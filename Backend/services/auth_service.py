@@ -405,9 +405,8 @@ class AuthService:
                 ))
 
             # Sync department_issues table with seed departments
-            conn.execute("DROP TABLE IF EXISTS department_issues")
             conn.execute("""
-                CREATE TABLE department_issues (
+                CREATE TABLE IF NOT EXISTS department_issues (
                     issue_id TEXT PRIMARY KEY,
                     department_id TEXT NOT NULL,
                     issue_name TEXT NOT NULL,
