@@ -1447,11 +1447,14 @@ class SQLiteRepository:
                         reopen_notes, resolution_proof_url, affected_upgraded,
                         exact_spot, awaiting_assign_since, assigned_by,
                         assign_escalation_level, marked_by, team_id,
-                        returned_reason, assignee_on_leave_flag, assignee_removed_flag
+                        returned_reason, assignee_on_leave_flag, assignee_removed_flag,
+                        is_emergency, emergency_category, reached, reached_at,
+                        acknowledged_by, acknowledged_at, emergency_outcome, emergency_realert_sent
                     ) VALUES (
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?, ?
                     )
                     """,
@@ -1689,6 +1692,14 @@ class SQLiteRepository:
             item.get("returned_reason"),
             int(bool(item.get("assignee_on_leave_flag", False))),
             int(bool(item.get("assignee_removed_flag", False))),
+            int(bool(item.get("is_emergency", False))),
+            item.get("emergency_category"),
+            item.get("reached"),
+            item.get("reached_at"),
+            item.get("acknowledged_by"),
+            item.get("acknowledged_at"),
+            item.get("emergency_outcome"),
+            int(bool(item.get("emergency_realert_sent", False))),
         )
 
     def _row_to_user(self, row):
@@ -1839,4 +1850,12 @@ class SQLiteRepository:
             "returned_reason": row["returned_reason"] if "returned_reason" in row.keys() else None,
             "assignee_on_leave_flag": bool(row["assignee_on_leave_flag"]) if "assignee_on_leave_flag" in row.keys() and row["assignee_on_leave_flag"] is not None else False,
             "assignee_removed_flag": bool(row["assignee_removed_flag"]) if "assignee_removed_flag" in row.keys() and row["assignee_removed_flag"] is not None else False,
+            "is_emergency": bool(row["is_emergency"]) if "is_emergency" in row.keys() and row["is_emergency"] is not None else False,
+            "emergency_category": row["emergency_category"] if "emergency_category" in row.keys() else None,
+            "reached": row["reached"] if "reached" in row.keys() else None,
+            "reached_at": row["reached_at"] if "reached_at" in row.keys() else None,
+            "acknowledged_by": row["acknowledged_by"] if "acknowledged_by" in row.keys() else None,
+            "acknowledged_at": row["acknowledged_at"] if "acknowledged_at" in row.keys() else None,
+            "emergency_outcome": row["emergency_outcome"] if "emergency_outcome" in row.keys() else None,
+            "emergency_realert_sent": bool(row["emergency_realert_sent"]) if "emergency_realert_sent" in row.keys() and row["emergency_realert_sent"] is not None else False,
         }

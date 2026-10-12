@@ -2050,6 +2050,21 @@ class ComplaintService:
                             )
                         changed = True
 
+            # 5. Check unacknowledged emergencies (>10m, Rule 2.4b)
+            if getattr(complaint, "is_emergency", False) and not getattr(complaint, "acknowledged_at", None):
+                if not getattr(complaint, "emergency_realert_sent", False):
+                    c_dt = parse_date(complaint.created_at)
+                    if c_dt and current_time >= c_dt + timedelta(minutes=10):
+                        complaint.emergency_realert_sent = True
+                        changed = True
+                        try:
+                            from api.dependencies import _get_services_for_db
+                            svcs = _get_services_for_db(str(self.repository.path))
+                            if "emergency" in svcs:
+                                svcs["emergency"].check_unacknowledged_emergencies()
+                        except Exception:
+                            pass
+
         if changed:
             self._save_complaints(complaints)
 

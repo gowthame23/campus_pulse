@@ -204,3 +204,14 @@ def normalize_priority(priority: str) -> str:
     if p == "Low":
         return "Low"
     return "Medium"
+
+
+# Emergency Constants
+EMERGENCY_UNACKNOWLEDGED_ALERT_MINUTES = 10
+EMERGENCY_STRIKE_LOCKOUT_DAYS = 30
+EMERGENCY_STRIKE_WINDOW_DAYS = 90
+EMERGENCY_STRIKE_THRESHOLD = 3
+EMERGENCY_OUTCOME_REAL = "real"
+EMERGENCY_OUTCOME_MISTAKE = "mistake"
+EMERGENCY_OUTCOME_MISUSE = "misuse"
+

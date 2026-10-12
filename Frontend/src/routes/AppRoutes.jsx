@@ -53,6 +53,7 @@ const SafetyReportsAdminPage = lazy(() => import("../pages/admin/SafetyReportsAd
 const EmployeeDashboard = lazy(() => import("../pages/employee/EmployeeDashboard.jsx"));
 const TeamsManagementPage = lazy(() => import("../pages/admin/TeamsManagementPage.jsx"));
 const CoverageGapsPage = lazy(() => import("../pages/admin/CoverageGapsPage.jsx"));
+const EmergencyManagementPage = lazy(() => import("../pages/admin/EmergencyManagementPage.jsx"));
 
 
 function RoleHome() {
@@ -264,6 +265,14 @@ export default function AppRoutes() {
           element={
             <ProtectedRoute roles={[ROLES.ADMINISTRATOR, ROLES.APP_MANAGER]}>
               <CoverageGapsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/emergency"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMINISTRATOR, ROLES.APP_MANAGER]}>
+              <EmergencyManagementPage />
             </ProtectedRoute>
           }
         />

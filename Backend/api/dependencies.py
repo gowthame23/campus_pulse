@@ -27,6 +27,7 @@ from services.validation_service import ValidationService
 from services.platform_service import PlatformService
 from services.program_service import ProgramService
 from services.public_complaint_service import PublicComplaintService
+from services.emergency_service import EmergencyService
 
 
 from pathlib import Path
@@ -101,6 +102,14 @@ def _get_services_for_db(path: str = None):
         )
         plt_svc = PlatformService(db_path=path)
         prg_svc = ProgramService(db_path=path)
+        emg_svc = EmergencyService(
+            db_path=path,
+            auth_service=auth_svc,
+            team_service=tm_svc,
+            notification_service=notif_svc,
+            config_service=cfg_svc,
+            complaint_service=cmpl_svc,
+        )
 
         _service_cache[path] = {
             "dashboard": dash_svc,
@@ -128,6 +137,7 @@ def _get_services_for_db(path: str = None):
             "platform": plt_svc,
             "program": prg_svc,
             "team": tm_svc,
+            "emergency": emg_svc,
         }
     return _service_cache[path]
 
@@ -252,5 +262,9 @@ def get_program_service() -> ProgramService:
 
 def get_team_service() -> TeamService:
     return _get_services_for_db()["team"]
+
+
+def get_emergency_service() -> EmergencyService:
+    return _get_services_for_db()["emergency"]
 
 

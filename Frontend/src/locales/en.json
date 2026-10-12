@@ -92,6 +92,28 @@
     "warden": "Warden",
     "student": "Student",
     "super_admin": "Super Admin"
+  },
+  "emergency": {
+    "button": "Emergency",
+    "tap_hint": "Tap 3 times for emergency",
+    "sheet_title": "What's the emergency?",
+    "sheet_desc": "For life-safety and urgent hazards. A critical ticket is created and staff are alerted immediately.",
+    "call_list_title": "Emergency Call List",
+    "call_list_desc": "Tap Call to dial directly. Stay calm and speak clearly.",
+    "did_you_reach": "Did you reach someone?",
+    "yes_reached": "Yes, I spoke to them",
+    "no_answer": "No answer / Couldn't reach",
+    "on_it": "I'm on it",
+    "is_on_it": "{name} is on it at {time}",
+    "called_yes": "Called: Yes",
+    "called_no": "Called: No answer",
+    "pinned_title": "Active Emergencies",
+    "emergency_badge": "Emergency",
+    "outcome_real": "Real emergency",
+    "outcome_mistake": "Genuine mistake",
+    "outcome_misuse": "Misuse",
+    "shortcut_paused": "Emergency shortcut paused until {date}",
+    "emergency_numbers": "Emergency numbers"
   }
 }
 

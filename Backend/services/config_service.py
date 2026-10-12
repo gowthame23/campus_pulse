@@ -468,6 +468,43 @@ class ConfigService:
             1,
             0,
         ),
+        # Emergency & Safety Settings
+        (
+            "campus_security_name",
+            "Campus Security",
+            "String",
+            "Security",
+            "Name for campus emergency security contact",
+            1,
+            0,
+        ),
+        (
+            "campus_security_phone",
+            "+91 98765 43210",
+            "String",
+            "Security",
+            "Direct phone number for campus security desk",
+            1,
+            0,
+        ),
+        (
+            "night_hours_start",
+            "20:00",
+            "String",
+            "General",
+            "Emergency contacts night window start (HH:MM)",
+            1,
+            0,
+        ),
+        (
+            "night_hours_end",
+            "08:00",
+            "String",
+            "General",
+            "Emergency contacts night window end (HH:MM)",
+            1,
+            0,
+        ),
     ]
 
     def __init__(self, db_path="storage/campus_pulse.db"):

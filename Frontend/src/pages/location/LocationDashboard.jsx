@@ -31,6 +31,7 @@ import Textarea from "../../components/Textarea.jsx";
 import Select from "../../components/Select.jsx";
 import Toast from "../../components/Toast.jsx";
 import AssignModal from "../../components/AssignModal.jsx";
+import PinnedEmergenciesBanner from "../../components/PinnedEmergenciesBanner.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
 import { complaintService } from "../../services/complaintService.js";
@@ -302,6 +303,9 @@ export default function LocationDashboard() {
           onClose={() => setToastMessage("")}
         />
       )}
+
+      {/* Pinned Emergencies at Top (Rule 2.4c) */}
+      <PinnedEmergenciesBanner onActionDone={reload} />
 
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">

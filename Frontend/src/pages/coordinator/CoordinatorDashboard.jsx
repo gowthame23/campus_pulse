@@ -32,6 +32,7 @@ import Toast from "../../components/Toast.jsx";
 import AssignModal from "../../components/AssignModal.jsx";
 import LeaveModal from "../../components/LeaveModal.jsx";
 import FixerOfTheMonthWidget from "../../components/FixerOfTheMonthWidget.jsx";
+import PinnedEmergenciesBanner from "../../components/PinnedEmergenciesBanner.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
 import { complaintService } from "../../services/complaintService.js";
@@ -381,6 +382,9 @@ export default function CoordinatorDashboard() {
       {toastMessage && (
         <Toast message={toastMessage} tone={toastTone} onClose={() => setToastMessage("")} />
       )}
+
+      {/* Pinned Emergencies at Top (Rule 2.4c) */}
+      <PinnedEmergenciesBanner onActionDone={reload} />
 
       {/* Acting Coordinator Banner (Rule B4 & K1) */}
       {actingTeams.map((t) => {

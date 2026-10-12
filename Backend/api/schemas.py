@@ -741,3 +741,54 @@ class LeaveCreateRequest(BaseModel):
     to_date: str = Field(..., description="YYYY-MM-DD")
     reason: Optional[str] = None
 
+
+class EmergencyCategoryCreateRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=100)
+    department_id: Optional[str] = None
+    sort_order: Optional[int] = 0
+    is_active: Optional[bool] = True
+
+
+class EmergencyCategoryUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    department_id: Optional[str] = None
+    sort_order: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+class EmergencyContactCreateRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=150)
+    phone: str = Field(..., min_length=3, max_length=50)
+    department_id: Optional[str] = None
+    location_id: Optional[str] = None
+    user_id: Optional[str] = None
+    sort_order: Optional[int] = 0
+    active: Optional[bool] = True
+    night_only: Optional[bool] = False
+    day_only: Optional[bool] = False
+
+
+class EmergencyContactUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    department_id: Optional[str] = None
+    location_id: Optional[str] = None
+    user_id: Optional[str] = None
+    sort_order: Optional[int] = None
+    active: Optional[bool] = None
+    night_only: Optional[bool] = None
+    day_only: Optional[bool] = None
+
+
+class EmergencyCreateRequest(BaseModel):
+    category: str = Field(..., min_length=1, max_length=100)
+    location_id: Optional[str] = None
+
+
+class EmergencyReachedRequest(BaseModel):
+    reached: bool
+
+
+class EmergencyOutcomeRequest(BaseModel):
+    outcome: str = Field(..., description="real | mistake | misuse")
+

@@ -28,6 +28,7 @@ import {
   CheckCircle2,
   UserCheck,
   MessageSquare,
+  PhoneCall,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
@@ -91,6 +92,7 @@ export default function Sidebar({ isOpen, onClose }) {
             { to: "/admin/locations", label: "Locations", icon: MapPin },
             { to: "/admin/departments", label: "Departments", icon: Building },
             { to: "/admin/coverage-gaps", label: "Coverage Gaps", icon: Activity },
+            { to: "/admin/emergency", label: "Emergency Setup", icon: PhoneCall },
             { to: "/admin/issues", label: "Issues Taxonomy", icon: Tag },
           ],
         },
@@ -143,6 +145,7 @@ export default function Sidebar({ isOpen, onClose }) {
             { to: "/admin/locations", label: "Locations", icon: MapPin },
             { to: "/admin/departments", label: "Departments", icon: Building },
             { to: "/admin/coverage-gaps", label: "Coverage Gaps", icon: Activity },
+            { to: "/admin/emergency", label: "Emergency Setup", icon: PhoneCall },
           ],
         },
         {
