@@ -646,20 +646,20 @@ def export_complaints_csv(
     for c in complaints:
         writer.writerow(
             [
-                c.complaint_id,
+                csv_safe(c.complaint_id),
                 csv_safe(c.title or ""),
                 csv_safe(c.category or ""),
                 csv_safe(c.complaint_type or ""),
-                c.status,
-                c.priority or "Medium",
-                c.location_id,
-                c.department_id,
-                c.assigned_to or "Unassigned",
-                c.created_by,
-                c.created_at,
-                c.resolved_at or "",
-                getattr(c, "sla_status", "🟢 On Time"),
-                c.visibility_type,
+                csv_safe(c.status),
+                csv_safe(c.priority or "Medium"),
+                csv_safe(c.location_id),
+                csv_safe(c.department_id),
+                csv_safe(c.assigned_to or "Unassigned"),
+                csv_safe(c.created_by),
+                csv_safe(c.created_at),
+                csv_safe(c.resolved_at or ""),
+                csv_safe(getattr(c, "sla_status", "🟢 On Time")),
+                csv_safe(c.visibility_type),
             ]
         )
 

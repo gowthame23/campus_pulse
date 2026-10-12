@@ -43,8 +43,11 @@ def add_days_string(days):
     return (now() + timedelta(days=days)).strftime(DATE_FORMAT)
 
 
-def csv_safe(value):
-    """Neutralize spreadsheet formula injection in user-supplied CSV cells."""
-    if isinstance(value, str) and value.startswith(("=", "+", "-", "@", "\t", "\r")):
-        return "'" + value
-    return value
+def csv_safe(val):
+    """Neutralize spreadsheet formula injection in CSV / Excel cells."""
+    if val is None:
+        return ""
+    val_str = str(val)
+    if val_str.startswith(("=", "+", "-", "@", "\t", "\r")):
+        return "'" + val_str
+    return val
