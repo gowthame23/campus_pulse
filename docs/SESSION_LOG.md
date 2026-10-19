@@ -218,6 +218,20 @@
 * **Current Status:** Fix deployed to GitHub; Railway automatically building and redeploying.
 
 ---
+
+### Entry 16 — Render Backend Deployment Configuration
+* **User Goal:** Deploy backend service on Render with zero configuration friction.
+* **Actions Taken & Code Fixed:**
+  1. Created declarative [`render.yaml`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/render.yaml) specification:
+     - Runtime: `python`
+     - Root Directory: `Backend`
+     - Build Command: `pip install -r requirements.txt`
+     - Start Command: `python run_api.py`
+     - Environment Variables: `ENVIRONMENT=production`, `CORS_ORIGINS=https://campuspulse-rho.vercel.app`, `RUN_SCHEDULER=true`
+  2. Pushed commit `c004d3e` to GitHub `main` branch.
+* **Current Status:** Render blueprint ready for 1-click deployment.
+
+---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
 
 
