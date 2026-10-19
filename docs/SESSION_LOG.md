@@ -332,6 +332,17 @@
   - `npm run build` completed in 1.27s with 0 errors.
 
 ---
+
+### Entry 23 — Resolved Page Date Range 2-Column Grid Optimization
+* **User Directive:** "now see the date from to to yy the unessary space" (with screenshot of `ResolvedPage.jsx` showing `To:` squeezed at the right edge and the second date picker wrapping onto a row by itself).
+* **Root Cause & Fix:**
+  - In [`Frontend/src/pages/complaints/ResolvedPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/complaints/ResolvedPage.jsx), the date range container was using `flex flex-wrap` with inline `From:` and `To:` spans. On mobile viewports (<450px), the `From:` label and first input took ~80% width, pushing `To:` to the far right edge of row 1, while the second date input wrapped down onto row 2, leaving awkward whitespace.
+  - Converted the date range container into a balanced 2-column grid on mobile (`grid grid-cols-2 gap-2 w-full sm:flex sm:items-center sm:gap-2.5 sm:w-auto`).
+  - Both `[ From: mm/dd/yyyy ]` and `[ To: mm/dd/yyyy ]` now sit side-by-side in balanced columns on a single row with zero wasted whitespace or dangling labels. On tablet/desktop, they adapt inline smoothly.
+* **Verification:**
+  - `npm run build` completed in 981ms with 0 errors.
+
+---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
 
 
