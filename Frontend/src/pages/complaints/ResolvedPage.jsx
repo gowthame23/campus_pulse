@@ -12,7 +12,6 @@ import {
   Building,
   Layers,
 } from "lucide-react";
-import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Table from "../../components/Table.jsx";
 import Badge from "../../components/Badge.jsx";
@@ -115,21 +114,7 @@ export default function ResolvedPage() {
     locationId || departmentId || category || priority || dateFrom || dateTo || query;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Resolved Complaints Archive"
-        description="Historical log of resolved and closed complaints across the institution."
-      >
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={fetchResolved}
-          leftIcon={<RotateCw className="h-4 w-4" />}
-        >
-          Refresh
-        </Button>
-      </PageHeader>
-
+    <div className="space-y-4 sm:space-y-6">
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
           {error}
@@ -191,43 +176,59 @@ export default function ResolvedPage() {
             <option value="Urgent">Urgent</option>
           </select>
 
-          {/* Date Range */}
-          <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:items-center sm:gap-2.5 sm:w-auto">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[11px] font-semibold text-slate-500 shrink-0">From:</span>
+          {/* Date Range - Non-overlapping layout */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 w-10 sm:w-auto shrink-0">
+                From:
+              </span>
               <input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-                className="w-full sm:w-auto rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 outline-none"
+                className="flex-1 sm:w-36 rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 outline-none focus:border-primary"
               />
             </div>
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[11px] font-semibold text-slate-500 shrink-0">To:</span>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 w-10 sm:w-auto shrink-0">
+                To:
+              </span>
               <input
                 type="date"
                 value={dateTo}
                 onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-                className="w-full sm:w-auto rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 outline-none"
+                className="flex-1 sm:w-36 rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 outline-none focus:border-primary"
               />
             </div>
           </div>
 
-          <Button type="submit" variant="primary" size="sm" className="w-full sm:w-auto">
-            Apply Search
-          </Button>
-
-          {hasActiveFilters && (
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <Button type="submit" variant="primary" size="sm" className="flex-1 sm:flex-initial">
+              Apply Search
+            </Button>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={clearFilters}
-              leftIcon={<X className="h-3.5 w-3.5" />}
+              onClick={fetchResolved}
+              className="flex items-center gap-1.5"
             >
-              Clear
+              <RotateCw className="h-3.5 w-3.5" />
+              Refresh
             </Button>
-          )}
+            {hasActiveFilters && (
+              <Button
+                type="button"
+                variant="subtle"
+                size="sm"
+                onClick={clearFilters}
+                className="flex items-center gap-1 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+              >
+                <X className="h-3.5 w-3.5" />
+                Clear
+              </Button>
+            )}
+          </div>
         </form>
       </Card>
 
