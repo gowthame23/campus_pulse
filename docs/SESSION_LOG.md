@@ -203,6 +203,21 @@
 * **Current Status:** Vercel frontend is live. Railway backend updated with automated root launcher and railway.json specification.
 
 ---
+
+### Entry 15 — Remediation of Missing Typing Import in Complaint Service
+* **User Goal:** Fix `NameError: name 'Optional' is not defined` causing startup crash on Railway.
+* **Actions Taken & Code Fixed:**
+  1. Identified exact traceback from Railway deploy logs:
+     `File "/app/services/complaint_service.py", line 2737, in ComplaintService`
+     `actor_id: Optional[str] = None`
+     `NameError: name 'Optional' is not defined`
+  2. Fixed [`Backend/services/complaint_service.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/services/complaint_service.py) line 4 by adding `from typing import Any, Dict, List, Optional, Set, Tuple`.
+  3. Audited all Python files across `Backend/` to guarantee no other missing typing imports exist.
+  4. Verified `api.main:app` imports with zero errors.
+  5. Pushed commit `7b50206` to GitHub `main` branch.
+* **Current Status:** Fix deployed to GitHub; Railway automatically building and redeploying.
+
+---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
 
 
