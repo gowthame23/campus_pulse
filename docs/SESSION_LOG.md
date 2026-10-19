@@ -470,5 +470,18 @@
 * **Verification:**
   - `npm run build` completed in 1.38s with 0 errors.
 
+### Entry 32 — Resolved Complaints Archive Header Removal & Date Range Overlap Fix
+* **User Directive:** "remove that resolved complaits archive text and from and to are over lapping check that also"
+* **Issues Addressed & Actions Taken:**
+  1. **Removed Redundant PageHeader Text ([`ResolvedPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/complaints/ResolvedPage.jsx)):**
+     - Removed `<PageHeader title="Resolved Complaints Archive" description="Historical log of resolved and closed complaints across the institution." ... />` completely.
+     - Relocated the `Refresh` button directly alongside `Apply Search` and `Clear` inside the filter toolbar card for seamless single-row operation.
+     - Reclaimed substantial vertical screen space so complaint filters and table records (`Resolved Complaints ({total})`) are immediately visible on mobile without scrolling.
+  2. **Fixed Date Filter "From" and "To" Overlap ([`ResolvedPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/complaints/ResolvedPage.jsx)):**
+     - Replaced the constrained 2-column grid (`grid-cols-2`) with responsive flow: stacked vertically on mobile (`flex-col gap-2 w-full`) and inline row on desktop (`sm:flex-row sm:items-center sm:gap-2`).
+     - Assigned a fixed label width (`w-10 sm:w-auto shrink-0`) to both `From:` and `To:` with `flex-1 sm:w-36` on inputs, giving full width for date inputs and calendar icons on mobile with zero overlapping or text clipping.
+* **Verification:**
+  - `npm run build` completed in 1.24s with 0 errors.
+
 ---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
