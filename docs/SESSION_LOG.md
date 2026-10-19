@@ -499,5 +499,17 @@
 * **Verification:**
   - `npm run build` completed in 1.07s with 0 errors.
 
+### Entry 34 — Verification of Language Dropdown Placement & Fixed Screen Anchoring
+* **User Directive:** "check it once the language was still place in the box not out of the box"
+* **Issues Addressed & Actions Taken:**
+  1. **Source Code & Dom Hierarchy Audit ([`LoginPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/auth/LoginPage.jsx)):**
+     - Verified that the language dropdown is completely detached from and rendered outside the login card container (`<div className="relative w-full max-w-[420px] ...">`).
+     - Upgraded wrapper positioning from `absolute` to `fixed top-4 right-4 z-30` (`ref={langRef}`), guaranteeing it stays anchored to the top-right corner of the mobile viewport regardless of login card vertical centering or scroll offset.
+     - Confirmed that only the single theme toggle button (`☀️ / 🌙`) resides inside the login card corner (`absolute top-3.5 right-3.5`).
+  2. **Mobile PWA Service Worker & Cache Guidance:**
+     - Noted that because Campus Pulse is a PWA with Workbox service-worker precaching (`dist/sw.js`), mobile browsers (such as Chrome on Android) may serve previously cached JS bundles from prior deployments until the page is hard reloaded or the tab is closed and reopened.
+* **Verification:**
+  - `npm run build` completed in 1.22s with 0 errors.
+
 ---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
