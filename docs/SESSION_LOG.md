@@ -528,5 +528,22 @@
 * **Verification:**
   - `npm run build` completed in 1.40s with 0 errors and valid PWA service worker generation.
 
+### Entry 36 — Announcement Page Banner Removal & 4-in-a-Row Quick Filter Layout
+* **User Directive:** "remove that text like the whole box offical campus notices boradcast feed are published by college admin and location and one more thing is we have 4 things one under another lets keep by one by one by chnaging active noties to active, unread circular to unread, critical alerts to crtical, pending acks to pending" (with attached screenshot of Announcement page on mobile).
+* **Issues Addressed & Actions Taken:**
+  1. **Removed Official Notices Info Banner ([`AnnouncementPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/AnnouncementPage.jsx)):**
+     - Completely removed the `Official Campus Notices & Broadcast Feed` banner card along with its description and `Admin Contact` email box.
+     - Cleaned up unused `adminContact` and `loadingContact` state, the associated fetching `useEffect`, and the unused `Mail` and `StatCard` imports.
+  2. **Unified 4-in-a-Row Side-by-Side Quick Filters ([`AnnouncementPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/AnnouncementPage.jsx)):**
+     - Replaced the previously vertical stacked layout (`grid-cols-1` on mobile) with a responsive 4-column single-row grid (`grid grid-cols-4 gap-1.5 sm:gap-3`).
+     - Shortened filter labels as instructed:
+       - `ACTIVE NOTICES` -> `Active`
+       - `UNREAD CIRCULARS` -> `Unread`
+       - `CRITICAL ALERTS` -> `Critical`
+       - `PENDING ACKS` -> `Pending`
+     - Formatted each filter button with vertical stacking on mobile (`flex-col items-center justify-center p-2 text-center`) and horizontal alignment on desktop (`sm:flex-row sm:justify-between sm:px-4 sm:py-3`), featuring bold uppercase text, tabular numeric counts, active selection highlights (`border-primary bg-primary/10 ring-2 ring-primary`), and subtle rose tinting for active critical alerts.
+* **Verification:**
+  - `npm run build` completed in 1.04s with 0 errors and valid PWA service worker generation.
+
 ---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
