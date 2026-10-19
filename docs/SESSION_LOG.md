@@ -292,6 +292,21 @@
   - `npm run build` completed in 1.21s with 129 precached PWA assets and 0 errors.
 
 ---
+
+### Entry 20 — Removal of Duplicate "File Complaint" from Top Navbar
+* **User Goal:** Fix the header button overlap on mobile devices where "File a Complaint" overlapped with the "Emergency" SOS button in the top navbar.
+* **Root Cause & Rationale:**
+  - In [`Frontend/src/layouts/Navbar.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/layouts/Navbar.jsx), a redundant `File Complaint` button was rendered in the top-right navbar right next to the Emergency button.
+  - On mobile displays (<400px), having both `🚨 Emergency` and `+ File Complaint` in the navbar caused severe horizontal crowding and overlapping into the language selector and notification bell.
+  - Filing a complaint is already prominently supported right on the Dashboard via the primary `+ Report a problem` ActionPill, in the bottom mobile navigation bar, and in the sidebar.
+* **Actions Taken & Code Fixed:**
+  - Removed the redundant `File Complaint` button from [`Navbar.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/layouts/Navbar.jsx).
+  - Cleaned up the unused `Plus` icon import.
+  - Now on mobile, the top navbar cleanly displays the hamburger menu and brand logo on the left, and the single `🚨 Emergency` SOS button, language picker, and profile avatar on the right with zero overlap or crowding.
+* **Verification:**
+  - `npm run build` completed in 1.42s with 0 errors.
+
+---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
 
 

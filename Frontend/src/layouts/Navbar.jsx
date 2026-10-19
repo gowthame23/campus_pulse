@@ -12,7 +12,6 @@ import {
   Users,
   MapPin,
   Folder,
-  Plus,
   Sun,
   Moon,
   Monitor,
@@ -411,15 +410,6 @@ export default function Navbar({ onMenuClick }) {
         <div className="flex items-center gap-2 sm:gap-3">
           {user?.role === ROLES.STUDENT && (
             <EmergencyButton compact userLocationId={user?.location_id} />
-          )}
-
-          {(user?.role === ROLES.STUDENT || user?.role === ROLES.LOCATION_IN_CHARGE) && (
-            <Link to="/complaints/new">
-              <Button size="sm" className="font-bold text-xs gap-1 hidden sm:flex min-h-9">
-                <Plus className="h-4 w-4" />
-                {t("nav.new_complaint", "File Complaint")}
-              </Button>
-            </Link>
           )}
 
           {/* Language Selector Dropdown */}
