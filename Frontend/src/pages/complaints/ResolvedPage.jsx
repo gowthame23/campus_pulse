@@ -138,8 +138,8 @@ export default function ResolvedPage() {
 
       {/* Filter Toolbar */}
       <Card className="p-4 space-y-4">
-        <form onSubmit={handleSearch} className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[200px]">
+        <form onSubmit={handleSearch} className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+          <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
               type="text"
@@ -154,7 +154,7 @@ export default function ResolvedPage() {
           <select
             value={locationId}
             onChange={(e) => { setLocationId(e.target.value); setPage(1); }}
-            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full sm:w-auto rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           >
             <option value="">All Locations</option>
             {locations.map((loc) => (
@@ -168,7 +168,7 @@ export default function ResolvedPage() {
           <select
             value={departmentId}
             onChange={(e) => { setDepartmentId(e.target.value); setPage(1); }}
-            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full sm:w-auto rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           >
             <option value="">All Departments</option>
             {departments.map((dept) => (
@@ -182,7 +182,7 @@ export default function ResolvedPage() {
           <select
             value={priority}
             onChange={(e) => { setPriority(e.target.value); setPage(1); }}
-            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full sm:w-auto rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           >
             <option value="">All Priorities</option>
             <option value="Low">Low</option>
@@ -192,24 +192,24 @@ export default function ResolvedPage() {
           </select>
 
           {/* Date Range */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500 w-full sm:w-auto">
             <span>From:</span>
             <input
               type="date"
               value={dateFrom}
               onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-              className="rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              className="flex-1 sm:flex-initial rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
             <span>To:</span>
             <input
               type="date"
               value={dateTo}
               onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-              className="rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              className="flex-1 sm:flex-initial rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
           </div>
 
-          <Button type="submit" variant="primary" size="sm">
+          <Button type="submit" variant="primary" size="sm" className="w-full sm:w-auto">
             Apply Search
           </Button>
 

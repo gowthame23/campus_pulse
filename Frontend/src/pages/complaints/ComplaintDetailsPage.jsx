@@ -1101,7 +1101,7 @@ export default function ComplaintDetailsPage() {
               {complaint.complaint_id}
             </span>
           </div>
-          <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-2">
+          <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-2">
             <span>{department?.name || complaint.department_name || complaint.department_id}</span>
             <span>•</span>
             <span>{location?.name || complaint.location_name || complaint.location_id}</span>

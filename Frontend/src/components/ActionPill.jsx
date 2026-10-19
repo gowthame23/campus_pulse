@@ -69,7 +69,7 @@ export default function ActionPill({
 
   const baseClasses = `
     group relative inline-flex items-center justify-between w-full h-[46px] min-h-[44px] max-h-[48px]
-    px-3.5 sm:px-4 rounded-full border text-xs sm:text-sm font-semibold tracking-tight
+    px-3 sm:px-4 rounded-full border text-xs sm:text-sm font-semibold tracking-tight
     transition-all duration-150 select-none cursor-pointer
     active:scale-[0.98]
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900
@@ -84,7 +84,7 @@ export default function ActionPill({
 
   const innerContent = (
     <>
-      <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-1.5">
+      <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 mr-1">
         {Icon && (
           <span className={`inline-flex shrink-0 ${selectedTone.icon}`}>
             <Icon className="h-5 w-5" aria-hidden="true" />

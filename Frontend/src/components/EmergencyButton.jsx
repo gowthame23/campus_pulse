@@ -48,7 +48,7 @@ export default function EmergencyButton({ userLocationId, compact = false }) {
   const getButtonLabel = () => {
     if (tapCount === 1) return "1… Tap 2 more";
     if (tapCount === 2) return "2… Tap once more";
-    return "🚨 Emergency";
+    return "Emergency";
   };
 
   if (status?.is_locked) {

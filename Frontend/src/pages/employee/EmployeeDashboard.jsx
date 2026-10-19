@@ -324,43 +324,23 @@ export default function EmployeeDashboard() {
         </div>
       )}
 
-      {/* Main Action Pill Block */}
-      <div className="flex items-center gap-3">
+      {/* Main Action Pill Block & View Switcher */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 max-w-md">
         <ActionPill
           icon={Wrench}
-          label={t("pills.my_jobs", "My jobs")}
+          label={t("employee.my_jobs_tab", "My Jobs")}
           count={complaints.filter((c) => !["Closed", "Closed (Auto Closed)", "Rejected"].includes(c.status)).length}
           active={activeTab === "jobs"}
           onClick={() => setActiveTab("jobs")}
           tone="blue"
-          className="max-w-xs"
         />
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800">
-        <button
-          type="button"
-          onClick={() => setActiveTab("jobs")}
-          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
-            activeTab === "jobs"
-              ? "border-blue-600 text-blue-600 dark:text-blue-400"
-              : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-          }`}
-        >
-          {t("employee.my_jobs_tab", "My Jobs")} ({complaints.length})
-        </button>
-        <button
-          type="button"
+        <ActionPill
+          icon={TrendingUp}
+          label={t("employee.my_stats_tab", "My Stats")}
+          active={activeTab === "stats"}
           onClick={() => setActiveTab("stats")}
-          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
-            activeTab === "stats"
-              ? "border-blue-600 text-blue-600 dark:text-blue-400"
-              : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-          }`}
-        >
-          {t("employee.my_stats_tab", "My Stats")}
-        </button>
+          tone="purple"
+        />
       </div>
 
       {/* TAB 1: MY JOBS */}

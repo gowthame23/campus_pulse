@@ -144,3 +144,15 @@ html.dark select option,
   color: #f8fafc !important;
 }
 
+/* Touch & Tab Bar Scrollbar Utilities (Clean touch scrolling across all devices) */
+.scrollbar-none::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-none,
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+

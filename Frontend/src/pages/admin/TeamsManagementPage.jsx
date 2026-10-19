@@ -334,10 +334,10 @@ export default function TeamsManagementPage() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-6">
+      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-4 sm:gap-6 overflow-x-auto max-w-full scrollbar-none">
         <button
           onClick={() => setActiveTab("teams")}
-          className={`pb-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+          className={`pb-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors whitespace-nowrap shrink-0 ${
             activeTab === "teams"
               ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
               : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
@@ -351,7 +351,7 @@ export default function TeamsManagementPage() {
         </button>
         <button
           onClick={() => setActiveTab("assignments")}
-          className={`pb-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+          className={`pb-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors whitespace-nowrap shrink-0 ${
             activeTab === "assignments"
               ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
               : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"

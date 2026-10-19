@@ -235,11 +235,11 @@ export default function LostFoundPage() {
       </PageHeader>
 
       {/* Main Simplified Navigation Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800">
+      <div className="flex border-b border-slate-200 dark:border-slate-800 overflow-x-auto max-w-full scrollbar-none">
         <button
           type="button"
           onClick={() => setActiveTab("my_reports")}
-          className={`py-2.5 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`py-2.5 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
             activeTab === "my_reports"
               ? "border-primary text-primary dark:text-primary font-bold"
               : "border-transparent text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 font-semibold"
@@ -250,7 +250,7 @@ export default function LostFoundPage() {
         <button
           type="button"
           onClick={() => setActiveTab("returned")}
-          className={`py-2.5 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`py-2.5 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
             activeTab === "returned"
               ? "border-primary text-primary dark:text-primary font-bold"
               : "border-transparent text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 font-semibold"

@@ -281,10 +281,10 @@ export default function EmergencyManagementPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-2">
+      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-2 overflow-x-auto max-w-full scrollbar-none">
         <button
           onClick={() => setActiveTab("categories")}
-          className={`py-2.5 px-4 font-bold text-xs rounded-t-xl transition-colors border-b-2 ${
+          className={`py-2.5 px-4 font-bold text-xs rounded-t-xl transition-colors border-b-2 whitespace-nowrap shrink-0 ${
             activeTab === "categories"
               ? "border-rose-600 text-rose-600 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-950/20"
               : "border-transparent text-slate-500 hover:text-slate-700"
@@ -294,7 +294,7 @@ export default function EmergencyManagementPage() {
         </button>
         <button
           onClick={() => setActiveTab("contacts")}
-          className={`py-2.5 px-4 font-bold text-xs rounded-t-xl transition-colors border-b-2 ${
+          className={`py-2.5 px-4 font-bold text-xs rounded-t-xl transition-colors border-b-2 whitespace-nowrap shrink-0 ${
             activeTab === "contacts"
               ? "border-rose-600 text-rose-600 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-950/20"
               : "border-transparent text-slate-500 hover:text-slate-700"
@@ -304,7 +304,7 @@ export default function EmergencyManagementPage() {
         </button>
         <button
           onClick={() => setActiveTab("settings")}
-          className={`py-2.5 px-4 font-bold text-xs rounded-t-xl transition-colors border-b-2 ${
+          className={`py-2.5 px-4 font-bold text-xs rounded-t-xl transition-colors border-b-2 whitespace-nowrap shrink-0 ${
             activeTab === "settings"
               ? "border-rose-600 text-rose-600 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-950/20"
               : "border-transparent text-slate-500 hover:text-slate-700"
