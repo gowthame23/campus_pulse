@@ -14,28 +14,33 @@ from core.constants import (
     STATUS_SUBMITTED,
     STATUS_WAITING_STUDENT,
     normalize_priority,
+    normalize_status,
 )
 from utils.helper import add_days_string, generate_id, now_string
 
 
 class Complaint:
-    SUBMITTED = STATUS_SUBMITTED
-    PENDING = STATUS_SUBMITTED
-    ASSIGNED = STATUS_ASSIGNED
-    IN_PROGRESS = STATUS_IN_PROGRESS
-    RESOLVED = "Resolved"
-    BLOCKED = STATUS_BLOCKED
-    WAITING_VERIFICATION = STATUS_WAITING_STUDENT
-    PENDING_WARDEN_VERIFICATION = STATUS_PENDING_WARDEN
-    CLOSED = STATUS_CLOSED
-    AUTO_CLOSED = STATUS_AUTO_CLOSED
-    REOPENED = STATUS_REOPENED
-    ADMIN_REVIEW = STATUS_ADMIN_REVIEW
-    REJECTED = STATUS_REJECTED
-    CANCELLED = STATUS_CANCELLED
-    CANCELLATION_REQUESTED = STATUS_CANCELLATION_REQUESTED
-    STATUS_CANCELLATION_REQUESTED = STATUS_CANCELLATION_REQUESTED
-    AWAITING_ASSIGNMENT = "Awaiting Coordinator Assignment"
+    STARRED = "Starred"
+    GOING_ON = "Going On"
+    DONE = "Done"
+
+    SUBMITTED = "Starred"
+    PENDING = "Starred"
+    ASSIGNED = "Going On"
+    IN_PROGRESS = "Going On"
+    RESOLVED = "Done"
+    BLOCKED = "Going On"
+    WAITING_VERIFICATION = "Done"
+    PENDING_WARDEN_VERIFICATION = "Done"
+    CLOSED = "Done"
+    AUTO_CLOSED = "Done"
+    REOPENED = "Going On"
+    ADMIN_REVIEW = "Going On"
+    REJECTED = "Rejected"
+    CANCELLED = "Cancelled"
+    CANCELLATION_REQUESTED = "Cancellation Requested"
+    STATUS_CANCELLATION_REQUESTED = "Cancellation Requested"
+    AWAITING_ASSIGNMENT = "Starred"
 
     def __init__(
         self,
@@ -147,7 +152,7 @@ class Complaint:
         self.complaint_type = complaint_type
         self.description = description
         self.attachment_url = attachment_url
-        self.status = status or self.SUBMITTED
+        self.status = normalize_status(status or self.STARRED)
         self.assigned_to = assigned_to
         self.created_at = created_at or now_string()
         self.updated_at = updated_at or self.created_at

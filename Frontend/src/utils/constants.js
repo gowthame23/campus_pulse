@@ -1,6 +1,5 @@
 export const ROLES = {
   STUDENT: "student",
-  EMPLOYEE: "employee",
   COORDINATOR: "coordinator",
   LOCATION_IN_CHARGE: "location_in_charge",
   APP_MANAGER: "app_manager",
@@ -8,8 +7,8 @@ export const ROLES = {
   SUPER_ADMIN: "super_admin",
 };
 
-// Rule 1.1 & 1.3: Canonical User-Facing Display Names
-// Admin | App Manager | Coordinator | Employee | Warden | Student (Super Admin platform-level)
+// Canonical User-Facing Display Names
+// Admin | App Manager | Coordinator | Warden | Student (Super Admin platform-level)
 export const ROLE_DISPLAY_NAMES = {
   administrator: "Admin",
   admin: "Admin",
@@ -17,7 +16,6 @@ export const ROLE_DISPLAY_NAMES = {
   manager: "App Manager",
   supervisor: "App Manager",
   coordinator: "Coordinator",
-  employee: "Employee",
   location_in_charge: "Warden",
   warden: "Warden",
   student: "Student",
@@ -30,20 +28,24 @@ export const getRoleDisplayName = (role) => {
   return ROLE_DISPLAY_NAMES[clean] || role;
 };
 
-
+// 3 Canonical Complaint Lifecycle Statuses: Starred, Going On, Done
 export const COMPLAINT_STATUS = {
-  SUBMITTED: "Submitted",
-  PENDING: "Pending",
-  ASSIGNED: "Assigned",
-  IN_PROGRESS: "In Progress",
-  WAITING_VERIFICATION: "Waiting for Verification",
-  CLOSED: "Closed",
-  AUTO_CLOSED: "Closed (Auto Closed)",
-  REOPENED: "Reopened",
-  AWAITING_ASSIGNMENT: "Awaiting Coordinator Assignment",
-  WAITING_FOR_PARTS: "Waiting for Parts",
-  PENDING_WARDEN_VERIFICATION: "Pending Warden Verification",
-  ADMIN_REVIEW: "Admin Review",
+  STARRED: "Starred",
+  GOING_ON: "Going On",
+  DONE: "Done",
+  // Backward compatibility mappings
+  SUBMITTED: "Starred",
+  PENDING: "Starred",
+  ASSIGNED: "Going On",
+  IN_PROGRESS: "Going On",
+  WAITING_VERIFICATION: "Done",
+  CLOSED: "Done",
+  AUTO_CLOSED: "Done",
+  REOPENED: "Going On",
+  AWAITING_ASSIGNMENT: "Starred",
+  WAITING_FOR_PARTS: "Going On",
+  PENDING_WARDEN_VERIFICATION: "Done",
+  ADMIN_REVIEW: "Going On",
 };
 
 export const PRESET_PROGRESS_NOTES = {
