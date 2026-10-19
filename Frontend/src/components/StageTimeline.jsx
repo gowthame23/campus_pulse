@@ -1,13 +1,12 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Clock,
   Check,
-  AlertTriangle,
   PlayCircle,
   User,
-  Star,
-  Hourglass,
   CheckCircle2,
+  Hourglass,
+  AlertCircle,
 } from "lucide-react";
 import Badge from "./Badge.jsx";
 import { formatDate } from "../utils/dateFormatter.js";
@@ -82,50 +81,50 @@ export function CountdownTimerBadge({ targetIso, label, warningHours = 4, danger
   );
 }
 
-export default function StageTimeline({ complaint, coordinatorUser, wardenUser, attachments = [] }) {
+export default function StageTimeline({ complaint, coordinatorUser, attachments = [] }) {
   if (!complaint) return null;
 
-  const rawStatus = String(complaint.status || "Starred").toLowerCase();
+  const rawStatus = String(complaint.status || "Complaint Raised").toLowerCase();
 
-  // Normalize into 3 clean stages: Starred, Going On, Done
-  const isStarred = rawStatus.includes("star") || rawStatus.includes("submit") || rawStatus.includes("pend");
+  // Normalize into 3 clean stages: Complaint Raised, Going On, Fixed
+  const isRaised = rawStatus.includes("raised") || rawStatus.includes("star") || rawStatus.includes("submit") || rawStatus.includes("pend");
   const isGoingOn = rawStatus.includes("going") || rawStatus.includes("progress") || rawStatus.includes("assign") || rawStatus.includes("part");
-  const isDone = rawStatus.includes("done") || rawStatus.includes("close") || rawStatus.includes("verif") || rawStatus.includes("resolv");
+  const isFixed = rawStatus.includes("fix") || rawStatus.includes("done") || rawStatus.includes("close") || rawStatus.includes("verif") || rawStatus.includes("resolv");
 
   const coordinatorName = coordinatorUser?.name || complaint.assigned_to || "Department Coordinator";
 
   const stages = [
     {
-      id: "starred",
-      title: "⭐ Starred",
-      status: isStarred ? "active" : "completed",
+      id: "raised",
+      title: "🟡 Complaint Raised",
+      status: isRaised ? "active" : "completed",
       actorName: complaint.creator_name || complaint.created_by || "Student",
-      actorRole: "Submitter",
+      actorRole: "Student",
       timestamp: complaint.created_at,
-      description: "Complaint logged and queued for department attention.",
+      description: "Complaint successfully filed and waiting in coordinator queue.",
     },
     {
       id: "going_on",
-      title: "⏳ Going On",
-      status: isDone ? "completed" : isGoingOn ? "active" : "pending",
+      title: "🔵 Going On",
+      status: isFixed ? "completed" : isGoingOn ? "active" : "pending",
       actorName: coordinatorName,
       actorRole: "Coordinator",
       timestamp: complaint.started_at || complaint.assigned_at,
-      description: isDone
-        ? "Work was completed by maintenance coordinator."
+      description: isFixed
+        ? "Work was started and completed by department coordinator."
         : isGoingOn
-        ? "Maintenance and repairs are actively underway."
-        : "Awaiting coordinator to begin maintenance work.",
+        ? "Coordinator started work. Maintenance is actively underway."
+        : "Awaiting coordinator to click Start.",
     },
     {
-      id: "done",
-      title: "✅ Done",
-      status: isDone ? "completed" : "pending",
+      id: "fixed",
+      title: "🟢 Fixed",
+      status: isFixed ? "completed" : "pending",
       actorName: coordinatorName,
       actorRole: "Coordinator",
       timestamp: complaint.fixed_at || complaint.resolved_at,
-      description: isDone
-        ? complaint.resolution_notes || "All repairs verified and completed."
+      description: isFixed
+        ? complaint.resolution_notes || "Repairs completed and verified."
         : "Work is not yet marked complete.",
     },
   ];
@@ -137,10 +136,10 @@ export default function StageTimeline({ complaint, coordinatorUser, wardenUser, 
         <div className="flex items-center justify-between mb-5 border-b border-slate-100 dark:border-slate-800/80 pb-3">
           <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-2">
             <Clock className="h-4 w-4 text-primary" />
-            Complaint Progress Tracker
+            Live Status Tracker
           </h2>
-          <span className="text-xs font-bold text-primary">
-            {isDone ? "Stage 3 of 3 (Done)" : isGoingOn ? "Stage 2 of 3 (Going On)" : "Stage 1 of 3 (Starred)"}
+          <span className="text-xs font-extrabold text-primary">
+            {isFixed ? "Stage 3 of 3 (Fixed)" : isGoingOn ? "Stage 2 of 3 (Going On)" : "Stage 1 of 3 (Complaint Raised)"}
           </span>
         </div>
 

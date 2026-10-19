@@ -252,13 +252,25 @@ export default function CoordinatorDashboard() {
   // Actions for My Jobs
   const handleStartWork = async (job) => {
     try {
-      await complaintService.updateStatus(job.complaint_id, "In Progress");
+      await complaintService.startWork(job.complaint_id);
       setToastTone("success");
-      setToastMessage(t("employee.toast_job_started", "Job started — status set to In Progress."));
+      setToastMessage("Work started! Status is now Going On.");
       reload();
     } catch (err) {
       setToastTone("danger");
       setToastMessage(err.response?.data?.detail || "Failed to start work.");
+    }
+  };
+
+  const handleDoneWork = async (job) => {
+    try {
+      await complaintService.resolve(job.complaint_id, { notes: "Work completed by coordinator", skip_photo: true });
+      setToastTone("success");
+      setToastMessage("Complaint marked as Fixed!");
+      reload();
+    } catch (err) {
+      setToastTone("danger");
+      setToastMessage("Failed to mark complaint as fixed.");
     }
   };
 
@@ -689,11 +701,11 @@ export default function CoordinatorDashboard() {
                       <Button
                         size="md"
                         variant="primary"
-                        onClick={() => setAssignModalComplaint(c)}
-                        className="font-bold text-xs flex items-center gap-1.5 shadow-sm py-2 px-4"
+                        onClick={() => handleStartWork(c)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-sm py-2 px-4 rounded-xl"
                       >
-                        <User className="h-4 w-4" />
-                        {t("coordinator.assign_to", "Assign to...")}
+                        <Play className="h-4 w-4" />
+                        Start
                       </Button>
                       <Button
                         size="sm"
@@ -874,27 +886,31 @@ export default function CoordinatorDashboard() {
 
                       {/* Big Mark Done button & More Menu */}
                       <div className="flex items-center gap-2.5 shrink-0 flex-wrap relative">
-                        {c.status === "Assigned" && (
+                        {(c.status === "Complaint Raised" || c.status === "Starred" || c.status === "Submitted") ? (
                           <Button
                             size="md"
                             variant="primary"
                             onClick={() => handleStartWork(c)}
-                            className="font-bold text-xs flex items-center gap-1.5 shadow-sm py-2 px-4"
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-sm py-2 px-4 rounded-xl"
                           >
                             <Play className="h-4 w-4" />
-                            {t("coordinator.start_work", "Start Work")}
+                            Start
                           </Button>
+                        ) : (c.status === "Going On" || c.status === "In Progress" || c.status === "Assigned") ? (
+                          <Button
+                            size="md"
+                            variant="success"
+                            onClick={() => handleDoneWork(c)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-sm py-2 px-5 rounded-xl"
+                          >
+                            <Check className="h-4 w-4" />
+                            Done
+                          </Button>
+                        ) : (
+                          <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                            Fixed
+                          </span>
                         )}
-
-                        <Button
-                          size="md"
-                          variant="success"
-                          onClick={() => handleOpenResolveModal(c)}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm py-2 px-5 rounded-xl"
-                        >
-                          <Check className="h-4 w-4" />
-                          {t("coordinator.mark_done", "Mark Done")}
-                        </Button>
 
                         {/* More Menu Toggle */}
                         <div className="relative">

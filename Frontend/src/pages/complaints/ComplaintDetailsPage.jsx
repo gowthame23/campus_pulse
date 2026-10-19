@@ -169,6 +169,14 @@ export default function ComplaintDetailsPage() {
     (user.user_id === complaint.created_by ||
       user.id === complaint.created_by ||
       user.email === complaint.created_by);
+  const statusNormalized = useMemo(() => {
+    const s = String(complaint?.status || "Complaint Raised").toLowerCase();
+    if (s.includes("raised") || s.includes("star") || s.includes("submit") || s.includes("pend")) return "Complaint Raised";
+    if (s.includes("going") || s.includes("progress") || s.includes("assign") || s.includes("part")) return "Going On";
+    if (s.includes("fix") || s.includes("done") || s.includes("close") || s.includes("verif") || s.includes("resolv")) return "Fixed";
+    return complaint?.status || "Complaint Raised";
+  }, [complaint?.status]);
+
   const isAssigned = Boolean(complaint?.assigned_to) || !["Submitted", "Pending"].includes(complaint?.status);
   const canStudentEditOrDelete =
     isOwner &&
@@ -783,6 +791,21 @@ export default function ComplaintDetailsPage() {
         setError(getApiError(err, "Failed to accept complaint."));
       }
       load();
+    }
+  };
+
+  const handleDirectDone = async () => {
+    setMessage("");
+    setError("");
+    try {
+      await complaintService.resolve(complaintId, {
+        notes: "Work completed by coordinator",
+        skip_photo: true,
+      });
+      setMessage("Complaint marked as Fixed.");
+      load();
+    } catch (err) {
+      setError(getApiError(err, "Failed to mark as fixed."));
     }
   };
 
@@ -1690,338 +1713,71 @@ export default function ComplaintDetailsPage() {
         <div className="grid gap-6">
           {/* Operations Action Center */}
           <Card>
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-2">
-              <Wrench className="h-4 w-4 text-primary" />
-              Action Center
-            </h2>
             <div className="grid gap-3">
-              {/* Assign to... Button */}
-              {(isCoordinator || isAdmin || isAppManager || (isWarden && (Number(complaint.assign_escalation_level || 0) >= 2 || !complaint.team_id))) &&
-                ["Submitted", "Pending", "Awaiting Coordinator Assignment"].includes(complaint.status) && (
-                  <Button
-                    type="button"
-                    onClick={() => setShowAssignModal(true)}
-                    variant="primary"
-                    className="w-full font-bold py-2.5 text-xs flex items-center justify-center gap-1.5"
-                  >
-                    <User className="h-4 w-4" />
-                    Assign to...
-                  </Button>
-                )}
+              {/* Coordinator 2-Step Action: Start -> Done */}
+              {(isCoordinator || isAdmin || isAppManager) && (
+                <div className="space-y-3">
+                  {statusNormalized === "Complaint Raised" && (
+                    <Button
+                      type="button"
+                      onClick={handleStartWork}
+                      variant="primary"
+                      className="w-full font-extrabold py-3.5 text-sm flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md transition-all active:scale-95"
+                    >
+                      <PlayCircle className="h-5 w-5" />
+                      Start
+                    </Button>
+                  )}
 
-              {/* Reassign Button */}
-              {(isAdmin || isAppManager || isCoordinator) &&
-                !["Closed", "Closed (Auto Closed)", "Rejected"].includes(complaint.status) &&
-                complaint.assigned_to && (
-                  <Button
-                    type="button"
-                    onClick={() => setShowAssignModal(true)}
-                    variant="outline"
-                    className="w-full font-semibold py-2 text-xs flex items-center justify-center gap-1.5"
-                  >
-                    <User className="h-3.5 w-3.5" />
-                    Reassign Complaint
-                  </Button>
-                )}
+                  {statusNormalized === "Going On" && (
+                    <Button
+                      type="button"
+                      onClick={handleDirectDone}
+                      variant="primary"
+                      className="w-full font-extrabold py-3.5 text-sm flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md transition-all active:scale-95"
+                    >
+                      <CheckCircle2 className="h-5 w-5" />
+                      Done
+                    </Button>
+                  )}
 
-              {/* Worker Work Execution Controls */}
-              {(isWorker && complaint.assigned_to === user?.user_id) && complaint.status === "Assigned" && (
-                <Button
-                  type="button"
-                  onClick={handleStartWork}
-                  variant="primary"
-                  className="w-full font-bold py-2.5 text-xs flex items-center justify-center gap-1.5"
-                >
-                  <Wrench className="h-4 w-4" />
-                  Start Work (In Progress)
-                </Button>
-              )}
-
-              {((isWorker && complaint.assigned_to === user?.user_id) || (isCoordinator && complaint.assigned_to)) && complaint.status === "In Progress" && (
-                <div className="grid gap-2">
-                  <Button
-                    type="button"
-                    onClick={() => setShowProgressModal(true)}
-                    variant="outline"
-                    className="w-full font-bold py-2 text-xs flex items-center justify-center gap-1.5"
-                  >
-                    <FileText className="h-4 w-4" />
-                    Add Progress Note
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => setShowPauseModal(true)}
-                    variant="outline"
-                    className="w-full font-bold py-2 text-xs text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 flex items-center justify-center gap-1.5"
-                  >
-                    <Clock className="h-4 w-4" />
-                    Waiting for Parts (Pause)
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => setShowResolveModal(true)}
-                    variant="success"
-                    className="w-full font-bold py-2.5 text-xs flex items-center justify-center gap-1.5"
-                  >
-                    <Check className="h-4 w-4" />
-                    Mark Done / Resolve Work
-                  </Button>
-                </div>
-              )}
-
-              {((isWorker && complaint.assigned_to === user?.user_id) || isCoordinator) && complaint.status === "Waiting for Parts" && (
-                <Button
-                  type="button"
-                  onClick={handleResumeWork}
-                  variant="primary"
-                  className="w-full font-bold py-2.5 text-xs flex items-center justify-center gap-1.5"
-                >
-                  <Check className="h-4 w-4" />
-                  Resume Work (Parts Arrived)
-                </Button>
-              )}
-
-
-              {/* Warden Verification Controls */}
-              {complaint.status === "Pending Warden Verification" && (
-                <div className="p-3 rounded-xl border border-purple-200 dark:border-purple-900/60 bg-purple-50/50 dark:bg-purple-950/20 space-y-2.5">
-                  <div className="flex items-center gap-2 text-purple-900 dark:text-purple-200 text-xs font-bold">
-                    <ShieldAlert className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                    Pending Warden Verification
-                  </div>
-                  {isSelfWorkOnTicket && !isAdmin ? (
-                    <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium">
-                      Self-Verification Guard: You cannot verify a complaint you worked on or filed.
-                    </p>
-                  ) : (isLocationWarden || isAdmin) ? (
-                    <div className="grid grid-cols-2 gap-2 pt-1">
-                      <Button
-                        type="button"
-                        variant="success"
-                        onClick={() => {
-                          setWardenVerdictChoice("Verified");
-                          setShowWardenVerifyModal(true);
-                        }}
-                        className="font-bold text-xs py-2"
-                      >
-                        Verified Fixed
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="danger"
-                        onClick={() => {
-                          setWardenVerdictChoice("Not Fixed");
-                          setShowWardenVerifyModal(true);
-                        }}
-                        className="font-bold text-xs py-2"
-                      >
-                        Not Fixed
-                      </Button>
+                  {statusNormalized === "Fixed" && (
+                    <div className="w-full py-3 px-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 font-bold text-center flex items-center justify-center gap-2 text-sm">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                      Fixed
                     </div>
-                  ) : (
-                    <p className="text-[11px] text-slate-500 font-medium">
-                      Awaiting in-person inspection from location warden.
-                    </p>
                   )}
                 </div>
               )}
 
-              {/* Student Confirmation Controls */}
-              {complaint.status === "Waiting for Verification" && (
+              {/* Student Confirmation Controls when Fixed */}
+              {(isOwner || isAdmin) && statusNormalized === "Fixed" && (
                 <div className="p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-emerald-900 dark:text-emerald-100 flex items-center gap-1.5">
                       <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                      Student Confirmation Required
-                    </span>
-                    <span className="text-[10px] font-mono font-bold text-slate-500">
-                      {complaint.reopen_count || 0} of 3 reopens used
+                      Is your issue resolved?
                     </span>
                   </div>
-                  <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
-                    Auto-closes in 48h if unconfirmed (reminder at 24h).
-                  </div>
-                  {(isOwner || isAdmin) ? (
-                    <div className="space-y-2 pt-1">
-                      <Button
-                        type="button"
-                        variant="success"
-                        onClick={handleStudentConfirm}
-                        className="w-full font-bold py-2.5 text-xs flex items-center justify-center gap-1.5 shadow-sm"
-                      >
-                        <Check className="h-4 w-4" />
-                        Confirm fixed
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setStudentReopenReason("");
-                          setShowStudentReopenModal(true);
-                        }}
-                        className="w-full font-bold py-2 text-xs text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-900 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center justify-center gap-1.5"
-                      >
-                        <AlertTriangle className="h-4 w-4" />
-                        Still not fixed
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => {
-                          setStudentReopenReason("Photo doesn't match: The uploaded resolution photo does not correspond to the reported issue.");
-                          setShowStudentReopenModal(true);
-                        }}
-                        className="w-full font-medium py-1.5 text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center justify-center gap-1.5 border border-dashed border-amber-300 dark:border-amber-800"
-                      >
-                        Photo doesn't match
-                      </Button>
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-slate-500 font-medium">
-                      Work has been marked resolved. Awaiting student confirmation.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Admin Decision for Admin Review */}
-              {complaint.status === "Admin Review" && (
-                <div className="p-3.5 rounded-xl border border-rose-300 dark:border-rose-900 bg-rose-50/80 dark:bg-rose-950/30 space-y-2.5">
-                  <div className="flex items-center gap-2 text-rose-900 dark:text-rose-200 text-xs font-bold">
-                    <ShieldAlert className="h-4 w-4 text-rose-600" />
-                    Admin Review Required (Disputed Ticket)
-                  </div>
-                  <p className="text-[11px] text-rose-800 dark:text-rose-300 font-medium">
-                    This ticket reached the maximum student reopen attempts (3/3).
-                  </p>
-                  {isAdmin ? (
+                  <div className="grid grid-cols-2 gap-2 pt-1">
                     <Button
                       type="button"
-                      variant="primary"
-                      onClick={() => setShowAdminDecisionModal(true)}
-                      className="w-full font-bold text-xs py-2 mt-1"
+                      variant="success"
+                      onClick={handleStudentConfirm}
+                      className="font-bold text-xs py-2.5 flex items-center justify-center gap-1.5"
                     >
-                      Issue Admin Review Decision
+                      <Check className="h-4 w-4" />
+                      Yes, All Fixed
                     </Button>
-                  ) : (
-                    <p className="text-[11px] text-slate-500 font-medium italic">
-                      Under review by campus administration.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Student Feedback & Rating for Closed complaints */}
-              {["Closed", "Closed (Auto Closed)"].includes(complaint.status) && (
-                <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                      <span>⭐</span> Coordinator Rating & Feedback
-                    </span>
-                    {feedbacks.length > 0 && (
-                      <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-                        Feedback Submitted
-                      </span>
-                    )}
+                    <Button
+                      type="button"
+                      variant="danger"
+                      onClick={() => setShowReopenModal(true)}
+                      className="font-bold text-xs py-2.5 flex items-center justify-center gap-1.5"
+                    >
+                      Not Fixed
+                    </Button>
                   </div>
-
-                  {feedbacks.length > 0 ? (
-                    <div className="space-y-2">
-                      {feedbacks.map((fb, idx) => (
-                        <div key={idx} className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
-                          <div className="flex items-center justify-between font-semibold">
-                            <span className="text-amber-500">
-                              {"★".repeat(Math.max(1, fb.rating || 5))}{"☆".repeat(Math.max(0, 5 - Math.max(1, fb.rating || 5)))}
-                            </span>
-                            <span className="text-[10px] text-slate-400">
-                              {fb.created_at ? formatDate(fb.created_at) : ""}
-                            </span>
-                          </div>
-                          {fb.thank_you_note && (
-                            <p className="mt-1 text-slate-700 dark:text-slate-200 italic">
-                              "{fb.thank_you_note}"
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : isOwner ? (
-                    <form onSubmit={handleFeedbackSubmit} className="space-y-2.5">
-                      <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                        How was the resolution? Rate your experience and leave an optional thank-you note for the coordinator.
-                      </p>
-                      <div className="flex items-center gap-2">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            type="button"
-                            onClick={() => setFeedbackRating(star)}
-                            className={`text-xl transition-transform hover:scale-125 cursor-pointer ${
-                              star <= feedbackRating ? "text-amber-400" : "text-slate-300 dark:text-slate-600"
-                            }`}
-                          >
-                            ★
-                          </button>
-                        ))}
-                        <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 ml-1">
-                          {feedbackRating} / 5 Stars
-                        </span>
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Add a thank-you note for the coordinator (optional)..."
-                        value={feedbackNote}
-                        onChange={(e) => setFeedbackNote(e.target.value)}
-                        className="h-9 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 outline-none focus:border-primary"
-                      />
-                      <Button
-                        type="submit"
-                        variant="primary"
-                        disabled={submittingFeedback}
-                        className="w-full text-xs font-bold py-1.5"
-                      >
-                        {submittingFeedback ? "Submitting..." : "Send Feedback & Thank You"}
-                      </Button>
-                    </form>
-                  ) : (
-                    <p className="text-[11px] text-slate-500 italic">
-                      No student feedback submitted for this resolution yet.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {complaint.visibility_type === "Community" && (
-                <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3 grid gap-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                      Affected Students
-                    </span>
-                    <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-0.5 rounded-full">
-                      {complaint.affected_count || 0} Affected
-                    </span>
-                  </div>
-                  {user?.role === ROLES.STUDENT &&
-                    !["Closed", "Closed (Auto Closed)"].includes(complaint.status) && (
-                      <Button
-                        onClick={async () => {
-                          try {
-                            setError("");
-                            setMessage("");
-                            const res = await complaintService.markAffected(complaintId);
-                            setComplaint(res.data);
-                            setMessage("You have been marked as affected by this issue.");
-                          } catch (err) {
-                            setError(getApiError(err, "Could not mark as affected."));
-                          }
-                        }}
-                        variant="subtle"
-                        className="w-full font-bold py-2 flex items-center justify-center gap-1.5 text-xs"
-                      >
-                        <Plus className="h-4 w-4" />
-                        I'm Affected Too
-                      </Button>
-                    )}
                 </div>
               )}
             </div>

@@ -28,23 +28,25 @@ export const getRoleDisplayName = (role) => {
   return ROLE_DISPLAY_NAMES[clean] || role;
 };
 
-// 3 Canonical Complaint Lifecycle Statuses: Starred, Going On, Done
+// 3 Canonical Complaint Lifecycle Statuses: Complaint Raised, Going On, Fixed
 export const COMPLAINT_STATUS = {
-  STARRED: "Starred",
+  RAISED: "Complaint Raised",
   GOING_ON: "Going On",
-  DONE: "Done",
+  FIXED: "Fixed",
   // Backward compatibility mappings
-  SUBMITTED: "Starred",
-  PENDING: "Starred",
+  STARRED: "Complaint Raised",
+  DONE: "Fixed",
+  SUBMITTED: "Complaint Raised",
+  PENDING: "Complaint Raised",
   ASSIGNED: "Going On",
   IN_PROGRESS: "Going On",
-  WAITING_VERIFICATION: "Done",
-  CLOSED: "Done",
-  AUTO_CLOSED: "Done",
+  WAITING_VERIFICATION: "Fixed",
+  CLOSED: "Fixed",
+  AUTO_CLOSED: "Fixed",
   REOPENED: "Going On",
-  AWAITING_ASSIGNMENT: "Starred",
+  AWAITING_ASSIGNMENT: "Complaint Raised",
   WAITING_FOR_PARTS: "Going On",
-  PENDING_WARDEN_VERIFICATION: "Done",
+  PENDING_WARDEN_VERIFICATION: "Fixed",
   ADMIN_REVIEW: "Going On",
 };
 

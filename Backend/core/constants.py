@@ -29,45 +29,49 @@ SLA_REMINDER_FRACTIONS = (0.5, 0.9)
 # Maximum Blocked Time (alert warden and app manager if blocked past this)
 MAX_BLOCKED_HOURS = 72
 
-# Complaint Lifecycle Statuses — 3 Canonical States: Starred, Going On, Done
-STATUS_STARRED = "Starred"                          # New / Received / Queued
-STATUS_GOING_ON = "Going On"                        # In Progress / Under Maintenance
-STATUS_DONE = "Done"                                # Completed / Resolved
+# Complaint Lifecycle Statuses — 3 Canonical States: Complaint Raised, Going On, Fixed
+STATUS_RAISED = "Complaint Raised"                  # New / Filed by student
+STATUS_GOING_ON = "Going On"                        # In Progress / Work started by coordinator
+STATUS_FIXED = "Fixed"                              # Fixed / Work done by coordinator
+
+STATUS_STARRED = STATUS_RAISED
+STATUS_DONE = STATUS_FIXED
 
 # Canonical 3 statuses list
-CANONICAL_STATUSES = (STATUS_STARRED, STATUS_GOING_ON, STATUS_DONE)
+CANONICAL_STATUSES = (STATUS_RAISED, STATUS_GOING_ON, STATUS_FIXED)
 
 # Aliases mapped to the 3 canonical statuses
-STATUS_SUBMITTED = STATUS_STARRED
+STATUS_SUBMITTED = STATUS_RAISED
 STATUS_ASSIGNED = STATUS_GOING_ON
 STATUS_IN_PROGRESS = STATUS_GOING_ON
 STATUS_BLOCKED = STATUS_GOING_ON
-STATUS_PENDING_WARDEN = STATUS_DONE
-STATUS_WAITING_STUDENT = STATUS_DONE
-STATUS_WAITING_VERIFICATION = STATUS_DONE
+STATUS_PENDING_WARDEN = STATUS_FIXED
+STATUS_WAITING_STUDENT = STATUS_FIXED
+STATUS_WAITING_VERIFICATION = STATUS_FIXED
 STATUS_REOPENED = STATUS_GOING_ON
 STATUS_ADMIN_REVIEW = STATUS_GOING_ON
-STATUS_CLOSED = STATUS_DONE
-STATUS_AUTO_CLOSED = STATUS_DONE
+STATUS_CLOSED = STATUS_FIXED
+STATUS_AUTO_CLOSED = STATUS_FIXED
 STATUS_REJECTED = "Rejected"
 STATUS_CANCELLED = "Cancelled"
 STATUS_CANCELLATION_REQUESTED = "Cancellation Requested"
 
-# Legacy status compatibility: old 'Resolved' rows are treated as 'Done'
-STATUS_LEGACY_RESOLVED = STATUS_DONE
+# Legacy status compatibility: old 'Resolved' rows are treated as 'Fixed'
+STATUS_LEGACY_RESOLVED = STATUS_FIXED
 
 def normalize_status(status: str) -> str:
-    """Normalize any legacy or incoming status string to one of the 3 canonical statuses."""
+    """Normalize any legacy or incoming status string to one of the 3 canonical statuses:
+    'Complaint Raised', 'Going On', 'Fixed'."""
     if not status:
-        return STATUS_STARRED
+        return STATUS_RAISED
     s = str(status).strip()
-    if s in (STATUS_STARRED, STATUS_GOING_ON, STATUS_DONE, STATUS_CANCELLED, STATUS_REJECTED):
+    if s in (STATUS_RAISED, STATUS_GOING_ON, STATUS_FIXED, STATUS_CANCELLED, STATUS_REJECTED):
         return s
     s_lower = s.lower()
-    if s_lower in ("submitted", "pending", "awaiting coordinator assignment", "awaiting assignment", "starred"):
-        return STATUS_STARRED
-    if any(k in s_lower for k in ("closed", "auto closed", "resolved", "verified", "done")):
-        return STATUS_DONE
+    if any(k in s_lower for k in ("raised", "submitted", "pending", "awaiting", "starred", "new")):
+        return STATUS_RAISED
+    if any(k in s_lower for k in ("fixed", "closed", "auto closed", "resolved", "verified", "done")):
+        return STATUS_FIXED
     if "cancel" in s_lower:
         return STATUS_CANCELLED
     if "reject" in s_lower:
@@ -76,7 +80,7 @@ def normalize_status(status: str) -> str:
 
 # Status Categories
 INACTIVE_STATUSES = (
-    STATUS_DONE,
+    STATUS_FIXED,
     "Closed",
     "Closed (Auto Closed)",
     "Auto-Closed",
@@ -85,7 +89,7 @@ INACTIVE_STATUSES = (
 )
 
 TERMINAL_STATUSES = (
-    STATUS_DONE,
+    STATUS_FIXED,
     "Closed",
     "Closed (Auto Closed)",
     "Auto-Closed",
@@ -95,7 +99,7 @@ TERMINAL_STATUSES = (
 
 # Statuses where the SLA countdown clock is actively ticking
 SLA_ACTIVE_STATUSES = (
-    STATUS_STARRED,
+    STATUS_RAISED,
     STATUS_GOING_ON,
 )
 
