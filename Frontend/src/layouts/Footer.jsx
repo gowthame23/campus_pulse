@@ -18,7 +18,7 @@ export default function Footer() {
   ];
 
   return (
-    <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md md:hidden shadow-xs">
+    <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md md:hidden shadow-xs pb-[env(safe-area-inset-bottom,0px)]">
       <nav
         className="grid"
         style={{

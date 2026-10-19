@@ -222,10 +222,10 @@ export default function NotificationsPage() {
       <Toast message={error} tone="danger" onClose={() => setError("")} />
 
       {/* Segmented Pill Tabs */}
-      <div className="inline-flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl gap-1 w-fit">
+      <div className="inline-flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl gap-1 overflow-x-auto max-w-full scrollbar-none">
         <button
           onClick={() => setActiveTab("notifications")}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
             activeTab === "notifications"
               ? "bg-white dark:bg-slate-900 text-primary shadow-2xs font-semibold"
               : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
@@ -246,7 +246,7 @@ export default function NotificationsPage() {
 
         <button
           onClick={() => setActiveTab("preferences")}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
             activeTab === "preferences"
               ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-semibold"
               : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"

@@ -485,29 +485,24 @@ export default function CoordinatorDashboard() {
         </div>
       </div>
 
-      {/* Main Action Pills Block */}
+      {/* Quick Action Navigation Pills */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
         <ActionPill
-          icon={Clock}
-          label={t("pills.to_assign", "To assign")}
-          count={toAssignComplaints.length}
-          active={activeTab === "to_assign"}
-          onClick={() => setActiveTab("to_assign")}
-          tone="amber"
-        />
-        <ActionPill
           icon={Users}
-          label={t("pills.team_board", "Department board")}
-          active={activeTab === "team_board"}
-          onClick={() => setActiveTab("team_board")}
-          tone="purple"
+          label={t("nav.workload", "Team Workload")}
+          to="/workload"
+          tone="indigo"
         />
         <ActionPill
-          icon={Wrench}
-          label={t("pills.my_jobs", "My jobs")}
-          count={myJobs.length}
-          active={activeTab === "my_jobs"}
-          onClick={() => setActiveTab("my_jobs")}
+          icon={TrendingUp}
+          label={t("coordinator.performance_btn", "Coordinator Stats")}
+          to="/coordinators/performance"
+          tone="emerald"
+        />
+        <ActionPill
+          icon={CheckCircle2}
+          label={t("nav.resolved", "Resolved Archive")}
+          to="/resolved"
           tone="blue"
         />
       </div>
@@ -547,11 +542,11 @@ export default function CoordinatorDashboard() {
       {/* Main Four-Tab Interface (Part K1) */}
       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
         {/* Tab Switcher */}
-        <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 overflow-x-auto">
+        <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 overflow-x-auto max-w-full scrollbar-none">
           <button
             type="button"
             onClick={() => setActiveTab("to_assign")}
-            className={`flex items-center gap-2 px-6 py-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === "to_assign"
                 ? "border-blue-600 text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900"
                 : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
@@ -569,7 +564,7 @@ export default function CoordinatorDashboard() {
           <button
             type="button"
             onClick={() => setActiveTab("team_board")}
-            className={`flex items-center gap-2 px-6 py-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === "team_board"
                 ? "border-blue-600 text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900"
                 : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
@@ -587,7 +582,7 @@ export default function CoordinatorDashboard() {
           <button
             type="button"
             onClick={() => setActiveTab("my_jobs")}
-            className={`flex items-center gap-2 px-6 py-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === "my_jobs"
                 ? "border-blue-600 text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900"
                 : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
@@ -605,7 +600,7 @@ export default function CoordinatorDashboard() {
           <button
             type="button"
             onClick={() => setActiveTab("stats")}
-            className={`flex items-center gap-2 px-6 py-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === "stats"
                 ? "border-blue-600 text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900"
                 : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
@@ -618,7 +613,7 @@ export default function CoordinatorDashboard() {
           <button
             type="button"
             onClick={() => setActiveTab("team_members")}
-            className={`flex items-center gap-2 px-6 py-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === "team_members"
                 ? "border-blue-600 text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900"
                 : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"

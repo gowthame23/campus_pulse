@@ -242,9 +242,6 @@ export default function StudentDashboard() {
             Track your reported campus issues, verify completed work, and monitor live notices.
           </p>
         </div>
-        <div className="flex items-center gap-2.5 shrink-0">
-          <EmergencyButton userLocationId={user?.location_id} />
-        </div>
       </div>
 
       {/* Main Action Pills Block (Max 4) */}
@@ -441,11 +438,11 @@ export default function StudentDashboard() {
             </p>
           </div>
 
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-semibold">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-semibold overflow-x-auto max-w-full scrollbar-none">
             <button
               type="button"
               onClick={() => setActiveTab("need_attention")}
-              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === "need_attention"
                   ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
@@ -456,7 +453,7 @@ export default function StudentDashboard() {
             <button
               type="button"
               onClick={() => setActiveTab("active")}
-              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === "active"
                   ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
@@ -467,7 +464,7 @@ export default function StudentDashboard() {
             <button
               type="button"
               onClick={() => setActiveTab("all")}
-              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === "all"
                   ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900"

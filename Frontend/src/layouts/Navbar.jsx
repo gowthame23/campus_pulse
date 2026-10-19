@@ -255,9 +255,10 @@ export default function Navbar({ onMenuClick }) {
           </button>
 
           {user?.role && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-bold shrink-0">
+            <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-bold shrink-0">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <span>{getRoleDisplayName(user.role)} Portal</span>
+              <span className="hidden sm:inline">{getRoleDisplayName(user.role)} Portal</span>
+              <span className="sm:hidden">{getRoleDisplayName(user.role).replace("Location In Charge", "Warden").replace("Administrator", "Admin").replace("App Manager", "Manager")}</span>
             </div>
           )}
 
@@ -489,7 +490,7 @@ export default function Navbar({ onMenuClick }) {
           {/* Theme Switcher */}
           <button
             onClick={toggleTheme}
-            className="flex items-center justify-center rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100 transition-colors"
+            className="hidden sm:flex items-center justify-center rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100 transition-colors"
             title={isDark ? "Switch to Light Theme" : "Switch to Dark Theme"}
             aria-label="Toggle theme"
           >
@@ -627,12 +628,12 @@ export default function Navbar({ onMenuClick }) {
           {/* Direct Quick Logout Button */}
           <button
             onClick={() => setConfirmLogout(true)}
-            className="flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 border border-red-200/60 dark:border-red-900/40 transition-colors cursor-pointer"
+            className="hidden sm:flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 border border-red-200/60 dark:border-red-900/40 transition-colors cursor-pointer"
             title="Logout"
             aria-label="Logout"
           >
             <LogOut className="h-4 w-4 shrink-0" />
-            <span className="hidden sm:inline">Logout</span>
+            <span>Logout</span>
           </button>
         </div>
       </div>
