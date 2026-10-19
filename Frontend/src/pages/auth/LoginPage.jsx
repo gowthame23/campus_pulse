@@ -83,62 +83,61 @@ export default function LoginPage() {
 
   return (
     <main className="relative flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 px-4 py-12 transition-colors duration-200">
-      <div className="relative w-full max-w-[420px] rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-md md:p-8 animate-in fade-in duration-200">
-        {/* Top-Right Corner Controls inside Login Card */}
-        <div className="absolute top-3.5 right-3.5 flex items-center gap-1.5 z-20">
-          {/* Language Selector Dropdown */}
-          <div className="relative" ref={langRef}>
-            <button
-              type="button"
-              onClick={() => setLangMenuOpen((prev) => !prev)}
-              className="flex items-center gap-1 h-7 px-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
-              title="Select language"
-              aria-label="Select language"
-            >
-              <Globe className="h-3 w-3 text-primary" />
-              <span>{LANGUAGES.find((l) => l.code === language)?.label || "English"}</span>
-              <ChevronDown className={`h-3 w-3 text-slate-400 transition-transform ${langMenuOpen ? "rotate-180" : ""}`} />
-            </button>
-
-            {langMenuOpen && (
-              <div className="absolute right-0 mt-1 w-28 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg py-1 z-30 animate-in fade-in zoom-in-95 duration-100">
-                {LANGUAGES.map((l) => (
-                  <button
-                    key={l.code}
-                    type="button"
-                    onClick={() => {
-                      setLanguage(l.code);
-                      setLangMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-medium text-left transition-colors cursor-pointer ${
-                      language === l.code
-                        ? "bg-primary/10 text-primary font-bold"
-                        : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                    }`}
-                  >
-                    <span>{l.label}</span>
-                    {language === l.code && <Check className="h-3.5 w-3.5 text-primary" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Single Theme Toggle Button (Light <-> Dark) */}
+      {/* Top-Right Corner outside the box: Compact Language Dropdown */}
+      <div className="absolute top-4 right-4 z-20" ref={langRef}>
+        <div className="relative">
           <button
             type="button"
-            onClick={() => setThemeMode(activeTheme === "dark" ? "light" : "dark")}
-            title={activeTheme === "dark" ? "Switch to Light mode" : "Switch to Dark mode"}
-            aria-label="Toggle theme"
-            className="flex items-center justify-center h-7 w-7 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+            onClick={() => setLangMenuOpen((prev) => !prev)}
+            className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 hover:bg-white dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 shadow-xs backdrop-blur-xs transition-colors cursor-pointer"
+            title="Select language"
+            aria-label="Select language"
           >
-            {activeTheme === "dark" ? (
-              <Sun className="h-3.5 w-3.5 text-amber-400" />
-            ) : (
-              <Moon className="h-3.5 w-3.5 text-slate-600" />
-            )}
+            <Globe className="h-3.5 w-3.5 text-primary" />
+            <span>{LANGUAGES.find((l) => l.code === language)?.label || "English"}</span>
+            <ChevronDown className={`h-3 w-3 text-slate-400 transition-transform ${langMenuOpen ? "rotate-180" : ""}`} />
           </button>
+
+          {langMenuOpen && (
+            <div className="absolute right-0 mt-1 w-28 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg py-1 z-30 animate-in fade-in zoom-in-95 duration-100">
+              {LANGUAGES.map((l) => (
+                <button
+                  key={l.code}
+                  type="button"
+                  onClick={() => {
+                    setLanguage(l.code);
+                    setLangMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-medium text-left transition-colors cursor-pointer ${
+                    language === l.code
+                      ? "bg-primary/10 text-primary font-bold"
+                      : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <span>{l.label}</span>
+                  {language === l.code && <Check className="h-3.5 w-3.5 text-primary" />}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+      </div>
+
+      <div className="relative w-full max-w-[420px] rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-md md:p-8 animate-in fade-in duration-200">
+        {/* Single Theme Toggle Button inside corner of Login Card */}
+        <button
+          type="button"
+          onClick={() => setThemeMode(activeTheme === "dark" ? "light" : "dark")}
+          title={activeTheme === "dark" ? "Switch to Light mode" : "Switch to Dark mode"}
+          aria-label="Toggle theme"
+          className="absolute top-3.5 right-3.5 z-20 flex items-center justify-center h-8 w-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+        >
+          {activeTheme === "dark" ? (
+            <Sun className="h-4 w-4 text-amber-400" />
+          ) : (
+            <Moon className="h-4 w-4 text-slate-600" />
+          )}
+        </button>
 
         {/* Header Branding */}
         <div className="mb-8 text-center pt-1 sm:pt-0">

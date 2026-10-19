@@ -459,5 +459,16 @@
 * **Verification:**
   - `npm run build` completed in 1.35s with 0 errors.
 
+### Entry 31 — Position Language Dropdown to Page Top Corner Outside Login Box
+* **User Directive:** "keep the language on the top corner out of the box"
+* **Issues Addressed & Actions Taken:**
+  1. **Moved Language Dropdown Outside Login Box ([`LoginPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/auth/LoginPage.jsx)):**
+     - Relocated the compact language dropdown (`🌐 English ▾`) to the page's top-right corner outside the login card (`absolute top-4 right-4 z-20`).
+     - Preserved the clean dropdown menu behavior for selecting English, తెలుగు, and हिन्दी with click-outside listener.
+  2. **Retained Single Theme Toggle Inside Login Box Corner ([`LoginPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/auth/LoginPage.jsx)):**
+     - Kept the single button toggle between Light and Dark mode (`☀️ / 🌙`) positioned cleanly in the top-right corner of the login card (`absolute top-3.5 right-3.5 z-20`).
+* **Verification:**
+  - `npm run build` completed in 1.38s with 0 errors.
+
 ---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
