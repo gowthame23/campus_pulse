@@ -54,23 +54,24 @@ import os
 env_type = os.getenv("ENVIRONMENT", "development").lower()
 cors_env = os.getenv("CORS_ORIGINS")
 reload_env = os.getenv("RELOAD", "false").lower()
-if env_type == "production":
-    if not cors_env:
-        raise RuntimeError(
-            "CORS_ORIGINS must be explicitly set when ENVIRONMENT=production. "
-            "Refusing to silently fall back to localhost origins in production."
-        )
-    if reload_env in ("true", "1", "yes"):
-        raise RuntimeError(
-            "RELOAD must not be enabled when ENVIRONMENT=production. "
-            "Auto-reload in production is unsafe."
-        )
+if env_type == "production" and reload_env in ("true", "1", "yes"):
+    raise RuntimeError(
+        "RELOAD must not be enabled when ENVIRONMENT=production. "
+        "Auto-reload in production is unsafe."
+    )
 
-cors_origins = (cors_env or "http://127.0.0.1:5173,http://localhost:5173").split(",")
+cors_origins = [o.strip() for o in (cors_env or "").split(",") if o.strip()]
+if not cors_origins:
+    cors_origins = [
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "https://campuspulse-rho.vercel.app",
+    ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app|http://localhost:\d+|http://127\.0\.0\.1:\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
