@@ -196,10 +196,11 @@
      - Confirmed HTTP 200 response on `https://campuspulse-rho.vercel.app/login`.
   2. **Backend Configured for Railway:**
      - Relaxed `CORS_ORIGINS` in `Backend/api/main.py` with safe defaults allowing `https://.*\.vercel\.app`, localhost, and `campuspulse-rho.vercel.app`.
-     - Standardized startup command in `Backend/run_api.py` and root `run_api.py` using Python-native environment parsing (`os.environ.get("PORT", "8000")`) and listening on `0.0.0.0` to eliminate shell variable expansion errors (`$PORT`).
-     - Updated `Procfile`, `Backend/Procfile`, and `Backend/Dockerfile` to invoke `python run_api.py`.
-     - Pushed commits `5cdc1f5` and `3b0fc4c` to GitHub main branch.
-* **Current Status:** Vercel frontend is live. Railway backend is configured and ready for service start command update to `python run_api.py`.
+     - Diagnosed Railway crash root cause from traceback: `uvicorn` attempting to import `api.main:app` from repository root where `api/` subdirectory was nested under `Backend/`.
+     - Standardized startup command in `Backend/run_api.py` and root `run_api.py` using Python-native environment parsing (`os.environ.get("PORT", "8000")`) and listening on `0.0.0.0` with automatic `Backend` path resolution.
+     - Added root `requirements.txt` and declarative `railway.json` with `"startCommand": "python run_api.py"`.
+     - Pushed commits `5cdc1f5`, `3b0fc4c`, `7ad4b13`, and `7d1a8f6` to GitHub `main` branch.
+* **Current Status:** Vercel frontend is live. Railway backend updated with automated root launcher and railway.json specification.
 
 ---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
