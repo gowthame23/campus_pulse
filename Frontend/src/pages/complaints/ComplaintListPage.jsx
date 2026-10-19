@@ -643,15 +643,15 @@ export default function ComplaintListPage() {
   ];
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-4 sm:gap-6">
       <PageHeader
         title="Complaints Tracker"
         description="Monitor, filter, and track campus complaints by location, department, status, or keyword."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
             {(user?.role === "student" || user?.role === "location_in_charge") && (
               <Link to="/complaints/new">
-                <Button size="sm" className="min-h-10 font-bold gap-1">
+                <Button size="sm" className="h-9 sm:h-10 font-bold gap-1 text-xs sm:text-sm">
                   <Plus className="h-4 w-4" />
                   File New Complaint
                 </Button>
@@ -661,7 +661,7 @@ export default function ComplaintListPage() {
               variant="subtle"
               size="sm"
               onClick={reload}
-              className="min-h-10"
+              className="h-9 sm:h-10 text-xs sm:text-sm"
             >
               <RotateCw className="h-4 w-4 mr-1" />
               Refresh
@@ -671,14 +671,14 @@ export default function ComplaintListPage() {
       />
 
       {/* Grid List Table with Single Merged Filter Toolbar */}
-      <Card>
+      <Card className="p-3.5 sm:p-6">
         {/* Top-Level Division: Remaining/Active vs Closed & Auto-Closed vs All */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 mb-2 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 sm:pb-3 mb-2 border-b border-slate-100 dark:border-slate-800">
           <div className="inline-flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl gap-1 overflow-x-auto max-w-full scrollbar-none">
             <button
               type="button"
               onClick={() => handleTabChange("remaining")}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 lifecycleTab === "remaining"
                   ? "bg-white dark:bg-slate-900 text-primary shadow-2xs font-semibold"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
@@ -700,7 +700,7 @@ export default function ComplaintListPage() {
             <button
               type="button"
               onClick={() => handleTabChange("closed")}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 lifecycleTab === "closed"
                   ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-2xs font-semibold"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
@@ -722,7 +722,7 @@ export default function ComplaintListPage() {
             <button
               type="button"
               onClick={() => handleTabChange("all")}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 lifecycleTab === "all"
                   ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-semibold"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
@@ -735,112 +735,115 @@ export default function ComplaintListPage() {
         </div>
 
         {/* Single Merged Filter & Search Toolbar */}
-        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 my-2">
-          {/* Search Box - Takes flexible width */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 my-2">
+          {/* Search Box - Takes full width on mobile, flexible on desktop */}
           <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search complaints..."
-              className="h-10 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-10 pr-9 text-xs font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-primary transition-colors"
+              className="h-9 sm:h-10 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-9 sm:pl-10 pr-8 text-xs font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-primary transition-colors"
             />
             {query && (
               <button
                 type="button"
                 onClick={() => setQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
 
-          {/* Merged Location Dropdown Filter */}
-          <select
-            value={activeLocationTab}
-            onChange={(e) => setActiveLocationTab(e.target.value)}
-            className="h-10 w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-primary shrink-0"
-          >
-            <option value="all">📍 All Locations ({getLocationCount("all")})</option>
-            {locations.map((loc) => {
-              const cnt = getLocationCount(loc.location_id);
-              return (
-                <option key={loc.location_id} value={loc.location_id}>
-                  📍 {loc.name} ({cnt})
-                </option>
-              );
-            })}
-          </select>
-
-          {/* Merged Department Dropdown Filter (Dynamically scoped to selected location & lifecycle tab) */}
-          <select
-            value={selectedDepartment}
-            onChange={(e) => setSelectedDepartment(e.target.value)}
-            className="h-10 w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-primary shrink-0"
-          >
-            <option value="">🏢 All Departments ({getDepartmentCount("")})</option>
-            {availableDepartments.map((deptName) => {
-              const cnt = getDepartmentCount(deptName);
-              return (
-                <option key={deptName} value={deptName}>
-                  🏢 {deptName} ({cnt})
-                </option>
-              );
-            })}
-          </select>
-
-          {/* Merged Status Filter Dropdown (Tailored to active tab) */}
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="h-10 w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-primary shrink-0"
-          >
-            {lifecycleTab === "remaining" && (
-              <>
-                <option value="">All Remaining Statuses ({remainingCount})</option>
-                <option value="Escalated">🚨 Escalated / Critical</option>
-                <option value="Submitted">Submitted (New)</option>
-                <option value="Assigned">Assigned to Coordinator</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Waiting for Verification">Waiting for Verification</option>
-                <option value="Reopened">Reopened</option>
-              </>
-            )}
-            {lifecycleTab === "closed" && (
-              <>
-                <option value="">All Closed Statuses ({closedCount})</option>
-                <option value="Closed">Closed</option>
-                <option value="Closed (Auto Closed)">Closed (Auto Closed)</option>
-                <option value="Rejected">Rejected</option>
-              </>
-            )}
-            {lifecycleTab === "all" && (
-              <>
-                <option value="">All Statuses ({totalCount})</option>
-                <option value="active">📂 Active Problems</option>
-                <option value="Escalated">🚨 Escalated / Critical</option>
-                {Object.values(COMPLAINT_STATUS).map((s) => (
-                  <option key={s} value={s}>
-                    {s}
+          {/* 2-Column Grid on Mobile, Flex Inline on Desktop */}
+          <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center sm:gap-3">
+            {/* Merged Location Dropdown Filter */}
+            <select
+              value={activeLocationTab}
+              onChange={(e) => setActiveLocationTab(e.target.value)}
+              className="h-9 sm:h-10 w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 sm:px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-primary shrink-0 truncate"
+            >
+              <option value="all">📍 All Locations ({getLocationCount("all")})</option>
+              {locations.map((loc) => {
+                const cnt = getLocationCount(loc.location_id);
+                return (
+                  <option key={loc.location_id} value={loc.location_id}>
+                    📍 {loc.name} ({cnt})
                   </option>
-                ))}
-              </>
-            )}
-          </select>
+                );
+              })}
+            </select>
 
-          {/* Merged SLA State Dropdown */}
-          <select
-            value={slaFilter}
-            onChange={(e) => setSlaFilter(e.target.value)}
-            className="h-10 w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-primary shrink-0"
-          >
-            <option value="">All SLA States</option>
-            <option value="On Time">🟢 On Time</option>
-            <option value="Due Today">🟡 Due Today</option>
-            <option value="Overdue">🔴 Overdue</option>
-          </select>
+            {/* Merged Department Dropdown Filter (Dynamically scoped to selected location & lifecycle tab) */}
+            <select
+              value={selectedDepartment}
+              onChange={(e) => setSelectedDepartment(e.target.value)}
+              className="h-9 sm:h-10 w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 sm:px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-primary shrink-0 truncate"
+            >
+              <option value="">🏢 All Depts ({getDepartmentCount("")})</option>
+              {availableDepartments.map((deptName) => {
+                const cnt = getDepartmentCount(deptName);
+                return (
+                  <option key={deptName} value={deptName}>
+                    🏢 {deptName} ({cnt})
+                  </option>
+                );
+              })}
+            </select>
+
+            {/* Merged Status Filter Dropdown (Tailored to active tab) */}
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="h-9 sm:h-10 w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 sm:px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-primary shrink-0 truncate"
+            >
+              {lifecycleTab === "remaining" && (
+                <>
+                  <option value="">All Remaining ({remainingCount})</option>
+                  <option value="Escalated">🚨 Escalated / Critical</option>
+                  <option value="Submitted">Submitted (New)</option>
+                  <option value="Assigned">Assigned to Coordinator</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Waiting for Verification">Waiting for Verification</option>
+                  <option value="Reopened">Reopened</option>
+                </>
+              )}
+              {lifecycleTab === "closed" && (
+                <>
+                  <option value="">All Closed ({closedCount})</option>
+                  <option value="Closed">Closed</option>
+                  <option value="Closed (Auto Closed)">Closed (Auto Closed)</option>
+                  <option value="Rejected">Rejected</option>
+                </>
+              )}
+              {lifecycleTab === "all" && (
+                <>
+                  <option value="">All Statuses ({totalCount})</option>
+                  <option value="active">📂 Active Problems</option>
+                  <option value="Escalated">🚨 Escalated / Critical</option>
+                  {Object.values(COMPLAINT_STATUS).map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </>
+              )}
+            </select>
+
+            {/* Merged SLA State Dropdown */}
+            <select
+              value={slaFilter}
+              onChange={(e) => setSlaFilter(e.target.value)}
+              className="h-9 sm:h-10 w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 sm:px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-primary shrink-0 truncate"
+            >
+              <option value="">All SLA States</option>
+              <option value="On Time">🟢 On Time</option>
+              <option value="Due Today">🟡 Due Today</option>
+              <option value="Overdue">🔴 Overdue</option>
+            </select>
+          </div>
         </div>
 
         {loading && (
