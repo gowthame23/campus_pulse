@@ -18,26 +18,26 @@ export default function StatCard({
   return (
     <div
       onClick={onClick}
-      className={`relative group rounded-xl border p-4 sm:p-5 shadow-2xs ${accentClass} ${interactiveClass}`}
+      className={`relative group rounded-xl border px-3.5 py-3 sm:px-4 sm:py-3.5 shadow-2xs ${accentClass} ${interactiveClass}`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
-          {label}
-        </span>
+      <div className="flex items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
+            {label}
+          </span>
+          <span className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-slate-100 tabular-nums px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 shrink-0">
+            {value}
+          </span>
+          {accent && (
+            <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" title="Action required" />
+          )}
+        </div>
         {onClick && (
-          <ArrowRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
-        )}
-      </div>
-      <div className="mt-2 flex items-baseline gap-2">
-        <span className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums leading-none">
-          {value}
-        </span>
-        {accent && (
-          <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" title="Action required" />
+          <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
         )}
       </div>
       {subtext && (
-        <p className="mt-2 text-xs font-normal text-slate-400 dark:text-slate-500 truncate">
+        <p className="mt-1.5 text-xs font-normal text-slate-400 dark:text-slate-500 truncate">
           {subtext}
         </p>
       )}
