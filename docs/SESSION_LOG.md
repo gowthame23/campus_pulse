@@ -318,6 +318,20 @@
   - Commits directly attribute to the user's GitHub profile ([@gowthame23](https://github.com/gowthame23)) while complying with GitHub's email privacy protection (`GH007`).
 
 ---
+
+### Entry 22 — Removal of Mobile Role Badge Overlap & Dashboard Greetings
+* **User Directive:** "even now we have something we cant see the student on that top that we can see the emeegercy and one more thing is no need of that greetings"
+* **Issues Addressed:**
+  1. **Top Navbar Mobile Role Badge Overlap:**
+     - The `• Student` badge on the left side of the top navbar was colliding with and getting cut off under the `🚨 Emergency` button on narrow mobile screens (<640px).
+     - Applied `hidden sm:flex` to the role portal badge in [`Frontend/src/layouts/Navbar.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/layouts/Navbar.jsx). On mobile, the top bar now stays clean with just the menu toggle and the right-side Emergency SOS button, language picker, and avatar, completely ending all collisions.
+  2. **Removed Dashboard Greetings Header:**
+     - In [`Frontend/src/pages/student/StudentDashboard.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/student/StudentDashboard.jsx), removed the "Good day, Student 1" greeting and descriptive text block as requested.
+     - The dashboard content (ActionPills: Report a problem, Lost & Found, My complaints, Notices, followed by the metric cards) now appears directly at the top of the viewport.
+* **Verification:**
+  - `npm run build` completed in 1.27s with 0 errors.
+
+---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
 
 

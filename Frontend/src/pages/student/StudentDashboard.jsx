@@ -232,17 +232,6 @@ export default function StudentDashboard() {
         />
       )}
 
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            Good day, {user?.name || "Student"}
-          </h1>
-          <p className="text-xs font-normal text-slate-500 dark:text-slate-400 mt-1">
-            Track your reported campus issues, verify completed work, and monitor live notices.
-          </p>
-        </div>
-      </div>
 
       {/* Main Action Pills Block (Max 4) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
