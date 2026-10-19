@@ -643,7 +643,7 @@ export default function ComplaintListPage() {
   ];
 
   return (
-    <div className="grid gap-3 sm:gap-6">
+    <div className="grid gap-3 sm:gap-6 w-full min-w-0 max-w-full overflow-hidden">
       <PageHeader
         title="Complaints Tracker"
         description="Monitor, filter, and track campus complaints by location, department, status, or keyword."
@@ -671,80 +671,82 @@ export default function ComplaintListPage() {
       />
 
       {/* Grid List Table with Single Merged Filter Toolbar */}
-      <Card className="p-3 sm:p-6">
+      <Card className="p-3 sm:p-6 w-full min-w-0 max-w-full overflow-hidden">
         {/* Top-Level Division: Remaining/Active vs Closed & Auto-Closed vs All */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 sm:pb-3 mb-1.5 border-b border-slate-100 dark:border-slate-800">
-          <div className="inline-flex items-center p-0.5 sm:p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl gap-1 overflow-x-auto max-w-full scrollbar-none">
-            <button
-              type="button"
-              onClick={() => handleTabChange("remaining")}
-              className={`flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                lifecycleTab === "remaining"
-                  ? "bg-white dark:bg-slate-900 text-primary shadow-2xs font-semibold"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
-              }`}
-            >
-              <Clock className="h-3.5 w-3.5 text-amber-500" />
-              <span>Remaining / Active</span>
-              <span
-                className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 sm:pb-3 mb-1.5 border-b border-slate-100 dark:border-slate-800 w-full min-w-0 max-w-full">
+          <div className="w-full overflow-x-auto scrollbar-none pb-0.5">
+            <div className="inline-flex items-center p-0.5 sm:p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleTabChange("remaining")}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   lifecycleTab === "remaining"
-                    ? "bg-primary/10 text-primary"
-                    : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                    ? "bg-white dark:bg-slate-900 text-primary shadow-2xs font-semibold"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
                 }`}
               >
-                {remainingCount}
-              </span>
-            </button>
+                <Clock className="h-3.5 w-3.5 text-amber-500" />
+                <span>Remaining / Active</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                    lifecycleTab === "remaining"
+                      ? "bg-primary/10 text-primary"
+                      : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                  }`}
+                >
+                  {remainingCount}
+                </span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => handleTabChange("closed")}
-              className={`flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                lifecycleTab === "closed"
-                  ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-2xs font-semibold"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
-              }`}
-            >
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-              <span>Closed & Auto-Closed</span>
-              <span
-                className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+              <button
+                type="button"
+                onClick={() => handleTabChange("closed")}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   lifecycleTab === "closed"
-                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                    : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                    ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-2xs font-semibold"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
                 }`}
               >
-                {closedCount}
-              </span>
-            </button>
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                <span>Closed & Auto-Closed</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                    lifecycleTab === "closed"
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                      : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                  }`}
+                >
+                  {closedCount}
+                </span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => handleTabChange("all")}
-              className={`flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                lifecycleTab === "all"
-                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-semibold"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
-              }`}
-            >
-              <Layers className="h-3.5 w-3.5 text-slate-400" />
-              <span>All ({totalCount})</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => handleTabChange("all")}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  lifecycleTab === "all"
+                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-semibold"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                }`}
+              >
+                <Layers className="h-3.5 w-3.5 text-slate-400" />
+                <span>All ({totalCount})</span>
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Single Merged Filter & Search Toolbar */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 my-1.5">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 my-1.5 w-full min-w-0 max-w-full">
           {/* Search Box - Takes full width on mobile, flexible on desktop */}
-          <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
+          <div className="relative w-full min-w-0 max-w-full sm:flex-1 sm:min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search complaints..."
-              className="h-9 sm:h-10 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-9 sm:pl-10 pr-8 text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-primary transition-colors"
+              className="h-9 sm:h-10 w-full min-w-0 max-w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-9 sm:pl-10 pr-8 text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-primary transition-colors"
             />
             {query && (
               <button
@@ -758,12 +760,12 @@ export default function ComplaintListPage() {
           </div>
 
           {/* 2-Column Grid on Mobile, Flex Inline on Desktop */}
-          <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center sm:gap-3">
+          <div className="grid grid-cols-2 gap-2 w-full min-w-0 max-w-full sm:w-auto sm:flex sm:items-center sm:gap-3">
             {/* Merged Location Dropdown Filter */}
             <select
               value={activeLocationTab}
               onChange={(e) => setActiveLocationTab(e.target.value)}
-              className="h-9 sm:h-10 w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs sm:text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-primary shrink-0 truncate cursor-pointer"
+              className="h-9 sm:h-10 w-full min-w-0 max-w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 sm:px-3 text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-primary truncate cursor-pointer"
             >
               <option value="all">📍 All Locations ({getLocationCount("all")})</option>
               {locations.map((loc) => {
@@ -776,11 +778,11 @@ export default function ComplaintListPage() {
               })}
             </select>
 
-            {/* Merged Department Dropdown Filter (Dynamically scoped to selected location & lifecycle tab) */}
+            {/* Merged Department Dropdown Filter */}
             <select
               value={selectedDepartment}
               onChange={(e) => setSelectedDepartment(e.target.value)}
-              className="h-9 sm:h-10 w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs sm:text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-primary shrink-0 truncate cursor-pointer"
+              className="h-9 sm:h-10 w-full min-w-0 max-w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 sm:px-3 text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-primary truncate cursor-pointer"
             >
               <option value="">🏢 All Depts ({getDepartmentCount("")})</option>
               {availableDepartments.map((deptName) => {
@@ -793,20 +795,20 @@ export default function ComplaintListPage() {
               })}
             </select>
 
-            {/* Merged Status Filter Dropdown (Tailored to active tab) */}
+            {/* Merged Status Filter Dropdown */}
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="h-9 sm:h-10 w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs sm:text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-primary shrink-0 truncate cursor-pointer"
+              className="h-9 sm:h-10 w-full min-w-0 max-w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 sm:px-3 text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-primary truncate cursor-pointer"
             >
               {lifecycleTab === "remaining" && (
                 <>
                   <option value="">All Remaining ({remainingCount})</option>
-                  <option value="Escalated">🚨 Escalated / Critical</option>
-                  <option value="Submitted">Submitted (New)</option>
-                  <option value="Assigned">Assigned to Coordinator</option>
+                  <option value="Escalated">🚨 Escalated</option>
+                  <option value="Submitted">Submitted</option>
+                  <option value="Assigned">Assigned</option>
                   <option value="In Progress">In Progress</option>
-                  <option value="Waiting for Verification">Waiting for Verification</option>
+                  <option value="Waiting for Verification">Verification</option>
                   <option value="Reopened">Reopened</option>
                 </>
               )}
@@ -814,15 +816,15 @@ export default function ComplaintListPage() {
                 <>
                   <option value="">All Closed ({closedCount})</option>
                   <option value="Closed">Closed</option>
-                  <option value="Closed (Auto Closed)">Closed (Auto Closed)</option>
+                  <option value="Closed (Auto Closed)">Auto Closed</option>
                   <option value="Rejected">Rejected</option>
                 </>
               )}
               {lifecycleTab === "all" && (
                 <>
                   <option value="">All Statuses ({totalCount})</option>
-                  <option value="active">📂 Active Problems</option>
-                  <option value="Escalated">🚨 Escalated / Critical</option>
+                  <option value="active">📂 Active</option>
+                  <option value="Escalated">🚨 Escalated</option>
                   {Object.values(COMPLAINT_STATUS).map((s) => (
                     <option key={s} value={s}>
                       {s}
@@ -836,9 +838,9 @@ export default function ComplaintListPage() {
             <select
               value={slaFilter}
               onChange={(e) => setSlaFilter(e.target.value)}
-              className="h-9 sm:h-10 w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs sm:text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-primary shrink-0 truncate cursor-pointer"
+              className="h-9 sm:h-10 w-full min-w-0 max-w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 sm:px-3 text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-primary truncate cursor-pointer"
             >
-              <option value="">All SLA States</option>
+              <option value="">All SLA</option>
               <option value="On Time">🟢 On Time</option>
               <option value="Due Today">🟡 Due Today</option>
               <option value="Overdue">🔴 Overdue</option>
