@@ -57,7 +57,7 @@ export default function CoverageGapsPage() {
             Coverage Gaps
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Rule C8 operational audits: uncovered location-department pairs, teams lacking backups, inactive coordinators, and warden vacancies.
+            Rule C8 operational audits: departments lacking coordinators, teams lacking backups, inactive coordinators, and warden vacancies.
           </p>
         </div>
 
@@ -73,7 +73,7 @@ export default function CoverageGapsPage() {
       )}
 
       {loading ? (
-        <div className="p-12 text-center text-sm text-slate-500">Checking coverage across all locations and departments...</div>
+        <div className="p-12 text-center text-sm text-slate-500">Checking coverage across all campus departments and locations...</div>
       ) : totalGaps === 0 ? (
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-12 text-center border border-slate-200 dark:border-slate-800 shadow-sm">
           <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto mb-3" />
@@ -81,41 +81,41 @@ export default function CoverageGapsPage() {
             Full Operational Coverage!
           </h2>
           <p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">
-            All (location, department) pairs belong to active teams, every team has a backup coordinator, all coordinators are active, and all locations have assigned wardens.
+            All campus departments are covered by active coordinators, every team has a backup coordinator, all coordinators are active, and all locations have assigned wardens.
           </p>
         </div>
       ) : (
         <div className="space-y-6">
-          {/* 1. Uncovered (Location, Department) Pairs */}
+          {/* 1. Uncovered Campus Departments */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <Layers className="h-4 w-4 text-rose-500" />
                 <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  Uncovered Location-Department Pairs ({uncoveredPairs.length})
+                  Departments Without Coordinator ({uncoveredPairs.length})
                 </h2>
               </div>
               <span className="text-xs text-rose-600 font-semibold">Critical Gap</span>
             </div>
 
             {uncoveredPairs.length === 0 ? (
-              <p className="text-xs text-emerald-600 font-medium">All location-department pairs are covered by teams.</p>
+              <p className="text-xs text-emerald-600 font-medium">All campus departments have assigned coordinators.</p>
             ) : (
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
                 {uncoveredPairs.map((p, idx) => (
                   <div key={idx} className="py-3 flex items-center justify-between gap-3 text-xs">
                     <div>
-                      <span className="font-bold text-slate-900 dark:text-slate-100">{p.location_name}</span>
+                      <span className="font-bold text-slate-900 dark:text-slate-100">{p.department_name}</span>
                       <span className="text-slate-400 mx-2">—</span>
-                      <span className="font-medium text-slate-700 dark:text-slate-300">{p.department_name}</span>
+                      <span className="font-medium text-slate-500 dark:text-slate-400">Campus-wide Department (No coordinator appointed)</span>
                     </div>
                     <Button
                       size="sm"
                       variant="primary"
-                      onClick={() => navigate("/admin/teams")}
+                      onClick={() => navigate("/admin/departments")}
                       className="text-xs font-semibold py-1 px-3 flex items-center gap-1"
                     >
-                      Fix: Create Team
+                      Fix: Assign Coordinator
                       <ArrowRight className="h-3 w-3" />
                     </Button>
                   </div>

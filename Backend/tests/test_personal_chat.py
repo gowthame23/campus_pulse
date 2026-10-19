@@ -38,7 +38,7 @@ def test_personal_chat_contacts_list(client, auth_service):
     contact_ids = [c["user_id"] for c in contacts]
     assert "USR_MANAGER_2" in contact_ids
     assert "USR_WARDEN" in contact_ids
-    assert "USR_COORDINATOR" in contact_ids
+    assert "USR_EMP_A1" in contact_ids
     assert "USR_ADMIN" in contact_ids
     # Current user is excluded
     assert "USR_MANAGER" not in contact_ids
@@ -56,9 +56,9 @@ def test_personal_chat_role_combinations(client, auth_service):
     """Verify chat starts between all supported role combinations."""
     combinations = [
         ("USR_MANAGER", "USR_MANAGER_2"),         # App Manager 1 <-> App Manager 2
-        ("USR_WARDEN", "USR_COORDINATOR"),        # Warden 1 <-> Coordinator 1
+        ("USR_WARDEN", "USR_EMP_A1"),             # Warden 1 <-> Coordinator 1 (Employee A1)
         ("USR_ADMIN", "USR_MANAGER"),             # Administrator <-> App Manager 1
-        ("USR_COORDINATOR", "USR_COORDINATOR_2"), # Coordinator 1 <-> Coordinator 2
+        ("USR_EMP_A1", "USR_EMP_A2"),             # Coordinator 1 <-> Coordinator 2 (Employee A1 <-> A2)
     ]
 
     for sender_id, recipient_id in combinations:
@@ -76,10 +76,10 @@ def test_personal_chat_role_combinations(client, auth_service):
 
 def test_personal_chat_messaging_persistence_and_unread(client, auth_service, chat_service):
     """Verify persistent message delivery, offline recipient unread counter, and reading."""
-    # 1. Start conversation between Warden 1 and Coordinator 1
+    # 1. Start conversation between Warden 1 and Coordinator 1 (Employee A1)
     start_resp = client.post(
         "/chat/start",
-        json={"recipient_id": "USR_COORDINATOR"},
+        json={"recipient_id": "USR_EMP_A1"},
         headers=auth_header("USR_WARDEN", auth_service),
     )
     assert start_resp.status_code == 200
@@ -100,14 +100,14 @@ def test_personal_chat_messaging_persistence_and_unread(client, auth_service, ch
     # 3. Check Coordinator's conversation list and unread count (recipient offline until checked)
     unread_resp = client.get(
         "/chat/unread-count",
-        headers=auth_header("USR_COORDINATOR", auth_service),
+        headers=auth_header("USR_EMP_A1", auth_service),
     )
     assert unread_resp.status_code == 200
     assert unread_resp.json()["unread_count"] >= 1
 
     convs_resp = client.get(
         "/chat/conversations",
-        headers=auth_header("USR_COORDINATOR", auth_service),
+        headers=auth_header("USR_EMP_A1", auth_service),
     )
     assert convs_resp.status_code == 200
     conv_list = convs_resp.json()
@@ -120,7 +120,7 @@ def test_personal_chat_messaging_persistence_and_unread(client, auth_service, ch
     # 4. Coordinator opens conversation -> messages loaded and marked read
     history_resp = client.get(
         f"/chat/{conv_id}",
-        headers=auth_header("USR_COORDINATOR", auth_service),
+        headers=auth_header("USR_EMP_A1", auth_service),
     )
     assert history_resp.status_code == 200
     msgs = history_resp.json()
@@ -129,10 +129,10 @@ def test_personal_chat_messaging_persistence_and_unread(client, auth_service, ch
     # 5. After reading, Coordinator's unread count for this conversation is 0
     unread_after = client.get(
         "/chat/unread-count",
-        headers=auth_header("USR_COORDINATOR", auth_service),
+        headers=auth_header("USR_EMP_A1", auth_service),
     )
     assert unread_after.status_code == 200
-    assert chat_service.get_unread_count(conv_id, "USR_COORDINATOR") == 0
+    assert chat_service.get_unread_count(conv_id, "USR_EMP_A1") == 0
 
 
 def test_student_forbidden_from_personal_chat(client, auth_service):

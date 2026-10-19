@@ -1,4 +1,5 @@
-export default function PageHeader({ title, description, actions }) {
+export default function PageHeader({ title, description, actions, children }) {
+  const actionContent = actions || children;
   return (
     <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 pb-5">
       <div>
@@ -11,8 +12,8 @@ export default function PageHeader({ title, description, actions }) {
           </p>
         )}
       </div>
-      {actions && (
-        <div className="flex flex-wrap items-center gap-2.5">{actions}</div>
+      {actionContent && (
+        <div className="flex flex-wrap items-center gap-2.5">{actionContent}</div>
       )}
     </div>
   );

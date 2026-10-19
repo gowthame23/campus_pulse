@@ -52,12 +52,18 @@ def app_mgr_headers():
 
 @pytest.fixture(scope="module")
 def coord_headers():
-    return _login("coordinator@example.com", "Coordinator@123")
+    try:
+        return _login("gowthamejjurothu15@gmail.com", "Coord@123")
+    except Exception:
+        return _login("coordinator@example.com", "Coordinator@123")
 
 
 @pytest.fixture(scope="module")
 def warden_headers():
-    return _login("warden@example.com", "warden@123")
+    try:
+        return _login("naveen@campus.edu", "warden@123")
+    except Exception:
+        return _login("warden@example.com", "warden@123")
 
 
 def _create_user(admin_headers, role, email_prefix, location_id=None, department_id=None):

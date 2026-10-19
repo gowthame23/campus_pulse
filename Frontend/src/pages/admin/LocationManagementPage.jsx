@@ -15,6 +15,7 @@ import {
   Tag,
   Check,
   Upload,
+  Layers,
 } from "lucide-react";
 import Button from "../../components/Button.jsx";
 import Card from "../../components/Card.jsx";
@@ -29,6 +30,7 @@ import Modal from "../../components/Modal.jsx";
 import BulkImportModal from "../../components/BulkImportModal.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
 import { locationService } from "../../services/locationService.js";
+import { departmentService } from "../../services/departmentService.js";
 import { userService } from "../../services/userService.js";
 import { ROLES } from "../../utils/constants.js";
 
@@ -459,6 +461,8 @@ export default function LocationManagementPage() {
   // Option 1: New Location under an existing Type
   const [createModalType, setCreateModalType] = useState(null); // e.g. "Hostel"
   const [newLocationName, setNewLocationName] = useState("");
+  const [newPublicComplaintAccess, setNewPublicComplaintAccess] = useState("everyone");
+  const [selectedDeptIds, setSelectedDeptIds] = useState([]);
   const [locDeptsConfig, setLocDeptsConfig] = useState([]);
 
   // Option 2: New Location Type creation
@@ -471,6 +475,8 @@ export default function LocationManagementPage() {
   const [editTarget, setEditTarget] = useState(null);
   const [editName, setEditName] = useState("");
   const [editType, setEditType] = useState("");
+  const [editPublicComplaintAccess, setEditPublicComplaintAccess] = useState("everyone");
+  const [editDeptIds, setEditDeptIds] = useState([]);
 
   // Delete Confirmation State
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -478,29 +484,34 @@ export default function LocationManagementPage() {
   const [deleteDependencyError, setDeleteDependencyError] = useState("");
 
   const { data, loading, reload } = useAsyncData(async () => {
-    const [typesRes, locationsRes, inChargesRes, coordinatorsRes, appManagersRes] =
+    const [typesRes, locationsRes, inChargesRes, appManagersRes, deptsRes] =
       await Promise.all([
         locationService
           .listTypes({ include_archived: showArchived })
           .catch(() => ({ data: [] })),
         locationService.list({ include_archived: showArchived }),
         userService.list(ROLES.LOCATION_IN_CHARGE).catch(() => ({ data: [] })),
-        userService.list(ROLES.COORDINATOR).catch(() => ({ data: [] })),
         userService.list(ROLES.APP_MANAGER).catch(() => ({ data: [] })),
+        departmentService.list({ include_archived: false }).catch(() => ({ data: [] })),
       ]);
     return {
       locationTypes: typesRes.data || [],
       locations: locationsRes.data || [],
       inCharges: inChargesRes.data || [],
-      coordinators: coordinatorsRes.data || [],
       appManagers: appManagersRes.data || [],
+      departments: deptsRes.data || [],
     };
   }, [showArchived]);
 
   const openCreateLocationModal = (type_name) => {
     setCreateModalType(type_name);
     setNewLocationName("");
+    const allDeptIds = (data?.departments || []).map((d) => d.department_id);
+    setSelectedDeptIds(allDeptIds);
     setLocDeptsConfig(getInitialDepts(type_name));
+    setNewPublicComplaintAccess(
+      (type_name || "").toLowerCase().includes("hostel") ? "location_only" : "everyone"
+    );
   };
 
   const openCreateTypeModal = () => {
@@ -532,24 +543,18 @@ export default function LocationManagementPage() {
       return;
     }
 
-    const enabledDepts = locDeptsConfig
-      .filter((d) => d.enabled && d.name.trim())
-      .map((d) => ({
-        name: d.name.trim(),
-        sla_days: Number(d.sla_days) || 2,
-        complaint_types: d.complaint_types || [],
-      }));
-
     try {
       await locationService.create({
         name: newLocationName.trim(),
         location_type: createModalType,
-        departments: enabledDepts,
+        department_ids: selectedDeptIds,
+        complaint_submission_policy: newPublicComplaintAccess,
+        public_complaint_access: newPublicComplaintAccess,
       });
       setCreateModalType(null);
       setNewLocationName("");
       setMessage(
-        `New location "${newLocationName.trim()}" created successfully with ${enabledDepts.length} department(s).`,
+        `New location "${newLocationName.trim()}" created successfully with ${selectedDeptIds.length} operating department(s).`,
       );
       reload();
     } catch (err) {
@@ -634,29 +639,21 @@ export default function LocationManagementPage() {
     }
   };
 
-  const assignCoordinator = async (locationId, coordinatorId) => {
-    setMessage("");
-    setError("");
-    try {
-      if (!coordinatorId) {
-        await locationService.unassignCoordinator(locationId);
-        setMessage("Coordinator unassigned successfully.");
-      } else {
-        await locationService.assignCoordinator(locationId, coordinatorId);
-        setMessage("Location coordinator assigned successfully.");
-      }
-      reload();
-    } catch (err) {
-      setError(
-        err?.response?.data?.detail || "Unable to assign coordinator.",
-      );
-    }
-  };
 
   const startEdit = (location) => {
     setEditTarget(location);
     setEditName(location.name);
     setEditType(location.location_type || getLocationType(location));
+    setEditPublicComplaintAccess(
+      location.complaint_submission_policy ||
+      location.public_complaint_access ||
+      ((location.location_type || "").toLowerCase().includes("hostel") ? "location_only" : "everyone")
+    );
+    setEditDeptIds(
+      location.department_ids ||
+      (location.departments || []).map((d) => d.department_id) ||
+      []
+    );
   };
 
   const handleEditSubmit = async (e) => {
@@ -673,6 +670,9 @@ export default function LocationManagementPage() {
       await locationService.update(editTarget.location_id, {
         name: editName.trim(),
         location_type: editType,
+        complaint_submission_policy: editPublicComplaintAccess,
+        public_complaint_access: editPublicComplaintAccess,
+        department_ids: editDeptIds,
       });
       setEditTarget(null);
       setMessage(`Location "${editName.trim()}" updated successfully.`);
@@ -732,6 +732,97 @@ export default function LocationManagementPage() {
     await archiveLocation(deleteTarget.location_id);
     setDeleteDependencyError("");
     setDeleteTarget(null);
+  };
+
+  const renderCentralDepartmentSelector = (selectedIds, setSelectedIds) => {
+    const allDepts = data?.departments || [];
+    const toggleDept = (deptId) => {
+      setSelectedIds((prev) =>
+        prev.includes(deptId)
+          ? prev.filter((id) => id !== deptId)
+          : [...prev, deptId]
+      );
+    };
+
+    const selectAll = () => {
+      setSelectedIds(allDepts.map((d) => d.department_id));
+    };
+
+    const deselectAll = () => {
+      setSelectedIds([]);
+    };
+
+    return (
+      <div className="border border-slate-200 dark:border-slate-800 rounded-xl p-4 bg-slate-50/50 dark:bg-slate-900/50">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+              <Layers className="h-4 w-4 text-primary" />
+              Operating Departments ({selectedIds.length} Selected)
+            </h4>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Select which campus-wide departments operate at this location.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={selectAll}
+              className="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+            >
+              Select All
+            </button>
+            <span className="text-slate-300 dark:text-slate-700">|</span>
+            <button
+              type="button"
+              onClick={deselectAll}
+              className="text-[11px] font-semibold text-slate-500 hover:underline cursor-pointer"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
+        {allDepts.length === 0 ? (
+          <div className="text-xs text-slate-400 italic py-2">
+            No central departments found.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+            {allDepts.map((dept) => {
+              const isChecked = selectedIds.includes(dept.department_id);
+              return (
+                <label
+                  key={dept.department_id}
+                  className={`flex items-start gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition-all ${
+                    isChecked
+                      ? "bg-primary/5 border-primary/40 text-slate-900 dark:text-slate-100 font-semibold"
+                      : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => toggleDept(dept.department_id)}
+                    className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary"
+                  />
+                  <div className="min-w-0">
+                    <span className="block truncate font-semibold">
+                      {dept.name}
+                    </span>
+                    {dept.description && (
+                      <span className="text-[10px] text-slate-400 block truncate font-normal">
+                        {dept.description}
+                      </span>
+                    )}
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
   };
 
   // Render department management section inside modals
@@ -989,17 +1080,11 @@ export default function LocationManagementPage() {
         );
         const inChargeMatch = (inCharge?.name || "").toLowerCase().includes(q);
 
-        const coord = (data?.coordinators || []).find(
-          (u) => u.user_id === loc.coordinator_id,
-        );
-        const coordMatch = (coord?.name || "").toLowerCase().includes(q);
-
         if (
           !nameMatch &&
           !typeMatch &&
           !appMgrMatch &&
-          !inChargeMatch &&
-          !coordMatch
+          !inChargeMatch
         ) {
           return false;
         }
@@ -1025,6 +1110,55 @@ export default function LocationManagementPage() {
           )}
         </div>
       ),
+    },
+    {
+      header: "Submission Policy",
+      accessor: "complaint_submission_policy",
+      render: (row) => {
+        const policy =
+          row.complaint_submission_policy ||
+          row.public_complaint_access ||
+          ((row.location_type || "").toLowerCase().includes("hostel") ? "location_only" : "everyone");
+        const isLocOnly = policy === "location_only";
+        return isLocOnly ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+            Location Only
+          </span>
+        ) : (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+            Everyone
+          </span>
+        );
+      },
+    },
+    {
+      header: "Operating Departments",
+      accessor: "departments",
+      render: (row) => {
+        const depts = row.departments || [];
+        if (depts.length === 0) {
+          return (
+            <span className="text-[11px] text-slate-400 italic">None assigned</span>
+          );
+        }
+        return (
+          <div className="flex flex-wrap gap-1 max-w-[220px]">
+            {depts.slice(0, 3).map((d) => (
+              <span
+                key={d.department_id}
+                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/50"
+              >
+                {d.name}
+              </span>
+            ))}
+            {depts.length > 3 && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                +{depts.length - 3} more
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       header: "App Manager",
@@ -1055,24 +1189,6 @@ export default function LocationManagementPage() {
         >
           <option value="">Unassigned</option>
           {(data?.inCharges || []).map((u) => (
-            <option key={u.user_id} value={u.user_id}>
-              {u.name} ({u.email})
-            </option>
-          ))}
-        </Select>
-      ),
-    },
-    {
-      header: "Coordinator",
-      accessor: "coordinator_id",
-      render: (row) => (
-        <Select
-          value={row.coordinator_id || ""}
-          onChange={(e) => assignCoordinator(row.location_id, e.target.value)}
-          className="!py-1 !px-2 !text-xs font-semibold"
-        >
-          <option value="">Unassigned</option>
-          {(data?.coordinators || []).map((u) => (
             <option key={u.user_id} value={u.user_id}>
               {u.name} ({u.email})
             </option>
@@ -1379,7 +1495,25 @@ export default function LocationManagementPage() {
             autoFocus
           />
 
-          {renderDepartmentConfigSection(locDeptsConfig, setLocDeptsConfig)}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Who can submit complaints at this location?
+            </label>
+            <Select
+              value={newPublicComplaintAccess}
+              onChange={(e) => setNewPublicComplaintAccess(e.target.value)}
+            >
+              <option value="everyone">Option A: Allow complaints from everyone</option>
+              <option value="location_only">Option B: Allow complaints only from their location</option>
+            </Select>
+            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              {newPublicComplaintAccess === "location_only"
+                ? "Restricted: Only eligible students belonging to or residing in this location can submit complaints."
+                : "Open: Any authenticated student eligible to report complaints can submit an issue for this location."}
+            </p>
+          </div>
+
+          {renderCentralDepartmentSelector(selectedDeptIds, setSelectedDeptIds)}
 
           <div className="mt-4 flex justify-end gap-3">
             <Button
@@ -1438,6 +1572,27 @@ export default function LocationManagementPage() {
               ));
             })()}
           </Select>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Who can submit complaints at this location?
+            </label>
+            <Select
+              value={editPublicComplaintAccess}
+              onChange={(e) => setEditPublicComplaintAccess(e.target.value)}
+            >
+              <option value="everyone">Option A: Allow complaints from everyone</option>
+              <option value="location_only">Option B: Allow complaints only from their location</option>
+            </Select>
+            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              {editPublicComplaintAccess === "location_only"
+                ? "Restricted: Only eligible students belonging to or residing in this location can submit complaints."
+                : "Open: Any authenticated student eligible to report complaints can submit an issue for this location."}
+            </p>
+          </div>
+
+          {renderCentralDepartmentSelector(editDeptIds, setEditDeptIds)}
+
           <div className="mt-6 flex justify-end gap-3">
             <Button
               type="button"

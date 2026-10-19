@@ -177,3 +177,30 @@
 | `POST` | `/superadmin/institutions` | Registers new university institution | Super Admin | Yes | `InstitutionCreateRequest(...)` | 201, 400, 403 |
 | `GET` | `/superadmin/health` | Comprehensive cluster health status | Super Admin | Yes | None | 200, 403 |
 | `GET` | `/superadmin/support` | Global cross-institution support tickets | Super Admin | Yes | None | 200, 403 |
+
+---
+
+### Module 11: Confidential Safety Reports (`/safety-reports`)
+*Router file:* [`Backend/api/routers/safety_reports.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/api/routers/safety_reports.py)
+
+| Method | Endpoint | Description | Roles | Auth Required | Request Body / Params | Status Codes |
+| :--- | :--- | :--- | :--- | :---: | :--- | :--- |
+| `POST` | `/safety-reports` | Creates confidential anonymous safety report | Student | Optional | `SafetyReportCreateRequest(...)` | 201, 400, 403 |
+| `GET` | `/safety-reports` | Lists safety reports (Admin view or caller's own) | Admin, Student | Yes | `?status=&limit=&offset=` | 200, 401, 403 |
+| `GET` | `/safety-reports/{case_code}`| Retrieves case report details and discussion | Admin, Reporter | Yes | Path: `case_code` | 200, 403, 404 |
+| `POST` | `/safety-reports/{case_code}/messages` | Sends anonymous 2-way case message | Admin, Reporter | Yes | `SafetyReportMessageRequest(body)` | 200, 400, 403, 404 |
+| `POST` | `/safety-reports/{report_id}/decision` | Closes safety report with outcome | Admin | Yes | `SafetyReportDecisionRequest(...)` | 200, 400, 403 |
+| `POST` | `/safety-reports/{report_id}/reveal` | Unseals reporter identity under abuse investigation (requires Admin step-up password re-authentication) | Admin | Yes | `SafetyReportRevealRequest(reason, admin_password)` | 200, 401, 403, 404 |
+
+---
+
+### Module 12: Employee Work Assignments & Multi-Department Coordination (`/users`, `/teams`)
+
+| Method | Endpoint | Description | Roles | Auth Required | Request Body / Params | Status Codes |
+| :--- | :--- | :--- | :--- | :---: | :--- | :--- |
+| `PUT` | `/users/{user_id}/employee-work-assignments` | Updates employee's department and location assignments | Admin, Manager | Yes | `{"department_ids": [...], "location_ids": [...]}` | 200, 400, 403 |
+| `PUT` | `/users/{user_id}/responsibility-and-role` | Updates employee role and coordinator responsibilities | Admin, Manager | Yes | `{"role": "...", "coordinator_responsibilities": [...]}` | 200, 400, 403 |
+| `POST` | `/users/import` | Bulk user import supporting form-data and query parameters with aliasing | Admin, Manager | Yes | `UploadFile`, `program`/`default_program`, etc. | 200, 400, 403 |
+| `GET` | `/teams` | Lists departmental maintenance teams | Admin, Manager | Yes | `?department_id=` | 200, 401, 403 |
+| `POST` | `/teams/{team_id}/members` | Adds member to maintenance team | Admin, Manager | Yes | `{"user_id": "..."}` | 200, 400, 403 |
+

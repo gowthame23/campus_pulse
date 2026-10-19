@@ -5,6 +5,7 @@ from core.constants import (
     STATUS_AUTO_CLOSED,
     STATUS_BLOCKED,
     STATUS_CANCELLED,
+    STATUS_CANCELLATION_REQUESTED,
     STATUS_CLOSED,
     STATUS_IN_PROGRESS,
     STATUS_PENDING_WARDEN,
@@ -32,6 +33,8 @@ class Complaint:
     ADMIN_REVIEW = STATUS_ADMIN_REVIEW
     REJECTED = STATUS_REJECTED
     CANCELLED = STATUS_CANCELLED
+    CANCELLATION_REQUESTED = STATUS_CANCELLATION_REQUESTED
+    STATUS_CANCELLATION_REQUESTED = STATUS_CANCELLATION_REQUESTED
     AWAITING_ASSIGNMENT = "Awaiting Coordinator Assignment"
 
     def __init__(
@@ -123,6 +126,17 @@ class Complaint:
         acknowledged_at=None,
         emergency_outcome=None,
         emergency_realert_sent=False,
+        is_deleted=False,
+        deleted_at=None,
+        deleted_by=None,
+        cancellation_requested=False,
+        cancellation_requested_by=None,
+        cancellation_reason=None,
+        cancellation_requested_at=None,
+        cancellation_decided_by=None,
+        cancellation_decided_at=None,
+        cancellation_decision_note=None,
+        previous_status=None,
     ):
         self.complaint_id = complaint_id or generate_id("CMP")
         self.archived = bool(archived)
@@ -213,6 +227,17 @@ class Complaint:
         self.acknowledged_at = acknowledged_at
         self.emergency_outcome = emergency_outcome
         self.emergency_realert_sent = bool(emergency_realert_sent)
+        self.is_deleted = bool(is_deleted)
+        self.deleted_at = deleted_at
+        self.deleted_by = deleted_by
+        self.cancellation_requested = bool(cancellation_requested)
+        self.cancellation_requested_by = cancellation_requested_by
+        self.cancellation_reason = cancellation_reason
+        self.cancellation_requested_at = cancellation_requested_at
+        self.cancellation_decided_by = cancellation_decided_by
+        self.cancellation_decided_at = cancellation_decided_at
+        self.cancellation_decision_note = cancellation_decision_note
+        self.previous_status = previous_status
 
     def add_history(self, message):
         self.updated_at = now_string()
@@ -368,5 +393,16 @@ class Complaint:
             acknowledged_at=data.get("acknowledged_at"),
             emergency_outcome=data.get("emergency_outcome"),
             emergency_realert_sent=data.get("emergency_realert_sent", False),
+            is_deleted=data.get("is_deleted", False),
+            deleted_at=data.get("deleted_at"),
+            deleted_by=data.get("deleted_by"),
+            cancellation_requested=data.get("cancellation_requested", False),
+            cancellation_requested_by=data.get("cancellation_requested_by"),
+            cancellation_reason=data.get("cancellation_reason"),
+            cancellation_requested_at=data.get("cancellation_requested_at"),
+            cancellation_decided_by=data.get("cancellation_decided_by"),
+            cancellation_decided_at=data.get("cancellation_decided_at"),
+            cancellation_decision_note=data.get("cancellation_decision_note"),
+            previous_status=data.get("previous_status"),
         )
         return c

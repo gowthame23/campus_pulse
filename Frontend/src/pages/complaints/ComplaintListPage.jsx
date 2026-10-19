@@ -13,6 +13,8 @@ import {
   Eye,
   CheckCircle2,
   Clock,
+  User,
+  Wrench,
 } from "lucide-react";
 import Badge from "../../components/Badge.jsx";
 import Button from "../../components/Button.jsx";
@@ -44,24 +46,33 @@ export default function ComplaintListPage() {
   const { user } = useAuth();
   const location = useLocation();
 
-  const [query, setQuery] = useState(location.state?.query || "");
-  const [status, setStatus] = useState(location.state?.status || "");
-  const [activeLocationTab, setActiveLocationTab] = useState("all");
-  const [selectedDepartment, setSelectedDepartment] = useState("");
-  const [slaFilter, setSlaFilter] = useState(
-    location.state?.sla || location.state?.slaFilter || "",
-  );
+  const getInitialParams = () => {
+    const sp = new URLSearchParams(location.search);
+    return {
+      query: sp.get("query") || sp.get("category") || sp.get("search") || location.state?.query || "",
+      status: sp.get("status") || location.state?.status || "",
+      sla: sp.get("sla") || sp.get("slaFilter") || location.state?.sla || location.state?.slaFilter || "",
+      department: sp.get("department") || sp.get("department_id") || location.state?.department || location.state?.department_id || "",
+      location: sp.get("location") || sp.get("location_id") || location.state?.location || location.state?.location_id || "all",
+    };
+  };
+
+  const initial = getInitialParams();
+
+  const [query, setQuery] = useState(initial.query);
+  const [status, setStatus] = useState(initial.status);
+  const [activeLocationTab, setActiveLocationTab] = useState(initial.location);
+  const [selectedDepartment, setSelectedDepartment] = useState(initial.department);
+  const [slaFilter, setSlaFilter] = useState(initial.sla);
 
   // Top-Level Lifecycle Tab: "remaining" (Default: Open/Pending/Active), "closed" (Closed & Auto-Closed), "all" (All Records)
   const [lifecycleTab, setLifecycleTab] = useState(() => {
-    if (location.state?.status) {
-      const s = String(location.state.status).toLowerCase();
-      if (s.startsWith("closed") || s === "rejected") {
-        return "closed";
-      }
-      if (s === "all") {
-        return "all";
-      }
+    const s = String(initial.status).toLowerCase();
+    if (s.startsWith("closed") || s === "rejected") {
+      return "closed";
+    }
+    if (s === "all") {
+      return "all";
     }
     return "remaining";
   });
@@ -72,8 +83,10 @@ export default function ComplaintListPage() {
   const [actionError, setActionError] = useState("");
 
   useEffect(() => {
-    if (location.state?.status !== undefined) {
-      const s = String(location.state.status).toLowerCase();
+    const sp = new URLSearchParams(location.search);
+    const targetStatus = sp.get("status") !== null ? sp.get("status") : location.state?.status;
+    if (targetStatus !== undefined && targetStatus !== null) {
+      const s = String(targetStatus).toLowerCase();
       if (s.startsWith("closed") || s === "rejected") {
         setLifecycleTab("closed");
       } else if (s === "all") {
@@ -81,15 +94,40 @@ export default function ComplaintListPage() {
       } else {
         setLifecycleTab("remaining");
       }
-      setStatus(location.state.status);
+      setStatus(targetStatus);
     }
-    if (location.state?.sla !== undefined || location.state?.slaFilter !== undefined) {
-      setSlaFilter(location.state.sla || location.state.slaFilter);
+
+    const targetSla =
+      sp.get("sla") !== null
+        ? sp.get("sla") || sp.get("slaFilter")
+        : location.state?.sla || location.state?.slaFilter;
+    if (targetSla !== undefined && targetSla !== null) {
+      setSlaFilter(targetSla);
     }
-    if (location.state?.query !== undefined) {
-      setQuery(location.state.query);
+
+    const targetQuery =
+      sp.get("query") !== null
+        ? sp.get("query") || sp.get("category") || sp.get("search")
+        : location.state?.query;
+    if (targetQuery !== undefined && targetQuery !== null) {
+      setQuery(targetQuery);
     }
-  }, [location.state]);
+
+    const targetDept =
+      sp.get("department_id") || sp.get("department") || location.state?.department_id || location.state?.department;
+    if (targetDept !== undefined && targetDept !== null && (departments || []).length > 0) {
+      const match = (departments || []).find(
+        (d) => d.department_id === targetDept || d.name?.toLowerCase() === targetDept.toLowerCase()
+      );
+      setSelectedDepartment(match ? match.name : targetDept);
+    }
+
+    const targetLoc =
+      sp.get("location_id") || sp.get("location") || location.state?.location_id || location.state?.location;
+    if (targetLoc !== undefined && targetLoc !== null) {
+      setActiveLocationTab(targetLoc);
+    }
+  }, [location.search, location.state, departments]);
 
   const handleTabChange = (tab) => {
     setLifecycleTab(tab);
@@ -140,11 +178,21 @@ export default function ComplaintListPage() {
     const targetLocId = locObj ? locObj.location_id : activeLocationTab;
     const targetLocName = locObj ? locObj.name : activeLocationTab;
 
-    // Filter departments matching target location
+    // Filter departments matching target location (or operating campus-wide)
     const matchedDepts = (departments || []).filter(
       (d) =>
-        d.location_id === targetLocId ||
-        d.location_id === targetLocName,
+        !d.archived &&
+        d.active !== false &&
+        (
+          !d.location_ids ||
+          d.location_ids.length === 0 ||
+          d.location_ids.includes(targetLocId) ||
+          d.location_ids.includes(targetLocName) ||
+          (d.operating_locations && d.operating_locations.some((l) => l.location_id === targetLocId || l.name === targetLocName)) ||
+          d.location_id === targetLocId ||
+          d.location_id === targetLocName ||
+          !d.location_id
+        )
     );
 
     matchedDepts.forEach((d) => {
@@ -177,11 +225,21 @@ export default function ComplaintListPage() {
   useEffect(() => {
     if (
       selectedDepartment &&
+      availableDepartments.length > 0 &&
       !availableDepartments.includes(selectedDepartment)
     ) {
-      setSelectedDepartment("");
+      const match = (departments || []).find(
+        (d) =>
+          d.department_id === selectedDepartment ||
+          d.name?.toLowerCase() === selectedDepartment.toLowerCase()
+      );
+      if (match && availableDepartments.includes(match.name)) {
+        setSelectedDepartment(match.name);
+      } else if (!match) {
+        setSelectedDepartment("");
+      }
     }
-  }, [activeLocationTab, availableDepartments, selectedDepartment]);
+  }, [activeLocationTab, availableDepartments, selectedDepartment, departments]);
 
   // Live real-time updates via WebSocket events, reconnects, or poll fallback
   useEffect(() => {
@@ -418,8 +476,9 @@ export default function ComplaintListPage() {
     setDeleting(true);
     setActionError("");
     try {
-      await complaintService.delete(complaintToDelete.complaint_id);
-      setMessage(`Complaint ${complaintToDelete.complaint_id} was deleted successfully.`);
+      const deletedId = complaintToDelete.complaint_id;
+      await complaintService.delete(deletedId);
+      setMessage(`Complaint ${deletedId} was deleted successfully.`);
       setComplaintToDelete(null);
       reload();
     } catch (err) {
@@ -492,6 +551,31 @@ export default function ComplaintListPage() {
           </span>
         </div>
       ),
+    },
+    {
+      key: "assigned_to",
+      header: "Assigned To",
+      render: (row) => {
+        const empName = row.assigned_employee_name || row.assigned_to_name;
+        const isUnassigned = !empName || empName === "Awaiting assignment" || !row.assigned_to;
+        return isUnassigned ? (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 px-2 py-0.5 rounded-md">
+            Awaiting assignment
+          </span>
+        ) : (
+          <div className="flex flex-col gap-0.5">
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200">
+              <User className="h-3 w-3 text-primary shrink-0" />
+              {empName}
+            </span>
+            {row.team_name && (
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 pl-4 truncate max-w-[120px]">
+                {row.team_name}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "sla_status",

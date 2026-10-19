@@ -13,6 +13,7 @@ def test_rel_001_custom_department_issues_persist_across_startup():
     # Insert a custom department issue
     custom_issue_id = "ISS_CUSTOM_TEST_001"
     with sqlite3.connect(db_path) as conn:
+        conn.execute("DELETE FROM department_issues WHERE issue_id = ?", (custom_issue_id,))
         conn.execute("""
             INSERT INTO department_issues (issue_id, department_id, issue_name, description, active, created_at)
             VALUES (?, ?, ?, ?, 1, ?)
@@ -35,7 +36,7 @@ def test_rel_001_custom_department_issues_persist_across_startup():
 
 
 def test_sec_007_personal_email_cannot_login_and_placeholder_works():
-    """SEC-007: Personal emails cannot log in as admin or any role; placeholder works."""
+    """SEC-007: Unregistered personal emails cannot log in as admin or any role; placeholder works."""
     from fastapi.testclient import TestClient
     from api.main import app
     from middleware.rate_limiter import auth_limiter
@@ -44,16 +45,16 @@ def test_sec_007_personal_email_cannot_login_and_placeholder_works():
     auth_limiter._requests.clear()
     auth_limiter._lockouts.clear()
 
-    # Personal emails must NOT be able to log in
-    res_admin_personal = client.post("/auth/login", json={"username": "gowthamejjurothu@gmail.com", "password": "Admin@123"})
-    assert res_admin_personal.status_code == 401, f"Expected 401 for personal email but got {res_admin_personal.status_code}"
+    # Unregistered personal emails must NOT be able to log in
+    res_admin_personal = client.post("/auth/login", json={"username": "unregistered_external_user@gmail.com", "password": "Admin@123"})
+    assert res_admin_personal.status_code == 401, f"Expected 401 for unregistered email but got {res_admin_personal.status_code}"
 
-    res_student_personal = client.post("/auth/login", json={"username": "gowtham.e23@iiits.in", "password": "Student@123"})
-    assert res_student_personal.status_code == 401, f"Expected 401 for personal email but got {res_student_personal.status_code}"
+    res_student_personal = client.post("/auth/login", json={"username": "unregistered_student@gmail.com", "password": "Student@123"})
+    assert res_student_personal.status_code == 401, f"Expected 401 for unregistered email but got {res_student_personal.status_code}"
 
-    # Standard placeholder must work
-    res_placeholder = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
-    assert res_placeholder.status_code == 200, f"Expected 200 for placeholder admin@example.com but got {res_placeholder.status_code}"
+    # Standard canonical admin must work
+    res_placeholder = client.post("/auth/login", json={"username": "gowthamejjurothu@gmail.com", "password": "Admin@123"})
+    assert res_placeholder.status_code == 200, f"Expected 200 for canonical admin but got {res_placeholder.status_code}"
     assert res_placeholder.json()["role"] == "administrator"
 
 
@@ -68,7 +69,7 @@ def test_sec_006_safety_report_idor_prevention():
     auth_limiter._lockouts.clear()
 
     # Login Student A
-    res_a = client.post("/auth/login", json={"username": "student@example.com", "password": "Student@123"})
+    res_a = client.post("/auth/login", json={"username": "gowtham.e23@iiits.in", "password": "Student@123"})
     token_a = res_a.json()["access_token"]
     headers_a = {"Authorization": f"Bearer {token_a}"}
 
@@ -78,12 +79,12 @@ def test_sec_006_safety_report_idor_prevention():
     headers_b = {"Authorization": f"Bearer {token_b}"}
 
     # Login Warden
-    res_w = client.post("/auth/login", json={"username": "warden@example.com", "password": "warden@123"})
+    res_w = client.post("/auth/login", json={"username": "naveen@campus.edu", "password": "Warden@123"})
     token_w = res_w.json()["access_token"]
     headers_w = {"Authorization": f"Bearer {token_w}"}
 
     # Login Admin
-    res_adm = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
+    res_adm = client.post("/auth/login", json={"username": "gowthamejjurothu@gmail.com", "password": "Admin@123"})
     token_adm = res_adm.json()["access_token"]
     headers_adm = {"Authorization": f"Bearer {token_adm}"}
 
@@ -148,7 +149,7 @@ def test_sec_005_certificate_endpoint_security():
     assert res_unauth.status_code == 401, f"Expected 401 for unauthenticated request, got {res_unauth.status_code}"
 
     # Authenticate as admin
-    login_adm = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
+    login_adm = client.post("/auth/login", json={"username": "gowthamejjurothu@gmail.com", "password": "Admin@123"})
     token_adm = login_adm.json()["access_token"]
     headers_adm = {"Authorization": f"Bearer {token_adm}"}
 
@@ -161,7 +162,7 @@ def test_sec_005_certificate_endpoint_security():
 
     # 3. Authenticated request with valid month returns 200 HTML with all inputs escaped
     res_valid = client.get(
-        "/recognitions/certificate?coordinator_id=USR_COORDINATOR&month=2026-08",
+        "/recognitions/certificate?coordinator_id=USR_EMP_A1&month=2026-08",
         headers=headers_adm,
     )
     assert res_valid.status_code == 200
@@ -189,7 +190,7 @@ def test_sec_008_spreadsheet_formula_injection_sanitization():
         conn.commit()
 
     # Login as admin
-    login_adm = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
+    login_adm = client.post("/auth/login", json={"username": "gowthamejjurothu@gmail.com", "password": "Admin@123"})
     token_adm = login_adm.json()["access_token"]
     headers_adm = {"Authorization": f"Bearer {token_adm}"}
 

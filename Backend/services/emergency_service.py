@@ -80,15 +80,35 @@ class EmergencyService:
             return None
 
     def create_category(self, name: str, department_id: str = None, sort_order: int = 0, is_active: bool = True):
-        cid = generate_id("EMCAT")
-        now_ts = now_string()
+        clean_name = name.strip()
         with self._connect() as conn:
+            existing = conn.execute(
+                "SELECT category_id FROM emergency_categories WHERE LOWER(name) = LOWER(?) LIMIT 1",
+                (clean_name,),
+            ).fetchone()
+            if existing:
+                cid = existing["category_id"]
+                conn.execute(
+                    """
+                    UPDATE emergency_categories
+                    SET department_id = COALESCE(?, department_id),
+                        sort_order = CASE WHEN ? != 0 THEN ? ELSE sort_order END,
+                        is_active = ?
+                    WHERE category_id = ?
+                    """,
+                    (department_id or None, sort_order, sort_order, int(is_active), cid),
+                )
+                conn.commit()
+                return self.get_category(cid)
+
+            cid = generate_id("EMCAT")
+            now_ts = now_string()
             conn.execute(
                 """
                 INSERT INTO emergency_categories (category_id, name, department_id, is_active, sort_order, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (cid, name.strip(), department_id or None, int(is_active), sort_order, now_ts),
+                (cid, clean_name, department_id or None, int(is_active), sort_order, now_ts),
             )
             conn.commit()
         return self.get_category(cid)

@@ -8,5 +8,13 @@ export const teamService = {
   create: (payload) => apiClient.post("/teams", payload),
   update: (teamId, payload) => apiClient.put(`/teams/${teamId}`, payload),
   deactivate: (teamId) => apiClient.delete(`/teams/${teamId}`),
+  getEligibleCoordinators: (teamId, position) =>
+    apiClient.get("/teams/eligible-coordinators", { params: { team_id: teamId, position } }),
+  getWorkMemberships: (params = {}) => apiClient.get("/teams/work-memberships", { params }),
+  assignWorkMembership: (payload) => apiClient.post("/teams/work-memberships", payload),
+  removeWorkMembership: (membershipId) =>
+    apiClient.delete(`/teams/work-memberships/${membershipId}`),
+  getEmployeesOverview: () => apiClient.get("/teams/employees-overview"),
+  listEmployeesOverview: () => apiClient.get("/teams/employees-overview"),
 };
 

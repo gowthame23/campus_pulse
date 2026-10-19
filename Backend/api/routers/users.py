@@ -5,16 +5,20 @@ from api.dependencies import (
     get_audit_service,
     get_auth_service,
     get_complaint_service,
+    get_department_service,
     get_notification_service,
 )
 from api.schemas import (
     AdminPasswordResetRequest,
     AssignLocationsRequest,
+    AssignDepartmentsRequest,
+    EmployeeWorkAssignmentsRequest,
     CoordinatorTransferRequest,
     ExcelImportReportResponse,
     UserActivityResponse,
     UserCreateRequest,
     UserResponse,
+    UserResponsibilityUpdateRequest,
     UserStatusUpdateRequest,
     UserUpdateRequest,
     LanguageUpdateRequest,
@@ -52,12 +56,52 @@ def _enrich_user_response(user, auth_service, all_locs, all_depts):
         warden_locs = auth_service.get_warden_locations(user.user_id)
         d["assigned_locations"] = [l.location_id for l in warden_locs]
         d["assigned_location_names"] = [l.name for l in warden_locs]
-    elif u_role == "coordinator":
-        coord_asgns = auth_service.list_coordinator_assignments(coordinator_id=user.user_id)
-        d["assigned_departments"] = [a["department_id"] for a in coord_asgns]
-        d["assigned_department_names"] = [
-            all_depts.get(a["department_id"], a["department_id"]) for a in coord_asgns
-        ]
+    elif u_role in ("coordinator", "employee"):
+        coord_asgns = auth_service.list_coordinator_assignments(coordinator_id=user.user_id) or []
+        assigned_dept_ids = []
+        assigned_dept_names = []
+        for a in coord_asgns:
+            did = a["department_id"]
+            if did not in assigned_dept_ids:
+                assigned_dept_ids.append(did)
+                assigned_dept_names.append(all_depts.get(did, did))
+
+        if getattr(user, "department_id", None) and user.department_id not in assigned_dept_ids:
+            assigned_dept_ids.append(user.department_id)
+            assigned_dept_names.append(all_depts.get(user.department_id, user.department_id))
+
+        d["assigned_departments"] = assigned_dept_ids
+        d["assigned_department_names"] = assigned_dept_names
+
+        with auth_service._connect() as conn:
+            coord_row = conn.execute(
+                "SELECT department_id, name, 'Coordinator 1' as pos, 1 as slot FROM departments WHERE coordinator_id = ? "
+                "UNION ALL "
+                "SELECT department_id, name, 'Coordinator 2' as pos, 2 as slot FROM departments WHERE coordinator_2_id = ?",
+                (user.user_id, user.user_id),
+            ).fetchone()
+            if coord_row:
+                d["coordinator_position"] = f"{coord_row['pos']} ({coord_row['name']})"
+                d["coordinator_department_id"] = coord_row["department_id"]
+                d["coordinator_department_name"] = coord_row["name"]
+                d["coordinator_slot"] = coord_row["slot"]
+            m_cnt = conn.execute(
+                "SELECT COUNT(*) FROM employee_work_memberships WHERE user_id = ?",
+                (user.user_id,),
+            ).fetchone()[0]
+            d["work_memberships_count"] = m_cnt
+
+            dept_rows = conn.execute(
+                "SELECT DISTINCT d.department_id, d.name "
+                "FROM employee_work_memberships ewm "
+                "JOIN departments d ON ewm.department_id = d.department_id "
+                "WHERE ewm.user_id = ?",
+                (user.user_id,),
+            ).fetchall()
+            for dr in dept_rows:
+                if dr["department_id"] not in d["assigned_departments"]:
+                    d["assigned_departments"].append(dr["department_id"])
+                    d["assigned_department_names"].append(dr["name"])
     return d
 
 
@@ -457,6 +501,149 @@ def update_user(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
 
+@router.put("/{user_id}/responsibility-and-role", response_model=UserResponse)
+def update_user_responsibility_and_role(
+    user_id: str,
+    payload: UserResponsibilityUpdateRequest,
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
+    auth_service=Depends(get_auth_service),
+    department_service=Depends(get_department_service),
+    audit_service=Depends(get_audit_service),
+):
+    target_user = auth_service.get_user(user_id)
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found."
+        )
+    _hide_super_admin(target_user, current_user)
+
+    if (current_user.role or "").lower() == "app_manager" and target_user.role in ("administrator", "app_manager"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="App Managers are not authorized to manage Admin or App Manager accounts.",
+        )
+
+    old_data = user_to_response(target_user)
+
+    # 1. Update Name if provided
+    if payload.name is not None and payload.name.strip():
+        target_user.name = payload.name.strip()
+
+    # 2. Update Role if provided
+    new_role = (payload.role or "").strip().lower() if payload.role else None
+    if new_role and new_role != (target_user.role or "").lower():
+        if target_user.role in ("administrator", "super_admin"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot alter administrator system role.",
+            )
+        valid_roles = ("employee", "coordinator", "location_in_charge", "app_manager", "student")
+        if new_role not in valid_roles:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid target role: {new_role}",
+            )
+        target_user.role = new_role
+
+        # If role changed away from coordinator or employee, deactivate any coordinator roles
+        if new_role not in ("employee", "coordinator"):
+            all_depts = auth_service.list_departments()
+            for d in all_depts:
+                changed = False
+                if d.coordinator_id == user_id:
+                    d.coordinator_id = None
+                    changed = True
+                if getattr(d, "coordinator_2_id", None) == user_id:
+                    d.coordinator_2_id = None
+                    changed = True
+                if changed:
+                    auth_service.save_department(d)
+            with auth_service._connect() as conn:
+                conn.execute(
+                    "UPDATE coordinator_assignments SET status = 'Inactive' WHERE coordinator_id = ?",
+                    (user_id,),
+                )
+                conn.commit()
+
+    # 3. Update Coordinator Responsibility if provided
+    coord_type = (payload.coordinator_type or "").strip().lower() if payload.coordinator_type else None
+    if coord_type:
+        all_depts = auth_service.list_departments()
+
+        if coord_type == "none":
+            # Demote/clear to standard operational staff - remove from all coordinator slots
+            for d in all_depts:
+                changed = False
+                if d.coordinator_id == user_id:
+                    d.coordinator_id = None
+                    changed = True
+                if getattr(d, "coordinator_2_id", None) == user_id:
+                    d.coordinator_2_id = None
+                    changed = True
+                if changed:
+                    auth_service.save_department(d)
+            with auth_service._connect() as conn:
+                conn.execute(
+                    "UPDATE coordinator_assignments SET status = 'Inactive' WHERE coordinator_id = ?",
+                    (user_id,),
+                )
+                conn.commit()
+
+        elif coord_type in ("coordinator_1", "coordinator_2"):
+            if not payload.department_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Department is required for coordinator assignment.",
+                )
+            target_dept = department_service.get_department(payload.department_id)
+            if not target_dept:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Target department not found.",
+                )
+
+            # Clear user from any other departments
+            for d in all_depts:
+                if d.department_id != payload.department_id:
+                    changed = False
+                    if d.coordinator_id == user_id:
+                        d.coordinator_id = None
+                        changed = True
+                    if getattr(d, "coordinator_2_id", None) == user_id:
+                        d.coordinator_2_id = None
+                        changed = True
+                    if changed:
+                        auth_service.save_department(d)
+
+            # Assign to target department slot
+            if coord_type == "coordinator_1":
+                if getattr(target_dept, "coordinator_2_id", None) == user_id:
+                    target_dept.coordinator_2_id = None
+                target_dept.coordinator_id = user_id
+            else:
+                if target_dept.coordinator_id == user_id:
+                    target_dept.coordinator_id = None
+                target_dept.coordinator_2_id = user_id
+            auth_service.save_department(target_dept)
+
+            # Ensure user is eligible for this department so they can service it
+            assigned_depts = list(target_user.assigned_departments or [])
+            if target_dept.department_id not in assigned_depts:
+                assigned_depts.append(target_dept.department_id)
+                auth_service.assign_user_departments(user_id, assigned_depts)
+
+    auth_service.save_user(target_user)
+    new_data = user_to_response(target_user)
+    audit_service.log(
+        current_user.user_id,
+        "Update Responsibility and Role",
+        user_id,
+        old_value=old_data,
+        new_value=new_data,
+    )
+    return new_data
+
+
 @router.put("/{user_id}/status", response_model=UserResponse)
 @router.patch("/{user_id}/status", response_model=UserResponse)
 def patch_user_status(
@@ -666,17 +853,17 @@ def reset_user_password(
             status_code=status.HTTP_400_BAD_REQUEST, detail="new_password is required."
         )
 
-    if current_user.role == AppManager.ROLE:
-        if target_user.role not in ("coordinator", "location_in_charge", "student", "employee"):
+    if (current_user.role or "").lower() == AppManager.ROLE.lower():
+        if (target_user.role or "").lower() not in ("coordinator", "location_in_charge", "student", "employee"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="App Managers can only reset passwords for Coordinators, Employees, Wardens, or Students.",
             )
-    elif current_user.role == Administrator.ROLE:
-        if target_user.role not in (Administrator.ROLE, AppManager.ROLE):
+    elif (current_user.role or "").lower() == Administrator.ROLE.lower():
+        if (target_user.role or "").lower() == "super_admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admins can only reset passwords for Admin or App Manager accounts.",
+                detail="Administrators cannot reset Super Admin passwords.",
             )
 
     from utils.passwords import hash_password, validate_password_complexity
@@ -702,11 +889,30 @@ def import_users(
     year: str | None = Form(None),
     location_id: str | None = Form(None),
     update_existing: bool = Form(False),
+    default_program: str | None = Form(None),
+    default_academic_year: str | None = Form(None),
+    default_year: str | None = Form(None),
+    default_location_id: str | None = Form(None),
+    q_program: str | None = Query(None, alias="program"),
+    q_academic_year: str | None = Query(None, alias="academic_year"),
+    q_year: str | None = Query(None, alias="year"),
+    q_location_id: str | None = Query(None, alias="location_id"),
+    q_default_program: str | None = Query(None, alias="default_program"),
+    q_default_academic_year: str | None = Query(None, alias="default_academic_year"),
+    q_default_year: str | None = Query(None, alias="default_year"),
+    q_default_location_id: str | None = Query(None, alias="default_location_id"),
+    q_update_existing: bool | None = Query(None, alias="update_existing"),
     current_user=Depends(require_roles(AppManager.ROLE, Administrator.ROLE)),
     auth_service=Depends(get_auth_service),
     audit_service=Depends(get_audit_service),
 ):
     from utils.excel_importer import parse_user_import_file
+
+    eff_program = program or default_program or q_program or q_default_program
+    eff_academic_year = academic_year or default_academic_year or q_academic_year or q_default_academic_year
+    eff_year = year or default_year or q_year or q_default_year
+    eff_location_id = location_id or default_location_id or q_location_id or q_default_location_id
+    eff_update_existing = bool(update_existing or q_update_existing)
 
     file_bytes = file.file.read()
     report_data = parse_user_import_file(
@@ -714,11 +920,11 @@ def import_users(
         filename=file.filename or "import.csv",
         auth_service=auth_service,
         creator=current_user,
-        default_program=program,
-        default_academic_year=academic_year,
-        default_year=year,
-        default_location_id=location_id,
-        update_existing=update_existing,
+        default_program=eff_program,
+        default_academic_year=eff_academic_year,
+        default_year=eff_year,
+        default_location_id=eff_location_id,
+        update_existing=eff_update_existing,
     )
 
     audit_service.log(
@@ -783,10 +989,11 @@ def get_app_manager_assignments(
 
 
 @router.post("/{user_id}/assigned-locations")
+@router.put("/{user_id}/assigned-locations")
 def assign_app_manager_locations(
     user_id: str,
     payload: AssignLocationsRequest,
-    current_user=Depends(require_roles(Administrator.ROLE)),
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
     auth_service=Depends(get_auth_service),
 ):
     try:
@@ -797,6 +1004,77 @@ def assign_app_manager_locations(
         }
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@router.post("/{user_id}/assigned-departments")
+@router.put("/{user_id}/assigned-departments")
+def assign_employee_departments(
+    user_id: str,
+    payload: AssignDepartmentsRequest,
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
+    auth_service=Depends(get_auth_service),
+    audit_service=Depends(get_audit_service),
+):
+    try:
+        updated_user = auth_service.assign_user_departments(
+            user_id, payload.department_ids, caller_user=current_user
+        )
+        all_depts = {d.department_id: d.name for d in auth_service.list_departments()}
+        dept_names = [all_depts.get(did, did) for did in payload.department_ids]
+        audit_service.log(
+            current_user.user_id,
+            "Assign Eligible Departments",
+            user_id,
+            old_value=None,
+            new_value={"department_ids": payload.department_ids, "department_names": dept_names},
+        )
+        return {
+            "message": "Eligible departments updated successfully.",
+            "assigned_departments": payload.department_ids,
+            "assigned_department_names": dept_names,
+        }
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+    except PermissionError as p_err:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
+
+
+@router.post("/{user_id}/employee-work-assignments")
+@router.put("/{user_id}/employee-work-assignments")
+def assign_employee_work_assignments(
+    user_id: str,
+    payload: EmployeeWorkAssignmentsRequest,
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
+    auth_service=Depends(get_auth_service),
+    audit_service=Depends(get_audit_service),
+):
+    try:
+        updated_user = auth_service.assign_employee_work_assignments(
+            user_id, payload.department_ids, payload.location_ids, caller_user=current_user
+        )
+        all_depts = {d.department_id: d.name for d in auth_service.list_departments()}
+        dept_names = [all_depts.get(did, did) for did in payload.department_ids]
+        audit_service.log(
+            current_user.user_id,
+            "Assign Employee Work Assignments",
+            user_id,
+            old_value=None,
+            new_value={
+                "department_ids": payload.department_ids,
+                "department_names": dept_names,
+                "location_ids": payload.location_ids,
+            },
+        )
+        return {
+            "message": "Employee work assignments updated successfully.",
+            "assigned_departments": payload.department_ids,
+            "assigned_department_names": dept_names,
+            "assigned_locations": payload.location_ids,
+        }
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+    except PermissionError as p_err:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
 
 
 @router.put("/me/language")

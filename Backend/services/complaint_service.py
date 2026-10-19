@@ -24,6 +24,7 @@ from core.constants import (
     STATUS_CLOSED,
     STATUS_IN_PROGRESS,
     STATUS_PENDING_WARDEN,
+    STATUS_REJECTED,
     STATUS_REOPENED,
     STATUS_SUBMITTED,
     STATUS_WAITING_STUDENT,
@@ -67,7 +68,12 @@ class ComplaintService:
                 notification_service=notification_service,
             )
 
-    def _load_complaints(self):
+    def _load_complaints(self, exclude_deleted=False):
+        if hasattr(self.repository, "get_all_complaints"):
+            return [
+                Complaint.from_dict(item)
+                for item in self.repository.get_all_complaints(exclude_deleted=exclude_deleted)
+            ]
         return [
             Complaint.from_dict(item)
             for item in self.repository.load().get("complaints", [])
@@ -95,9 +101,15 @@ class ComplaintService:
             dept = dept_cache[complaint.department_id]
         else:
             dept = self.auth_service.get_department(complaint.department_id)
-        if not dept:
+
+        is_other = (
+            complaint.location_id == "LOC_OTHER"
+            or complaint.department_id in ("DEPT_OTHER", "DEPT_OTHER_GENERAL", "DEPT_HOSTEL_OTHER")
+            or (dept and (dept.name or "").lower() in ("other", "other / not sure"))
+        )
+        if is_other or not dept:
             complaint.due_date = None
-            complaint.sla_status = "🟢 On Time"
+            complaint.sla_status = "Under Review" if is_other else "🟢 On Time"
             return
 
         created_dt = parse_date(complaint.created_at)
@@ -128,36 +140,26 @@ class ComplaintService:
                 complaint.sla_status = "🟢 On Time"
 
     def list_all(self, include_archived=False):
-        complaints = self._load_complaints()
-        self.apply_automatic_rules(complaints)
-        complaints = self._load_complaints()
+        complaints = self._load_complaints(exclude_deleted=True)
         dept_cache = {}
         for c in complaints:
             self._enrich_sla(c, dept_cache)
         if not include_archived:
-            return [c for c in complaints if not c.archived]
-        return complaints
+            return [c for c in complaints if not c.archived and not getattr(c, "is_deleted", False)]
+        return [c for c in complaints if not getattr(c, "is_deleted", False)]
 
     def get_complaint(self, complaint_id, include_archived=False):
-        for complaint in self.list_all(include_archived=include_archived):
-            if complaint.complaint_id == complaint_id:
-                return complaint
-        return None
+        raw = self.repository.get_complaint(complaint_id)
+        if not raw:
+            return None
+        c = Complaint.from_dict(raw)
+        self._enrich_sla(c)
+        if not include_archived and c.archived:
+            return None
+        return c
 
     def save_complaint(self, complaint):
-        complaints = self._load_complaints()
-        if complaint.status in (Complaint.CLOSED, Complaint.AUTO_CLOSED):
-            try:
-                self.clear_affected_records(complaint.complaint_id)
-            except Exception:
-                pass
-        for index, item in enumerate(complaints):
-            if item.complaint_id == complaint.complaint_id:
-                complaints[index] = complaint
-                self._save_complaints(complaints)
-                return
-        complaints.append(complaint)
-        self._save_complaints(complaints)
+        self.repository.save_single_complaint(complaint.to_dict())
 
     def create_complaint(
         self,
@@ -202,58 +204,103 @@ class ComplaintService:
         if hasattr(location, "active") and not location.active:
             raise ValueError("Selected location is inactive.")
 
-        # Student hostel restriction: a student's assigned hostel restricts hostel complaints,
-        # not other permitted campus facilities (Academic Block, Mess, SAC, Sports Complex, etc.).
+        # Student location and public complaint access rules:
+        # Option A ('everyone'): Any student can submit a public complaint.
+        # Option B ('location_only'): Only students assigned to this location can submit complaints.
+        # Hostels default to location_only, other campus facilities default to everyone.
         if (getattr(user, "role", "") or "").lower() == "student":
             loc_type = (getattr(location, "location_type", "") or getattr(location, "name", "")).lower()
-            if "hostel" in loc_type:
-                student_loc_id = getattr(user, "location_id", None)
-                student_hostel = getattr(user, "hostel", None)
-                profile = (
-                    self.auth_service.get_student_profile(user.user_id)
-                    if hasattr(self.auth_service, "get_student_profile")
-                    else None
+            is_hostel = "hostel" in loc_type
+
+            student_loc_id = getattr(user, "location_id", None)
+            student_hostel = getattr(user, "hostel", None)
+            profile = (
+                self.auth_service.get_student_profile(user.user_id)
+                if hasattr(self.auth_service, "get_student_profile")
+                else None
+            )
+            if profile:
+                student_loc_id = student_loc_id or profile.get("location_id")
+                student_hostel = student_hostel or profile.get("hostel")
+
+            allowed_ids = set()
+            allowed_names = set()
+            if student_loc_id:
+                allowed_ids.add(str(student_loc_id).lower())
+                st_loc = self.auth_service.get_location(student_loc_id)
+                if st_loc:
+                    allowed_ids.add(st_loc.location_id.lower())
+                    allowed_names.add(st_loc.name.lower())
+            if student_hostel:
+                allowed_names.add(str(student_hostel).lower())
+                st_loc_by_name = self.auth_service.get_location(student_hostel)
+                if st_loc_by_name:
+                    allowed_ids.add(st_loc_by_name.location_id.lower())
+                    allowed_names.add(st_loc_by_name.name.lower())
+                for l in self.auth_service.list_locations():
+                    if l.name.lower() == str(student_hostel).lower() or l.location_id.lower() == str(student_hostel).lower():
+                        allowed_ids.add(l.location_id.lower())
+                        allowed_names.add(l.name.lower())
+            assigned_locations = getattr(user, "assigned_locations", None) or []
+            if isinstance(assigned_locations, list):
+                for al in assigned_locations:
+                    if isinstance(al, str):
+                        allowed_ids.add(al.lower())
+                        allowed_names.add(al.lower())
+
+            target_id = location.location_id.lower()
+            target_name = location.name.lower()
+            is_student_at_location = (target_id in allowed_ids) or (target_name in allowed_names)
+
+            raw_policy = (
+                getattr(location, "complaint_submission_policy", None)
+                or getattr(location, "public_complaint_access", None)
+            )
+            if raw_policy:
+                p_str = str(raw_policy).strip().lower()
+                if p_str in ("everyone", "allow_all", "all", "public", "allow_everyone"):
+                    submission_policy = "everyone"
+                else:
+                    submission_policy = "location_only"
+            else:
+                submission_policy = "location_only" if is_hostel else "everyone"
+
+            if submission_policy == "location_only" and not is_student_at_location:
+                raise PermissionError(
+                    "This location only accepts complaints from residents or assigned students of this assigned hostel."
                 )
-                if profile:
-                    student_loc_id = student_loc_id or profile.get("location_id")
-                    student_hostel = student_hostel or profile.get("hostel")
 
-                allowed_ids = set()
-                allowed_names = set()
-                if student_loc_id:
-                    allowed_ids.add(str(student_loc_id).lower())
-                    st_loc = self.auth_service.get_location(student_loc_id)
-                    if st_loc:
-                        allowed_ids.add(st_loc.location_id.lower())
-                        allowed_names.add(st_loc.name.lower())
-                if student_hostel:
-                    allowed_names.add(str(student_hostel).lower())
-                    st_loc_by_name = self.auth_service.get_location(student_hostel)
-                    if st_loc_by_name:
-                        allowed_ids.add(st_loc_by_name.location_id.lower())
-                        allowed_names.add(st_loc_by_name.name.lower())
-                    for l in self.auth_service.list_locations():
-                        if l.name.lower() == str(student_hostel).lower() or l.location_id.lower() == str(student_hostel).lower():
-                            allowed_ids.add(l.location_id.lower())
-                            allowed_names.add(l.name.lower())
+        # Resolve 'other' / 'DEPT_OTHER' aliases to the canonical department in database
+        if department_id in ("DEPT_OTHER", "DEPT_OTHER_GENERAL", "DEPT_HOSTEL_OTHER") or (department_id or "").lower() in ("other", "dept_other", "dept_hostel_other"):
+            dept_obj = self.auth_service.get_department("DEPT_OTHER_GENERAL") or self.auth_service.get_department("DEPT_OTHER")
+            if dept_obj:
+                department = dept_obj
+                department_id = dept_obj.department_id
+            else:
+                from models.department import Department
+                department = Department("Other", 1, department_id="DEPT_OTHER_GENERAL")
+                department_id = "DEPT_OTHER_GENERAL"
+        else:
+            department = self.auth_service.get_department(department_id)
 
-                target_id = location.location_id.lower()
-                target_name = location.name.lower()
-                is_match = target_id in allowed_ids or target_name in allowed_names
-
-                if not is_match:
-                    raise PermissionError(
-                        "Students can only submit complaints for their assigned hostel."
-                    )
-
-        department = self.auth_service.get_department(department_id)
-        if not department and (department_id == "DEPT_OTHER" or department_id.lower() == "other"):
-            from models.department import Department
-            department = Department("Other", 1, department_id="DEPT_OTHER")
-        elif not department:
+        if not department:
             raise ValueError("Department does not exist.")
         if hasattr(department, "active") and not department.active:
             raise ValueError("Selected department is inactive.")
+
+        # Validate that department is associated with the selected location (if the department has location mappings configured)
+        with self.auth_service._connect() as conn:
+            has_mappings = conn.execute(
+                "SELECT 1 FROM location_departments WHERE department_id = ? AND is_active = 1",
+                (department.department_id,),
+            ).fetchone()
+            if has_mappings:
+                assoc = conn.execute(
+                    "SELECT 1 FROM location_departments WHERE location_id = ? AND department_id = ? AND is_active = 1",
+                    (location.location_id, department.department_id),
+                ).fetchone()
+                if not assoc and department.department_id not in ("DEPT_OTHER", "DEPT_OTHER_GENERAL"):
+                    raise ValueError("Department is not available or associated with the selected location.")
 
         # 4. Issue & Priority Validation
         final_priority = None
@@ -313,6 +360,21 @@ class ComplaintService:
 
         # 6. Compute initial SLA deadline
         sla_hours = get_sla_hours(final_priority, category=category)
+        if hasattr(self.repository, "get_department_sla_config"):
+            try:
+                sla_cfg = self.repository.get_department_sla_config(department_id)
+                if sla_cfg:
+                    p_norm = (normalize_priority(final_priority) or "").lower()
+                    if p_norm == "critical":
+                        sla_hours = int(sla_cfg.get("critical_duration_hours", sla_hours))
+                    elif p_norm == "high":
+                        sla_hours = int(sla_cfg.get("high_duration_hours", sla_hours))
+                    elif p_norm == "medium":
+                        sla_hours = int(sla_cfg.get("medium_duration_hours", sla_hours))
+                    elif p_norm in ("normal", "low"):
+                        sla_hours = int(sla_cfg.get("normal_duration_hours", sla_hours))
+            except Exception:
+                pass
         sla_deadline = (current_time + timedelta(hours=sla_hours)).isoformat()
 
         # 7. Create Complaint instance
@@ -334,8 +396,64 @@ class ComplaintService:
         complaint.urgent_reason = urgent_reason if is_urgent else None
         complaint.exact_spot = exact_spot
 
-        # 8. Team Routing (Part D)
-        team = self.team_service.get_team_for_location_department(location_id, department_id)
+        # 8. Department-Level Campus-Wide & Team Coordinator Routing
+        acting_coord = None
+        dept_obj = self.auth_service.get_department(department_id)
+
+        # 0. Active Team mapped to (location_id, department_id)
+        team = None
+        if hasattr(self, "team_service") and self.team_service:
+            try:
+                team = self.team_service.get_team_for_location_department(location_id, department_id)
+            except Exception:
+                team = None
+
+        if team:
+            complaint.team_id = team.get("team_id")
+            acting_team_coord = self.team_service.get_acting_coordinator(team)
+            if acting_team_coord:
+                acting_coord = acting_team_coord
+            else:
+                t_coord = team.get("coordinator_id")
+                if t_coord and not self.team_service.is_user_on_leave(t_coord, department_id=department_id):
+                    u = self.auth_service.get_user(t_coord)
+                    if u and getattr(u, "active", True) and not getattr(u, "is_deleted", False):
+                        acting_coord = u
+                if not acting_coord:
+                    t_backup = team.get("backup_coordinator_id")
+                    if t_backup and not self.team_service.is_user_on_leave(t_backup, department_id=department_id):
+                        u = self.auth_service.get_user(t_backup)
+                        if u and getattr(u, "active", True) and not getattr(u, "is_deleted", False):
+                            acting_coord = u
+
+        # 1. Primary: Department Coordinator 1
+        if not acting_coord and dept_obj and getattr(dept_obj, "coordinator_id", None):
+            c1_id = dept_obj.coordinator_id
+            if not self.team_service.is_user_on_leave(c1_id, department_id=department_id):
+                u1 = self.auth_service.get_user(c1_id)
+                if u1 and getattr(u1, "active", True) and not getattr(u1, "is_deleted", False):
+                    acting_coord = u1
+
+        # 2. Backup: Department Coordinator 2 (takes over when Coordinator 1 is on leave or unassigned)
+        if not acting_coord and dept_obj and getattr(dept_obj, "coordinator_2_id", None):
+            c2_id = dept_obj.coordinator_2_id
+            if not self.team_service.is_user_on_leave(c2_id, department_id=department_id):
+                u2 = self.auth_service.get_user(c2_id)
+                if u2 and getattr(u2, "active", True) and not getattr(u2, "is_deleted", False):
+                    acting_coord = u2
+
+        # 3. Fallback: Direct coordinator assignments if any
+        if not acting_coord:
+            coord_asgns = self.auth_service.list_coordinator_assignments(location_id=location_id, department_id=department_id)
+            if coord_asgns:
+                for asgn in coord_asgns:
+                    c_id = asgn.get("coordinator_id")
+                    if c_id and not self.team_service.is_user_on_leave(c_id, department_id=department_id):
+                        u = self.auth_service.get_user(c_id)
+                        if u and getattr(u, "active", True) and not getattr(u, "is_deleted", False):
+                            acting_coord = u
+                            break
+
         now_ts = now_string()
         complaint.status = Complaint.SUBMITTED
         complaint.assigned_to = None
@@ -345,71 +463,58 @@ class ComplaintService:
         loc_obj = self.auth_service.get_location(location_id)
         warden_id = getattr(loc_obj, "in_charge_id", None)
         loc_label = loc_obj.name if loc_obj else location_id
-        dept_obj = self.auth_service.get_department(department_id)
         dept_label = dept_obj.name if dept_obj else department_id
 
-        if team:
-            complaint.team_id = team["team_id"]
-            acting_coord = self.team_service.get_acting_coordinator(team)
-            if acting_coord:
-                complaint.add_history(f"Assigned to team '{team['name']}'. Awaiting assignment by coordinator.")
-                self.notification_service.notify(
-                    acting_coord.user_id,
-                    f"New complaint waiting to be assigned: {complaint.title or complaint.category}",
-                    complaint_id=complaint.complaint_id,
-                    title="New Complaint to Assign",
-                )
-                if warden_id:
-                    self.notification_service.notify(
-                        warden_id,
-                        f"New complaint filed at your location: {complaint.title or complaint.category}",
-                        complaint_id=complaint.complaint_id,
-                        title="New Complaint in Your Location",
-                    )
-            else:
-                # Rule F3: If coordinator is on leave and team has no backup (or backup also on leave)
-                # -> goes straight to Escalation Level 2.
-                complaint.assign_escalation_level = 2
-                complaint.add_history(f"Team '{team['name']}' has no active acting coordinator today. Escalated directly to Level 2 (Warden & App Manager).")
-                esc2_msg = f"No acting coordinator for team '{team['name']}'. Complaint {complaint.complaint_id} escalated to Warden and App Manager for assignment."
-                if warden_id:
-                    self.notification_service.notify(
-                        warden_id,
-                        esc2_msg,
-                        complaint_id=complaint.complaint_id,
-                        title="No Acting Coordinator - Escalation Level 2",
-                    )
-                app_mgr_id = getattr(loc_obj, "app_manager_id", None) or self.get_active_app_manager()
-                if app_mgr_id:
-                    self.notification_service.notify(
-                        app_mgr_id,
-                        esc2_msg,
-                        complaint_id=complaint.complaint_id,
-                        title="No Acting Coordinator - Escalation Level 2",
-                    )
-        else:
-            complaint.team_id = None
-            complaint.add_history("No team set up for this location/department. Placed in unrouted queue.")
-            unrouted_msg = f"New complaint filed, but no team is set up for {dept_label} at {loc_label}. Please assign or set up a team."
+        if acting_coord:
+            complaint.add_history(f"Awaiting assignment by coordinator {acting_coord.name}.")
+            self.notification_service.notify(
+                acting_coord.user_id,
+                f"New complaint waiting to be assigned: {complaint.title or complaint.category}",
+                complaint_id=complaint.complaint_id,
+                title="Awaiting Assignment - New Complaint to Assign",
+            )
             if warden_id:
                 self.notification_service.notify(
-                    warden_id, unrouted_msg, complaint_id=complaint.complaint_id, title="Unrouted Complaint - Needs Team"
+                    warden_id,
+                    f"New complaint filed at your location: {complaint.title or complaint.category}",
+                    complaint_id=complaint.complaint_id,
+                    title="New Complaint in Your Location",
+                )
+        else:
+            complaint.team_id = None
+            complaint.assign_escalation_level = 2
+            complaint.add_history(f"No active coordinator available for {dept_label} at {loc_label}. Escalated to Warden and App Manager.")
+            esc2_msg = f"No active coordinator for {dept_label} at {loc_label}. Complaint {complaint.complaint_id} escalated to Warden and App Manager for assignment."
+            if warden_id:
+                self.notification_service.notify(
+                    warden_id, esc2_msg, complaint_id=complaint.complaint_id, title="Unrouted Complaint - Coverage Gap"
                 )
             app_mgr_id = getattr(loc_obj, "app_manager_id", None) or self.get_active_app_manager()
             if app_mgr_id:
                 self.notification_service.notify(
-                    app_mgr_id, unrouted_msg, complaint_id=complaint.complaint_id, title="Unrouted Complaint - Needs Team"
+                    app_mgr_id, esc2_msg, complaint_id=complaint.complaint_id, title="Unrouted Complaint - Coverage Gap"
                 )
             for admin_u in self.auth_service.list_users(role="administrator"):
                 if admin_u.active and not getattr(admin_u, "is_deleted", False):
                     self.notification_service.notify(
-                        admin_u.user_id, unrouted_msg, complaint_id=complaint.complaint_id, title="Unrouted Complaint - Needs Team"
+                        admin_u.user_id, esc2_msg, complaint_id=complaint.complaint_id, title="Unrouted Complaint - Needs Coordinator"
                     )
 
+
         # 9. Notify submitter
+        is_other_submission = (
+            complaint.location_id == "LOC_OTHER"
+            or complaint.department_id in ("DEPT_OTHER", "DEPT_OTHER_GENERAL", "DEPT_HOSTEL_OTHER")
+            or (dept_obj and (dept_obj.name or "").lower() in ("other", "other / not sure"))
+        )
+        if is_other_submission:
+            sub_msg = f"Thank you for your information. Your submission {complaint.complaint_id} has been routed to Administration for review."
+        else:
+            sub_msg = f"Your complaint {complaint.complaint_id} has been submitted successfully."
+
         self.notification_service.notify(
             user.user_id,
-            f"Your complaint {complaint.complaint_id} has been submitted successfully.",
+            sub_msg,
             complaint_id=complaint.complaint_id,
             title="Complaint Submitted",
         )
@@ -447,6 +552,23 @@ class ComplaintService:
         ]
 
     def _get_mapped_coordinators(self, location_id, department_id):
+        candidate_coords = []
+        seen_coords = set()
+
+        dept = self.auth_service.get_department(department_id)
+        if dept:
+            for cid in (getattr(dept, "coordinator_id", None), getattr(dept, "coordinator_2_id", None)):
+                if cid and cid not in seen_coords:
+                    seen_coords.add(cid)
+                    u = self.auth_service.get_user(cid)
+                    if (
+                        u
+                        and getattr(u, "active", False)
+                        and not getattr(u, "is_deleted", False)
+                        and getattr(u, "status", "Active") == "Active"
+                    ):
+                        candidate_coords.append(cid)
+
         assignments = (
             self.auth_service.list_coordinator_assignments(
                 location_id=location_id, department_id=department_id
@@ -459,8 +581,6 @@ class ComplaintService:
             )
             or []
         )
-        candidate_coords = []
-        seen_coords = set()
         for a in assignments + all_loc_assignments:
             cid = a.get("coordinator_id")
             if cid and cid not in seen_coords:
@@ -475,10 +595,129 @@ class ComplaintService:
                     candidate_coords.append(cid)
         return candidate_coords
 
+    def get_eligible_assignees(self, complaint_id: str):
+        complaint = self.get_complaint(complaint_id)
+        if not complaint:
+            raise ValueError(f"Complaint {complaint_id} not found.")
+
+        dept_id = complaint.department_id
+        loc_id = complaint.location_id
+
+        # 1. Query employee_work_memberships for (dept_id, loc_id)
+        eligible_users = []
+        with self.auth_service._connect() as conn:
+            query = """
+                SELECT DISTINCT u.user_id, u.name, u.email, u.phone_number, u.role, u.department_id, u.active
+                FROM employee_work_memberships ewm
+                JOIN users u ON ewm.user_id = u.user_id
+                WHERE ewm.department_id = ? AND ewm.location_id = ?
+                  AND u.active = 1 AND (u.is_deleted = 0 OR u.is_deleted IS NULL)
+                  AND u.role IN ('employee', 'coordinator')
+                ORDER BY u.name ASC
+            """
+            rows = conn.execute(query, (dept_id, loc_id)).fetchall()
+            eligible_users = [dict(r) for r in rows]
+
+        # Fallback if no specific work memberships configured yet for this (dept, loc)
+        is_fallback = False
+        if not eligible_users:
+            is_fallback = True
+            with self.auth_service._connect() as conn:
+                fallback_query = """
+                    SELECT user_id, name, email, phone_number, role, department_id, active
+                    FROM users
+                    WHERE (department_id = ? OR role IN ('employee', 'coordinator'))
+                      AND active = 1 AND (is_deleted = 0 OR is_deleted IS NULL)
+                      AND role IN ('employee', 'coordinator')
+                    ORDER BY name ASC
+                """
+                f_rows = conn.execute(fallback_query, (dept_id,)).fetchall()
+                eligible_users = [dict(r) for r in f_rows]
+
+        # 2. For each eligible user, fetch cross-department active jobs and leave status
+        results = []
+        with self.auth_service._connect() as conn:
+            for u in eligible_users:
+                uid = u["user_id"]
+
+                # Leave check
+                on_leave = self.team_service.is_user_on_leave(uid)
+                leave_until = None
+                leave_reason = None
+                if on_leave:
+                    leaves = self.team_service.get_user_leaves(uid, active_only=True)
+                    if leaves:
+                        leave_until = leaves[0].get("to_date")
+                        leave_reason = leaves[0].get("reason", "On leave")
+
+                # Cross-department active jobs query
+                # Privacy-safe: DO NOT expose student name, email, roll number, description, or attachments!
+                job_rows = conn.execute(
+                    """
+                    SELECT c.complaint_id, c.title, c.category, c.department_id, d.name as department_name,
+                           c.location_id, l.name as location_name, c.status, c.priority, c.created_at
+                    FROM complaints c
+                    LEFT JOIN departments d ON c.department_id = d.department_id
+                    LEFT JOIN locations l ON c.location_id = l.location_id
+                    WHERE c.assigned_to = ?
+                      AND c.status IN ('Assigned', 'In Progress', 'Waiting for Parts')
+                      AND (c.is_deleted = 0 OR c.is_deleted IS NULL)
+                    ORDER BY c.created_at DESC
+                    """,
+                    (uid,),
+                ).fetchall()
+
+                active_jobs = [
+                    {
+                        "complaint_id": j["complaint_id"],
+                        "title": j["title"] or j["category"] or "Work Order",
+                        "department_id": j["department_id"],
+                        "department_name": j["department_name"] or j["department_id"],
+                        "location_id": j["location_id"],
+                        "location_name": j["location_name"] or j["location_id"],
+                        "status": j["status"],
+                        "priority": j["priority"],
+                    }
+                    for j in job_rows
+                ]
+
+                # Workload state
+                if on_leave:
+                    workload_state = "on_leave"
+                elif len(active_jobs) > 0:
+                    workload_state = "assigned"
+                else:
+                    workload_state = "available"
+
+                results.append({
+                    "user_id": uid,
+                    "name": u["name"],
+                    "email": u["email"],
+                    "phone": u.get("phone_number"),
+                    "role": u["role"],
+                    "workload_state": workload_state,
+                    "active_jobs_count": len(active_jobs),
+                    "active_jobs": active_jobs,
+                    "on_leave": on_leave,
+                    "leave_until": leave_until,
+                    "leave_reason": leave_reason,
+                    "is_fallback": is_fallback,
+                })
+
+        # Sort: available first (least loaded), then assigned (least loaded), then on-leave last
+        state_order = {"available": 0, "assigned": 1, "on_leave": 2}
+        results.sort(key=lambda x: (state_order.get(x["workload_state"], 1), x["active_jobs_count"], x["name"]))
+        return results
+
+
     def assign_work(self, complaint_id, coordinator_id, reason=None, actor_id=None):
         complaint = self.get_complaint(complaint_id)
         if not complaint:
             raise ValueError("Complaint not found.")
+
+        # Disallow assigning/reassigning closed, rejected, or completed complaints
+        if complaint.status in (STATUS_CLOSED, STATUS_AUTO_CLOSED, STATUS_REJECTED, "Closed", "Closed (Auto Closed)", "Rejected"):
+            raise ValueError(f"Cannot assign or reassign a complaint with status '{complaint.status}'.")
 
         target_user = self.auth_service.get_user(coordinator_id)
         if not target_user:
@@ -521,21 +760,42 @@ class ComplaintService:
             if team:
                 complaint.team_id = team["team_id"]
 
-        if team and actor_role not in ("administrator", "app_manager"):
-            is_in_team = self.team_service.is_user_in_team(team["team_id"], coordinator_id) or coordinator_id in (
-                team.get("coordinator_id"),
-                team.get("backup_coordinator_id"),
-            )
-            if not is_in_team:
-                raise ValueError(f"User {target_user.name} does not belong to team {team['name']}.")
+        # Check employee work membership eligibility for (department_id, location_id)
+        with self.auth_service._connect() as conn:
+            m_count = conn.execute(
+                "SELECT COUNT(*) FROM employee_work_memberships WHERE department_id = ? AND location_id = ?",
+                (complaint.department_id, complaint.location_id)
+            ).fetchone()[0]
+            if m_count > 0:
+                is_member = conn.execute(
+                    "SELECT 1 FROM employee_work_memberships WHERE user_id = ? AND department_id = ? AND location_id = ?",
+                    (coordinator_id, complaint.department_id, complaint.location_id)
+                ).fetchone()
+                dept = self.auth_service.get_department(complaint.department_id)
+                is_dept_coord = dept and coordinator_id in (getattr(dept, "coordinator_id", None), getattr(dept, "coordinator_2_id", None))
+                if not is_member and not is_dept_coord:
+                    raise ValueError(f"User {target_user.name} is not eligible for {complaint.department_id} at this location.")
+            elif team and actor_role not in ("administrator", "app_manager"):
+                # Legacy team fallback only if no employee work memberships are configured
+                is_in_team = self.team_service.is_user_in_team(team["team_id"], coordinator_id) or coordinator_id in (
+                    team.get("coordinator_id"),
+                    team.get("backup_coordinator_id"),
+                )
+                if not is_in_team:
+                    raise ValueError(f"User {target_user.name} does not belong to team {team['name']}.")
 
         # Authorization check
-        if actor_role in ("administrator", "app_manager"):
+        dept_obj = self.auth_service.get_department(complaint.department_id)
+        is_dept_coord = dept_obj and actor_id in (getattr(dept_obj, "coordinator_id", None), getattr(dept_obj, "coordinator_2_id", None))
+
+        if actor_role in ("administrator", "app_manager") or is_dept_coord:
             allowed = True
         elif team:
             acting_coord = self.team_service.get_acting_coordinator(team)
             acting_id = acting_coord.user_id if acting_coord else None
             is_coord = actor_id in (team.get("coordinator_id"), team.get("backup_coordinator_id"), acting_id)
+            if not is_coord:
+                is_coord = self.auth_service.is_coordinator_assigned(actor_id, complaint.location_id, complaint.department_id)
             if is_coord:
                 allowed = True
             elif int(getattr(complaint, "assign_escalation_level", 0) or 0) >= 2:
@@ -546,10 +806,14 @@ class ComplaintService:
             else:
                 allowed = False
         else:
-            # Unrouted complaint: Warden, App Manager, Admin can assign
-            loc_obj = self.auth_service.get_location(complaint.location_id)
-            is_warden = loc_obj and getattr(loc_obj, "in_charge_id", None) == actor_id
-            allowed = is_warden or actor_role in ("location_in_charge", "warden", "app_manager")
+            is_coord = self.auth_service.is_coordinator_assigned(actor_id, complaint.location_id, complaint.department_id)
+            if is_coord:
+                allowed = True
+            else:
+                # Unrouted complaint: Warden, App Manager, Admin can assign
+                loc_obj = self.auth_service.get_location(complaint.location_id)
+                is_warden = loc_obj and getattr(loc_obj, "in_charge_id", None) == actor_id
+                allowed = is_warden or actor_role in ("location_in_charge", "warden", "app_manager")
 
         if not allowed and actor_id:
             raise PermissionError("You are not authorized to assign this complaint.")
@@ -565,8 +829,12 @@ class ComplaintService:
             complaint.assigned_at = now_str
             complaint.assignee_on_leave_flag = False
             complaint.assignee_removed_flag = False
-            if complaint.status in (Complaint.SUBMITTED, "Submitted"):
+            if complaint.status in (Complaint.SUBMITTED, "Submitted", STATUS_BLOCKED, "Waiting for Parts", "Waiting for parts"):
                 complaint.status = Complaint.ASSIGNED
+                complaint.blocked_reason = None
+                complaint.blocked_until = None
+                complaint.blocked_at = None
+                complaint.blocked_alerted = False
             hist_msg = f"Reassigned from {old_name} to {target_user.name} ({coordinator_id}) by {actor_name}."
             if reason:
                 hist_msg += f" Reason: {reason.strip()}"
@@ -615,11 +883,11 @@ class ComplaintService:
                             assigned_by_name = to_u.name
                     raise ComplaintConflictError(f"Already assigned by {assigned_by_name}")
 
-            complaint = self.get_complaint(complaint_id)
             complaint.assigned_to = coordinator_id
             complaint.assigned_by = actor_id
             complaint.assigned_at = now_str
             complaint.status = Complaint.ASSIGNED
+            complaint.awaiting_assign_since = None
             complaint.assignee_on_leave_flag = False
             complaint.assignee_removed_flag = False
             complaint.add_history(f"Assigned to {target_user.name} ({coordinator_id}) by {actor_name}.")
@@ -1081,9 +1349,11 @@ class ComplaintService:
             raise PermissionError("You cannot verify a complaint you worked on.")
 
         if u_role != "administrator":
-            allowed_creators = {complaint.created_by}
+            user_identities = {str(uid).lower()}
             if getattr(user, "email", None):
-                allowed_creators.add(user.email)
+                user_identities.add(str(user.email).lower())
+
+            is_creator = str(complaint.created_by).lower() in user_identities
 
             is_affected_allowed = False
             stage_start = parse_date(getattr(complaint, "student_stage_at", None) or complaint.resolved_at or complaint.updated_at)
@@ -1091,7 +1361,7 @@ class ComplaintService:
                 if self.is_student_affected(complaint_id, uid):
                     is_affected_allowed = True
 
-            if uid not in allowed_creators and not is_affected_allowed:
+            if not is_creator and not is_affected_allowed:
                 raise PermissionError("Only the student who filed the complaint, an affected student after 24h, or an administrator can close it.")
 
         now_ts = now_string()
@@ -1148,16 +1418,17 @@ class ComplaintService:
         u_name = getattr(user, "name", uid)
 
         if u_role != "administrator":
-            allowed_creators = {complaint.created_by}
+            user_identities = {str(uid).lower()}
             if getattr(user, "email", None):
-                allowed_creators.add(user.email)
+                user_identities.add(str(user.email).lower())
 
+            is_creator = str(complaint.created_by).lower() in user_identities
             is_affected = False
             if complaint.visibility_type in ("Public", "Community", "public", "community"):
                 if self.is_student_affected(complaint_id, uid):
                     is_affected = True
 
-            if uid not in allowed_creators and not is_affected:
+            if not is_creator and not is_affected:
                 raise PermissionError("Only the student who filed the complaint or an affected student can reopen it.")
 
         valid_status = False
@@ -1702,15 +1973,32 @@ class ComplaintService:
     def apply_automatic_rules(self, complaints=None):
         complaints = complaints or self._load_complaints()
         changed = False
+        changed_complaints = []
         current_time = now()
         loc_cache = {}
+        team_cache = {}
+        loc_dept_team_cache = {}
 
         def _get_loc(loc_id):
             if loc_id not in loc_cache:
                 loc_cache[loc_id] = self.auth_service.get_location(loc_id)
             return loc_cache[loc_id]
 
+        def _get_team(team_id):
+            if not team_id:
+                return None
+            if team_id not in team_cache:
+                team_cache[team_id] = self.team_service.get_team(team_id)
+            return team_cache[team_id]
+
+        def _get_team_for_loc_dept(loc_id, dept_id):
+            key = (loc_id, dept_id)
+            if key not in loc_dept_team_cache:
+                loc_dept_team_cache[key] = self.team_service.get_team_for_location_department(loc_id, dept_id)
+            return loc_dept_team_cache[key]
+
         for complaint in complaints:
+            c_changed = False
             # 1. 48h Auto-Close & 24h Reminder for Waiting for Verification
             if complaint.status in (Complaint.WAITING_VERIFICATION, "Waiting for Verification"):
                 due_at = parse_date(complaint.verification_due_at)
@@ -1726,13 +2014,13 @@ class ComplaintService:
                             complaint_id=complaint.complaint_id,
                             title="Resolution Auto-Close Reminder",
                         )
-                        changed = True
+                        changed = True; c_changed = True
 
                 # Check 48h deadline for auto-close
                 if due_at and current_time > due_at:
                     complaint.auto_close()
                     complaint.add_history("Auto-closed after 48h student inactivity.")
-                    changed = True
+                    changed = True; c_changed = True
 
             # 2. SLA Countdown & Escalation Ladder for active tickets
             if complaint.status in SLA_ACTIVE_STATUSES or (complaint.status not in INACTIVE_STATUSES and complaint.status not in (Complaint.WAITING_VERIFICATION, "Waiting for Verification")):
@@ -1743,7 +2031,7 @@ class ComplaintService:
                     sla_hours = SLA_HOURS.get(p, 48)
                     sla_deadline_dt = created_dt + timedelta(hours=sla_hours)
                     complaint.sla_deadline = sla_deadline_dt.isoformat()
-                    changed = True
+                    changed = True; c_changed = True
 
                 # 50% and 90% SLA Reminders to coordinator
                 created_dt = parse_date(complaint.created_at) or current_time
@@ -1760,7 +2048,7 @@ class ComplaintService:
                                 complaint_id=complaint.complaint_id,
                                 title="SLA 50% Reminder",
                             )
-                        changed = True
+                        changed = True; c_changed = True
                     if ratio >= 0.90 and int(getattr(complaint, "sla_reminders_sent", 0) or 0) < 2:
                         complaint.sla_reminders_sent = 2
                         complaint.add_history("90% of SLA time elapsed. Urgency reminder sent.")
@@ -1771,18 +2059,35 @@ class ComplaintService:
                                 complaint_id=complaint.complaint_id,
                                 title="SLA 90% Urgency Warning",
                             )
-                        changed = True
+                        changed = True; c_changed = True
 
                 if current_time > sla_deadline_dt:
                     loc = _get_loc(complaint.location_id)
                     warden_id = getattr(loc, "in_charge_id", None)
-                    app_mgr_id = getattr(loc, "app_manager_id", None)
+                    app_mgr_id = getattr(loc, "app_manager_id", None) or self.get_active_app_manager()
 
-                    # Level 1: Overdue -> Assigned Worker + Acting Coordinator + Warden
+                    # Load department SLA escalation configuration
+                    sla_cfg = None
+                    if hasattr(self.repository, "get_department_sla_config") and complaint.department_id:
+                        try:
+                            sla_cfg = self.repository.get_department_sla_config(complaint.department_id)
+                        except Exception:
+                            sla_cfg = None
+                    app_mgr_esc_hours = int(sla_cfg.get("app_manager_escalation_hours", 24)) if sla_cfg else 24
+                    admin_esc_hours = int(sla_cfg.get("admin_escalation_hours", 48)) if sla_cfg else 48
+
+                    # Level 1: Overdue (SLA Deadline Expired) -> Alert ONLY App Manager (not coordinator or warden)
                     if int(getattr(complaint, "escalation_level", 0)) < 1:
                         complaint.escalation_level = 1
                         complaint.escalated = True
-                        complaint.add_history("SLA deadline exceeded. Escalated to Assigned Worker, Coordinator, and Warden.")
+                        complaint.add_history("SLA deadline exceeded. Escalated to App Manager.")
+                        if app_mgr_id:
+                            self.notification_service.notify(
+                                app_mgr_id,
+                                f"Complaint {complaint.complaint_id} ({complaint.priority}) has passed its resolution deadline ({complaint.sla_deadline}). Action required.",
+                                complaint_id=complaint.complaint_id,
+                                title="SLA Deadline Exceeded - App Manager Alert",
+                            )
                         if complaint.assigned_to:
                             self.notification_service.notify(
                                 complaint.assigned_to,
@@ -1790,53 +2095,37 @@ class ComplaintService:
                                 complaint_id=complaint.complaint_id,
                                 title="SLA Overdue Alert",
                             )
-                        team = self.team_service.get_team(complaint.team_id) if getattr(complaint, "team_id", None) else None
-                        acting_c = self.team_service.get_acting_coordinator(team) if team else None
-                        if acting_c and acting_c.user_id != complaint.assigned_to:
-                            self.notification_service.notify(
-                                acting_c.user_id,
-                                f"Complaint {complaint.complaint_id} ({complaint.priority}) assigned to {complaint.assigned_to} is OVERDUE.",
-                                complaint_id=complaint.complaint_id,
-                                title="SLA Overdue Alert",
-                            )
-                        if warden_id:
-                            self.notification_service.notify(
-                                warden_id,
-                                f"Complaint {complaint.complaint_id} ({complaint.priority}) in your location is OVERDUE.",
-                                complaint_id=complaint.complaint_id,
-                                title="SLA Overdue Alert",
-                            )
-                        changed = True
+                        changed = True; c_changed = True
 
-                    # Level 2: Overdue + 24h -> App Manager
-                    if current_time > sla_deadline_dt + timedelta(hours=24):
+                    # Level 2: Overdue + 24 hours (or configured app_manager_escalation_hours) -> Alert App Manager again
+                    if current_time > sla_deadline_dt + timedelta(hours=app_mgr_esc_hours):
                         if int(getattr(complaint, "escalation_level", 0)) < 2:
                             complaint.escalation_level = 2
-                            complaint.add_history("SLA deadline exceeded by 24h. Escalated to App Manager.")
+                            complaint.add_history(f"SLA deadline exceeded by {app_mgr_esc_hours}h. Second escalation alert to App Manager.")
                             if app_mgr_id:
                                 self.notification_service.notify(
                                     app_mgr_id,
-                                    f"Complaint {complaint.complaint_id} ({complaint.priority}) is 24h past SLA. Escalated to App Manager.",
+                                    f"URGENT: Complaint {complaint.complaint_id} ({complaint.priority}) is now {app_mgr_esc_hours}h past SLA deadline. Escalated to App Manager (2nd Alert).",
                                     complaint_id=complaint.complaint_id,
-                                    title="SLA 24h Escalation",
+                                    title=f"SLA +{app_mgr_esc_hours}h App Manager Escalation",
                                 )
-                            changed = True
+                            changed = True; c_changed = True
 
-                    # Level 3: Overdue + 48h -> Administrator
-                    if current_time > sla_deadline_dt + timedelta(hours=48):
+                    # Level 3: Overdue + 48 hours (or configured admin_escalation_hours) -> Escalate to Administrators
+                    if current_time > sla_deadline_dt + timedelta(hours=admin_esc_hours):
                         if int(getattr(complaint, "escalation_level", 0)) < 3:
                             complaint.escalation_level = 3
                             complaint.admin_notified = True
-                            complaint.add_history("SLA deadline exceeded by 48h. Escalated to Admin.")
+                            complaint.add_history(f"SLA deadline exceeded by {admin_esc_hours}h. Escalated to Administrator.")
                             for admin_u in self.auth_service.list_users(role="administrator"):
                                 if admin_u.active and not getattr(admin_u, "is_deleted", False):
                                     self.notification_service.notify(
                                         admin_u.user_id,
-                                        f"CRITICAL: Complaint {complaint.complaint_id} ({complaint.priority}) is 48h past SLA. Escalated to Admin.",
+                                        f"CRITICAL: Complaint {complaint.complaint_id} ({complaint.priority}) is {admin_esc_hours}h past SLA. Escalated to Administrator.",
                                         complaint_id=complaint.complaint_id,
-                                        title="SLA Critical Escalation",
+                                        title="SLA Critical Admin Escalation",
                                     )
-                            changed = True
+                            changed = True; c_changed = True
 
                 # Part F: Escalation when nobody assigns (NO AUTO-ASSIGNMENT!)
                 if complaint.status == Complaint.SUBMITTED and not complaint.assigned_to:
@@ -1846,9 +2135,9 @@ class ComplaintService:
                     assign_hours = ASSIGN_DEADLINE_HOURS.get(p, 4)
                     elapsed_hours = (current_time - assign_since).total_seconds() / 3600.0
 
-                    team = self.team_service.get_team(complaint.team_id) if getattr(complaint, "team_id", None) else None
+                    team = _get_team(complaint.team_id) if getattr(complaint, "team_id", None) else None
                     if not team:
-                        team = self.team_service.get_team_for_location_department(complaint.location_id, complaint.department_id)
+                        team = _get_team_for_loc_dept(complaint.location_id, complaint.department_id)
                         if team:
                             complaint.team_id = team["team_id"]
 
@@ -1857,35 +2146,40 @@ class ComplaintService:
                     warden_id = getattr(loc, "in_charge_id", None)
                     app_mgr_id = getattr(loc, "app_manager_id", None) or self.get_active_app_manager()
 
-                    # Level 0 -> 1 (or 2 if team has no backup)
+                    dept_obj_esc = self.auth_service.get_department(complaint.department_id)
+                    dept_c1 = getattr(dept_obj_esc, "coordinator_id", None)
+                    dept_c2 = getattr(dept_obj_esc, "coordinator_2_id", None)
+
+                    # Level 0 -> 1 (Escalate to backup coordinator: Coordinator 2)
                     if curr_esc == 0 and elapsed_hours >= assign_hours:
-                        has_backup = bool(team and team.get("backup_coordinator_id"))
-                        if has_backup:
+                        backup_id = dept_c2 or (team.get("backup_coordinator_id") if team else None)
+                        if backup_id:
                             complaint.assign_escalation_level = 1
                             complaint.add_history(
-                                f"Assignment deadline exceeded ({assign_hours}h). Escalated to backup coordinator {team['backup_coordinator_id']}."
+                                f"Assignment deadline exceeded ({assign_hours}h). Escalated to backup coordinator {backup_id}."
                             )
-                            backup_u = self.auth_service.get_user(team["backup_coordinator_id"])
-                            if backup_u and backup_u.active and not self.team_service.is_user_on_leave(team["backup_coordinator_id"]):
+                            backup_u = self.auth_service.get_user(backup_id)
+                            if backup_u and backup_u.active and not self.team_service.is_user_on_leave(backup_id):
                                 self.notification_service.notify(
-                                    team["backup_coordinator_id"],
+                                    backup_id,
                                     f"Complaint {complaint.complaint_id} has been waiting {round(elapsed_hours, 1)}h for assignment. Please assign.",
                                     complaint_id=complaint.complaint_id,
                                     title="Assignment Escalated to Backup",
                                 )
-                            if team.get("coordinator_id"):
+                            primary_id = dept_c1 or (team.get("coordinator_id") if team else None)
+                            if primary_id:
                                 self.notification_service.notify(
-                                    team["coordinator_id"],
+                                    primary_id,
                                     f"Complaint {complaint.complaint_id} was escalated to backup for assignment.",
                                     complaint_id=complaint.complaint_id,
                                     title="Assignment Escalated to Backup",
                                 )
-                            changed = True
+                            changed = True; c_changed = True
                         else:
-                            # If team has no backup, jump straight to F2
+                            # If no backup coordinator, jump straight to Level 2 (Warden & App Manager)
                             complaint.assign_escalation_level = 2
                             complaint.add_history(
-                                f"Assignment deadline exceeded ({assign_hours}h). Team has no backup; escalated to Warden and App Manager."
+                                f"Assignment deadline exceeded ({assign_hours}h). No backup coordinator; escalated to Warden and App Manager."
                             )
                             esc2_msg = f"Complaint {complaint.complaint_id} not assigned after {round(elapsed_hours, 1)}h. Warden or App Manager can now assign."
                             if warden_id:
@@ -1896,7 +2190,9 @@ class ComplaintService:
                                 self.notification_service.notify(
                                     app_mgr_id, esc2_msg, complaint_id=complaint.complaint_id, title="Unassigned Complaint Escalation"
                                 )
-                            changed = True
+                            changed = True; c_changed = True
+
+                            changed = True; c_changed = True
 
                     # Level 1 -> 2
                     elif curr_esc == 1 and elapsed_hours >= 2 * assign_hours:
@@ -1913,7 +2209,7 @@ class ComplaintService:
                             self.notification_service.notify(
                                 app_mgr_id, esc2_msg, complaint_id=complaint.complaint_id, title="Unassigned Complaint Escalation"
                             )
-                        changed = True
+                        changed = True; c_changed = True
 
             # Blocked status monitoring: if blocked >72h or past blocked_until without update
             if complaint.status == STATUS_BLOCKED:
@@ -1937,7 +2233,7 @@ class ComplaintService:
                             app_mgr_id, alert_text, complaint_id=complaint.complaint_id, title="Blocked Delay Alert"
                         )
                     complaint.add_history("Blocked duration exceeded threshold. Alerted Warden and App Manager.")
-                    changed = True
+                    changed = True; c_changed = True
 
             # 3. Complaints pending warden verification (>24h reminder to warden, >48h to App Manager)
             if complaint.status in (Complaint.PENDING_WARDEN_VERIFICATION, "Pending Warden Verification"):
@@ -1956,7 +2252,7 @@ class ComplaintService:
                         title="Setup Gap: No Warden Assigned",
                     )
                     complaint.add_history(f"Setup gap: Location {loc_name} has no warden. Alerted App Manager.")
-                    changed = True
+                    changed = True; c_changed = True
 
                 if fixed_dt:
                     if current_time > fixed_dt + timedelta(hours=24):
@@ -1970,7 +2266,7 @@ class ComplaintService:
                                     complaint_id=complaint.complaint_id,
                                     title="Pending Verification Reminder",
                                 )
-                            changed = True
+                            changed = True; c_changed = True
 
                     if current_time > fixed_dt + timedelta(hours=48):
                         if int(getattr(complaint, "warden_escalation_level", 0)) < 2:
@@ -1983,7 +2279,7 @@ class ComplaintService:
                                     complaint_id=complaint.complaint_id,
                                     title="Warden Verification Overdue",
                                 )
-                            changed = True
+                            changed = True; c_changed = True
 
             # 4. Auto-close background check for Waiting for Verification tickets
             if complaint.status in (Complaint.WAITING_VERIFICATION, STATUS_WAITING_STUDENT, "Waiting for Verification", "Waiting For Verification"):
@@ -2017,7 +2313,7 @@ class ComplaintService:
                                         complaint_id=complaint.complaint_id,
                                         title="Auto-Close Reminder",
                                     )
-                        changed = True
+                        changed = True; c_changed = True
 
                     # Expired -> Auto close
                     if current_time > due_dt:
@@ -2048,7 +2344,7 @@ class ComplaintService:
                                 complaint_id=complaint.complaint_id,
                                 title="Complaint Auto-Closed",
                             )
-                        changed = True
+                        changed = True; c_changed = True
 
             # 5. Check unacknowledged emergencies (>10m, Rule 2.4b)
             if getattr(complaint, "is_emergency", False) and not getattr(complaint, "acknowledged_at", None):
@@ -2056,7 +2352,7 @@ class ComplaintService:
                     c_dt = parse_date(complaint.created_at)
                     if c_dt and current_time >= c_dt + timedelta(minutes=10):
                         complaint.emergency_realert_sent = True
-                        changed = True
+                        changed = True; c_changed = True
                         try:
                             from api.dependencies import _get_services_for_db
                             svcs = _get_services_for_db(str(self.repository.path))
@@ -2065,8 +2361,13 @@ class ComplaintService:
                         except Exception:
                             pass
 
-        if changed:
-            self._save_complaints(complaints)
+            if c_changed:
+                changed_complaints.append(complaint)
+
+        # Granular persistence: save only complaints that were actually modified
+        if changed_complaints:
+            for mod_c in changed_complaints:
+                self.save_complaint(mod_c)
 
     def analytics(self):
         complaints = self.list_all()
@@ -2291,10 +2592,15 @@ class ComplaintService:
         if complaint.assigned_to and complaint.assigned_to != coordinator_id:
             raise ValueError("You can only work on complaints assigned to you.")
 
+        if not complaint.assigned_at:
+            complaint.assigned_at = now_string()
+        if not complaint.assigned_by:
+            complaint.assigned_by = coordinator_id
+        complaint.awaiting_assign_since = None
         complaint.status = Complaint.IN_PROGRESS
         complaint.assigned_to = coordinator_id
         complaint.started_at = complaint.started_at or now_string()
-        complaint.add_history(f"Work started by Coordinator {coordinator_id}.")
+        complaint.add_history(f"Work started by {coordinator_id}.")
         self.save_complaint(complaint)
         return complaint
 
@@ -2423,6 +2729,118 @@ class ComplaintService:
         self.save_complaint(complaint)
         return complaint
 
+    def reroute_complaint(
+        self,
+        complaint_id: str,
+        destination_department_id: str,
+        reason: str,
+        actor_id: Optional[str] = None,
+    ) -> Complaint:
+        complaint = self.get_complaint(complaint_id)
+        if not complaint:
+            raise ValueError(f"Complaint {complaint_id} not found.")
+
+        dest_dept = self.auth_service.get_department(destination_department_id)
+        if not dest_dept:
+            raise ValueError(f"Destination department {destination_department_id} does not exist.")
+        if not getattr(dest_dept, "active", True):
+            raise ValueError(f"Destination department {dest_dept.name} is inactive.")
+
+        if complaint.department_id == destination_department_id:
+            raise ValueError("Complaint is already in this department. Destination department must be different.")
+
+        if not reason or not reason.strip():
+            raise ValueError("Rerouting requires a mandatory reason.")
+
+        src_dept = self.auth_service.get_department(complaint.department_id)
+        src_dept_name = src_dept.name if src_dept else complaint.department_id
+        dest_dept_name = dest_dept.name
+
+        actor = self.auth_service.get_user(actor_id) if actor_id else None
+        if actor_id:
+            if not actor:
+                raise PermissionError("Actor not found.")
+            actor_role = (actor.role or "").lower()
+            if actor_role in ("administrator", "app_manager"):
+                allowed = True
+            elif actor_role in ("coordinator", "employee"):
+                is_src_coord = src_dept and actor_id in (getattr(src_dept, "coordinator_id", None), getattr(src_dept, "coordinator_2_id", None))
+                is_dest_coord = actor_id in (getattr(dest_dept, "coordinator_id", None), getattr(dest_dept, "coordinator_2_id", None))
+                allowed = bool(is_src_coord or is_dest_coord)
+            else:
+                allowed = False
+            if not allowed:
+                raise PermissionError("You are not authorized to reroute this complaint.")
+
+        actor_name = actor.name if actor else (actor_id or "System")
+        now_str = now_string()
+
+        # Record history with source, destination, actor, reason, timestamp
+        complaint.add_history(
+            f"Complaint rerouted from {src_dept_name} to {dest_dept_name} by {actor_name}. Reason: {reason.strip()}"
+        )
+
+        complaint.department_id = destination_department_id
+        complaint.department_name = dest_dept_name
+        complaint.updated_at = now_str
+
+        # Re-link team if exists
+        new_team = self.team_service.get_team_for_location_department(complaint.location_id, destination_department_id)
+        complaint.team_id = new_team["team_id"] if new_team else None
+
+        # Revalidate current employee assignment
+        if complaint.assigned_to:
+            is_worker_eligible = False
+            worker_on_leave = self.team_service.is_user_on_leave(complaint.assigned_to, department_id=destination_department_id)
+            if not worker_on_leave:
+                with self.auth_service._connect() as conn:
+                    m_count = conn.execute(
+                        "SELECT COUNT(*) FROM employee_work_memberships WHERE department_id = ? AND location_id = ?",
+                        (destination_department_id, complaint.location_id),
+                    ).fetchone()[0]
+                    if m_count > 0:
+                        is_member = conn.execute(
+                            "SELECT 1 FROM employee_work_memberships WHERE user_id = ? AND department_id = ? AND location_id = ?",
+                            (complaint.assigned_to, destination_department_id, complaint.location_id),
+                        ).fetchone()
+                        is_dept_coord = complaint.assigned_to in (getattr(dest_dept, "coordinator_id", None), getattr(dest_dept, "coordinator_2_id", None))
+                        is_worker_eligible = bool(is_member or is_dept_coord)
+                    elif new_team:
+                        is_worker_eligible = self.team_service.is_user_in_team(new_team["team_id"], complaint.assigned_to) or complaint.assigned_to in (
+                            new_team.get("coordinator_id"), new_team.get("backup_coordinator_id")
+                        )
+                    else:
+                        is_worker_eligible = False
+
+            if not is_worker_eligible:
+                old_worker = complaint.assigned_to
+                complaint.assigned_to = None
+                if complaint.status in (Complaint.ASSIGNED, Complaint.IN_PROGRESS):
+                    complaint.status = Complaint.SUBMITTED
+                complaint.add_history(
+                    f"Worker {old_worker} unassigned upon reroute because they are not eligible for {dest_dept_name} at this location."
+                )
+
+        self.save_complaint(complaint)
+
+        # Notify responsible coordinators of destination department
+        try:
+            mapped_coords = self._get_mapped_coordinators(complaint.location_id, destination_department_id)
+            for cid in mapped_coords:
+                if cid != actor_id:
+                    self.notification_service.create_notification(
+                        receiver_id=cid,
+                        title=f"Complaint Rerouted to {dest_dept_name}: {complaint.complaint_id}",
+                        message=f"Complaint {complaint.complaint_id} was rerouted from {src_dept_name} to {dest_dept_name} by {actor_name}. Reason: {reason.strip()}",
+                        reference_type="Complaint",
+                        reference_id=complaint.complaint_id,
+                        priority="Medium",
+                    )
+        except Exception:
+            pass
+
+        return complaint
+
     def block_complaint(self, complaint_id, coordinator_id, reason, expected_date=None):
         complaint = self.get_complaint(complaint_id)
         if not complaint:
@@ -2491,6 +2909,21 @@ class ComplaintService:
         complaint.priority = norm_priority
         created_dt = parse_date(complaint.created_at) or now()
         hours = SLA_HOURS.get(norm_priority, 48)
+        if hasattr(self.repository, "get_department_sla_config") and complaint.department_id:
+            try:
+                sla_cfg = self.repository.get_department_sla_config(complaint.department_id)
+                if sla_cfg:
+                    p_norm = norm_priority.lower()
+                    if p_norm == "critical":
+                        hours = int(sla_cfg.get("critical_duration_hours", hours))
+                    elif p_norm == "high":
+                        hours = int(sla_cfg.get("high_duration_hours", hours))
+                    elif p_norm == "medium":
+                        hours = int(sla_cfg.get("medium_duration_hours", hours))
+                    elif p_norm in ("normal", "low"):
+                        hours = int(sla_cfg.get("normal_duration_hours", hours))
+            except Exception:
+                pass
         complaint.sla_deadline = (created_dt + timedelta(hours=hours)).isoformat()
 
         msg = f"Priority changed from {old_priority} to {norm_priority} by {user.name}."
@@ -2579,4 +3012,237 @@ class ComplaintService:
             raise PermissionError("Your role is not authorized to escalate complaints.")
 
         self.save_complaint(complaint)
+        return complaint
+
+    def is_coordinator_in_scope(self, user, complaint) -> bool:
+        """Verify whether a user has authority over a complaint based on role, location, and department."""
+        if not user or not complaint:
+            return False
+        role = (getattr(user, "role", "") or "").lower()
+        if role in ("administrator", "app_manager"):
+            if role == "administrator":
+                return True
+            # App manager covers assigned locations
+            return self.auth_service.is_app_manager_assigned(user.user_id, complaint.location_id)
+
+        if role in ("coordinator", "employee"):
+            # 1. Directly assigned
+            if complaint.assigned_to == user.user_id:
+                return True
+            # 2. Campus-wide Department Coordinator 1 or Coordinator 2
+            dept = self.auth_service.get_department(complaint.department_id)
+            if dept:
+                if getattr(dept, "coordinator_id", None) == user.user_id:
+                    return True
+                if getattr(dept, "coordinator_2_id", None) == user.user_id:
+                    return True
+            # 3. Member/lead of the complaint's team
+            if getattr(complaint, "team_id", None) and hasattr(self, "team_service"):
+                team = self.team_service.get_team(complaint.team_id)
+                if team:
+                    if user.user_id in (team.get("coordinator_id"), team.get("backup_coordinator_id")):
+                        return True
+                    if self.team_service.is_user_in_team(team["team_id"], user.user_id):
+                        return True
+            # 4. Team mapped to location & department
+            if hasattr(self, "team_service"):
+                loc_dept_team = self.team_service.get_team_for_location_department(
+                    complaint.location_id, complaint.department_id
+                )
+                if loc_dept_team:
+                    if user.user_id in (loc_dept_team.get("coordinator_id"), loc_dept_team.get("backup_coordinator_id")):
+                        return True
+                    if self.team_service.is_user_in_team(loc_dept_team["team_id"], user.user_id):
+                        return True
+            # 5. Coordinator assignment for location & department
+            assignments = self.auth_service.list_coordinator_assignments(coordinator_id=user.user_id) or []
+            loc = self.auth_service.get_location(complaint.location_id)
+            c_loc_id = loc.location_id if loc else complaint.location_id
+            c_loc_type = getattr(loc, "location_type", None) or (loc.infer_location_type(loc.name) if loc else complaint.location_id)
+            c_dept_id = dept.department_id if dept else complaint.department_id
+
+            for asgn in assignments:
+                a_loc = asgn.get("location_id")
+                a_dept = asgn.get("department_id")
+                loc_match = (
+                    a_loc in ("ALL", None)
+                    or a_loc == c_loc_id
+                    or a_loc == c_loc_type
+                    or (loc and a_loc.lower() == loc.name.lower())
+                )
+                dept_match = (
+                    a_dept in ("ALL", None)
+                    or a_dept == c_dept_id
+                    or (dept and a_dept.lower() == dept.name.lower())
+                )
+                if loc_match and dept_match:
+                    return True
+
+        return False
+
+    def request_cancellation(self, complaint_id: str, user, reason: str):
+        complaint = self.get_complaint(complaint_id)
+        if not complaint:
+            raise ValueError(f"Complaint {complaint_id} not found.")
+
+        if getattr(complaint, "is_deleted", False):
+            raise ValueError("Complaint has been deleted.")
+
+        # Check authorization: must be creator or administrator
+        u_role = (getattr(user, "role", "") or "").lower()
+        is_creator = (
+            complaint.created_by == user.user_id
+            or getattr(user, "email", None) == complaint.created_by
+        )
+        if not is_creator and u_role != "administrator":
+            raise PermissionError("Only the reporter or an administrator can request cancellation.")
+
+        clean_reason = (reason or "").strip()
+        if len(clean_reason) < 3:
+            raise ValueError("A reason for cancellation is required (minimum 3 characters).")
+
+        # Disallow cancelling closed/terminal complaints
+        if complaint.status in (Complaint.CLOSED, Complaint.AUTO_CLOSED, Complaint.CANCELLED, Complaint.REJECTED):
+            raise ValueError(f"Cannot request cancellation for a complaint in '{complaint.status}' status.")
+
+        if complaint.status == Complaint.CANCELLATION_REQUESTED or getattr(complaint, "cancellation_requested", False):
+            raise ComplaintConflictError("A cancellation request is already pending review for this complaint.")
+
+        complaint.previous_status = complaint.status
+        complaint.cancellation_requested = True
+        complaint.cancellation_requested_by = user.user_id
+        complaint.cancellation_reason = clean_reason
+        complaint.cancellation_requested_at = now_string()
+        complaint.status = Complaint.CANCELLATION_REQUESTED
+        complaint.add_history(f"Cancellation requested by {getattr(user, 'name', user.user_id)} ({getattr(user, 'role', 'Student')}): {clean_reason}")
+        self.save_complaint(complaint)
+
+        # Notify assigned employee/worker if assigned
+        if complaint.assigned_to:
+            try:
+                self.notification_service.create_notification(
+                    receiver_id=complaint.assigned_to,
+                    title=f"Cancellation Requested: {complaint.complaint_id}",
+                    message=f"Submitter requested cancellation for complaint {complaint.complaint_id}: \"{clean_reason}\"",
+                    reference_type="Complaint",
+                    reference_id=complaint.complaint_id,
+                    priority="High",
+                )
+            except Exception:
+                pass
+
+        # Notify responsible coordinators
+        try:
+            mapped_coords = self._get_mapped_coordinators(complaint.location_id, complaint.department_id)
+            for cid in mapped_coords:
+                if cid != complaint.assigned_to:
+                    self.notification_service.create_notification(
+                        receiver_id=cid,
+                        title=f"Review Cancellation Request: {complaint.complaint_id}",
+                        message=f"{getattr(user, 'name', 'Student')} requested cancellation for complaint {complaint.complaint_id}: \"{clean_reason}\". Please review.",
+                        reference_type="Complaint",
+                        reference_id=complaint.complaint_id,
+                        priority="High",
+                    )
+        except Exception:
+            pass
+
+        return complaint
+
+    def approve_cancellation(self, complaint_id: str, user, note: str = ""):
+        complaint = self.get_complaint(complaint_id)
+        if not complaint:
+            raise ValueError(f"Complaint {complaint_id} not found.")
+
+        u_role = (getattr(user, "role", "") or "").lower()
+        if u_role not in ("administrator", "app_manager", "coordinator", "employee"):
+            raise PermissionError("Only coordinators or administrators can approve cancellation requests.")
+
+        if u_role in ("coordinator", "employee") and not self.is_coordinator_in_scope(user, complaint):
+            raise PermissionError("Coordinators can only approve cancellations within their assigned location and department scope.")
+
+        if complaint.status != Complaint.CANCELLATION_REQUESTED and not getattr(complaint, "cancellation_requested", False):
+            raise ValueError(f"Complaint {complaint_id} does not have a pending cancellation request.")
+
+        decision_note = (note or "").strip() or "Cancellation approved."
+        complaint.status = Complaint.CANCELLED
+        complaint.cancellation_requested = False
+        complaint.cancellation_decided_by = user.user_id
+        complaint.cancellation_decided_at = now_string()
+        complaint.cancellation_decision_note = decision_note
+        complaint.closed_at = now_string()
+        complaint.closed_by = user.user_id
+        complaint.add_history(f"Cancellation approved by {getattr(user, 'name', user.user_id)} ({getattr(user, 'role', 'Coordinator')}): {decision_note}. Status changed to Cancelled.")
+        self.save_complaint(complaint)
+
+        # Notify reporter
+        try:
+            self.notification_service.create_notification(
+                receiver_id=complaint.created_by,
+                title=f"Cancellation Approved: {complaint.complaint_id}",
+                message=f"Your cancellation request for complaint {complaint.complaint_id} was approved by {getattr(user, 'name', 'Coordinator')}. Note: {decision_note}",
+                reference_type="Complaint",
+                reference_id=complaint.complaint_id,
+                priority="Normal",
+            )
+        except Exception:
+            pass
+
+        # Notify assigned worker
+        if complaint.assigned_to:
+            try:
+                self.notification_service.create_notification(
+                    receiver_id=complaint.assigned_to,
+                    title=f"Complaint Cancelled: {complaint.complaint_id}",
+                    message=f"Complaint {complaint.complaint_id} was cancelled by {getattr(user, 'name', 'Coordinator')}.",
+                    reference_type="Complaint",
+                    reference_id=complaint.complaint_id,
+                    priority="Normal",
+                )
+            except Exception:
+                pass
+
+        return complaint
+
+    def reject_cancellation(self, complaint_id: str, user, reason: str):
+        complaint = self.get_complaint(complaint_id)
+        if not complaint:
+            raise ValueError(f"Complaint {complaint_id} not found.")
+
+        u_role = (getattr(user, "role", "") or "").lower()
+        if u_role not in ("administrator", "app_manager", "coordinator", "employee"):
+            raise PermissionError("Only coordinators or administrators can reject cancellation requests.")
+
+        if u_role in ("coordinator", "employee") and not self.is_coordinator_in_scope(user, complaint):
+            raise PermissionError("Coordinators can only reject cancellations within their assigned location and department scope.")
+
+        if complaint.status != Complaint.CANCELLATION_REQUESTED and not getattr(complaint, "cancellation_requested", False):
+            raise ValueError(f"Complaint {complaint_id} does not have a pending cancellation request.")
+
+        clean_reason = (reason or "").strip()
+        if not clean_reason:
+            raise ValueError("A reason for rejecting the cancellation request is required.")
+
+        restored_status = getattr(complaint, "previous_status", None) or Complaint.ASSIGNED
+        complaint.status = restored_status
+        complaint.cancellation_requested = False
+        complaint.cancellation_decided_by = user.user_id
+        complaint.cancellation_decided_at = now_string()
+        complaint.cancellation_decision_note = clean_reason
+        complaint.add_history(f"Cancellation rejected by {getattr(user, 'name', user.user_id)} ({getattr(user, 'role', 'Coordinator')}): {clean_reason}. Status restored to {restored_status}.")
+        self.save_complaint(complaint)
+
+        # Notify reporter
+        try:
+            self.notification_service.create_notification(
+                receiver_id=complaint.created_by,
+                title=f"Cancellation Rejected: {complaint.complaint_id}",
+                message=f"Your cancellation request for complaint {complaint.complaint_id} was rejected by {getattr(user, 'name', 'Coordinator')}. Reason: {clean_reason}. Status restored to {restored_status}.",
+                reference_type="Complaint",
+                reference_id=complaint.complaint_id,
+                priority="High",
+            )
+        except Exception:
+            pass
+
         return complaint

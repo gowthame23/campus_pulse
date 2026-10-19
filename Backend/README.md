@@ -28,17 +28,26 @@ http://127.0.0.1:8000/docs
 
 The app creates `storage/campus_pulse.db` automatically if it does not exist.
 
-## Default Accounts
+## Standard 14 Clean Baseline Accounts
 
-| Role | Email | Password |
-| --- | --- | --- |
-| Administrator | gowthamejjurothu@gmail.com | Admin@123 |
-| App Manager | ejjurothugowtham@gmail.com | Manager@123 |
-| Coordinator | gowthamejjurothu15@gmail.com | Coordinator@123 |
-| Student | gowtham.e23@iiits.in | Student@123 |
-| Location In-Charge (Warden) | naveen@campus.edu | warden@123 |
+| Role | Email | Password | Responsibilities |
+| --- | --- | --- | --- |
+| Super Admin | superadmin@campuspulse.edu | Admin@123 | Platform Owner & Governance |
+| Administrator | gowthamejjurothu@gmail.com | Admin@123 | Campus Operations & Admin Controls |
+| App Manager 1 | ejjurothugowtham@gmail.com | Manager@123 | Operations Supervisor (North Zone) |
+| App Manager 2 | appmanager2@campus.edu | Manager@123 | Operations Supervisor (South Zone) |
+| Employees (6 total) | employee.a1@campuspulse.edu to employee.b3@campuspulse.edu | Employee@123 | Field Maintenance (4 serve as C1/C2 Coordinators) |
+| Students (2 total) | gowtham.e23@iiits.in, student2@campus.edu | Student@123 | Student Residents |
+| Wardens (2 total) | naveen@campus.edu, warden2@campus.edu | warden@123 | Hostel Wardens |
 
 Use `/auth/login` to get a bearer token, then authorize in Swagger UI with that token.
+
+## Automated Test Execution
+
+```bash
+python -m pytest tests/test_multi_department_coordinators.py tests/test_remediation_f01_f15.py -v
+```
+All 29 tests pass with 100% pass rate.
 
 ## Backend Architecture
 

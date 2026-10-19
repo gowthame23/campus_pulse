@@ -49,11 +49,19 @@ def create_safety_report(
     blocked_until = getattr(current_user, "safety_blocked_until", None)
     if blocked_until:
         try:
-            if datetime.fromisoformat(blocked_until.replace("Z", "")) > datetime.now():
+            from datetime import timezone
+            # Normalize to timezone-aware UTC datetime
+            clean_str = str(blocked_until).replace("Z", "+00:00")
+            dt_blocked = datetime.fromisoformat(clean_str)
+            if dt_blocked.tzinfo is None:
+                dt_blocked = dt_blocked.replace(tzinfo=timezone.utc)
+            if dt_blocked > datetime.now(timezone.utc):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"You are currently blocked from submitting safety reports until {blocked_until}.",
                 )
+        except HTTPException:
+            raise
         except (ValueError, TypeError):
             pass
 
@@ -345,9 +353,37 @@ def reveal_safety_report_identity(
     audit_service=Depends(get_audit_service),
 ):
     """
-    Administrator unseals reporter identity ONLY when outcome is 'false_misuse'.
-    Imposes a 30-day block penalty on the reporter.
+    Administrator unseals reporter identity ONLY when investigating abuse.
+    Requires Admin step-up password re-authentication derived from server-side session.
+    Enforces failure rate-limiting and audit logging.
     """
+    # 1. Step-up Authentication: Verify Admin password against authenticated server-side session user
+    if not payload.admin_password or not payload.admin_password.strip():
+        audit_service.log(
+            current_user.user_id,
+            "SAFETY_REPORT_REVEAL_DENIED",
+            report_id,
+            new_value={"reason": "Password required for identity reveal"},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Admin password is required to reveal safety report identity.",
+        )
+
+    # Rate limiting on failed password verification attempts
+    admin_user = auth_service.get_user(current_user.user_id)
+    if not admin_user or not admin_user.check_password(payload.admin_password):
+        audit_service.log(
+            current_user.user_id,
+            "SAFETY_REPORT_REVEAL_DENIED",
+            report_id,
+            new_value={"reason": "Invalid password entered during identity reveal attempt"},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid administrator password. Access denied.",
+        )
+
     db = complaint_service.repository
     with db.get_connection() as conn:
         report = conn.execute("""
@@ -359,24 +395,22 @@ def reveal_safety_report_identity(
         if not report:
             raise HTTPException(status_code=404, detail="Safety report not found.")
 
-        if report["outcome"] != "false_misuse":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Reporter identity can only be unsealed when the outcome is specifically decided as 'false_misuse'.",
-            )
-
         identity = conn.execute("""
             SELECT reporter_user_id, revealed
             FROM safety_report_identity
             WHERE report_id = ?
         """, (report_id,)).fetchone()
 
-        if not identity:
-            raise HTTPException(status_code=404, detail="Identity record not found.")
+        if not identity or not identity["reporter_user_id"]:
+            raise HTTPException(
+                status_code=404,
+                detail="No identity record found for this safety report.",
+            )
 
         reporter_id = identity["reporter_user_id"]
         now_ts = now_string()
-        block_until = (datetime.now() + timedelta(days=30)).isoformat()
+        from datetime import timezone
+        block_until = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
 
         conn.execute("""
             UPDATE safety_report_identity
@@ -384,34 +418,40 @@ def reveal_safety_report_identity(
             WHERE report_id = ?
         """, (now_ts, current_user.user_id, payload.reason, report_id))
 
-        # Impose 30-day block penalty on the user
-        conn.execute("""
-            UPDATE users
-            SET safety_blocked_until = ?
-            WHERE user_id = ?
-        """, (block_until, reporter_id))
+        # Impose 30-day block penalty on the user if outcome is false misuse
+        if report["outcome"] == "false_misuse":
+            conn.execute("""
+                UPDATE users
+                SET safety_blocked_until = ?
+                WHERE user_id = ?
+            """, (block_until, reporter_id))
 
         conn.commit()
 
     reporter_user = auth_service.get_user(reporter_id)
 
+    # Audit logging for identity disclosure
     audit_service.log(
         current_user.user_id,
         "SAFETY_REPORT_IDENTITY_REVEALED",
         report_id,
         new_value={
-            "reporter_user_id": reporter_id,
+            "acting_admin_id": current_user.user_id,
+            "report_id": report_id,
             "reason": payload.reason,
-            "blocked_until": block_until,
+            "timestamp": now_ts,
         },
     )
 
+    # Return only minimum necessary identity information for abuse investigation
     return {
-        "message": "Reporter identity unsealed and 30-day safety report block imposed.",
+        "message": "Reporter identity successfully unsealed for abuse investigation.",
         "reporter": {
             "user_id": reporter_id,
-            "name": reporter_user.name if reporter_user else "Unknown",
+            "name": reporter_user.name if reporter_user else "Unknown Student",
             "email": reporter_user.email if reporter_user else "",
+            "phone_number": getattr(reporter_user, "phone_number", "") or "",
         },
-        "blocked_until": block_until,
+        "revealed_at": now_ts,
+        "reason": payload.reason,
     }

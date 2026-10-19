@@ -685,6 +685,12 @@ class SetupImportService:
                 if pdata.get("matched_user_id"):
                     existing_user = self.auth_service.get_user(pdata["matched_user_id"])
                     if existing_user:
+                        creator_role = (getattr(creator, "role", "") or "").lower()
+                        # Privilege Escalation Guard: App Managers cannot overwrite roles to/from Administrator or App Manager
+                        if creator_role == "app_manager":
+                            if existing_user.role in ("administrator", "super_admin", "app_manager") or role in (ROLE_APP_MANAGER, "administrator", "super_admin"):
+                                raise PermissionError(f"App Managers cannot modify administrative or App Manager accounts.")
+
                         existing_user.name = name
                         existing_user.role = role
                         if phone:
@@ -906,9 +912,14 @@ class SetupImportService:
         active_locations = [l for l in locations if getattr(l, "active", True) and not getattr(l, "archived", False)]
         locations_count = len(active_locations)
 
-        # 3. Coverage gaps: departments/places with no team
+        # 3. Coverage gaps: departments with no coordinator or team
         gaps_data = self.team_service.get_coverage_gaps() if hasattr(self.team_service, "get_coverage_gaps") else {}
-        coverage_gaps = gaps_data.get("uncovered_pairs", []) if isinstance(gaps_data, dict) else (gaps_data or [])
+        coverage_gaps = (
+            gaps_data.get("uncovered_departments")
+            or gaps_data.get("uncovered_pairs", [])
+            if isinstance(gaps_data, dict)
+            else (gaps_data or [])
+        )
         uncovered_count = len(coverage_gaps)
 
         # 4. Teams with no backup
@@ -982,7 +993,7 @@ class SetupImportService:
                 "count": uncovered_count,
                 "items": coverage_gaps,
                 "is_ready": uncovered_count == 0,
-                "link": "/admin/teams",
+                "link": "/admin/departments",
             },
             "teams_no_backup": {
                 "count": len(teams_no_backup),

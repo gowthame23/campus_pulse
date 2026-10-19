@@ -358,7 +358,7 @@ export default function EmergencyManagementPage() {
                           {cat.department_name}
                         </span>
                       ) : (
-                        <span className="text-slate-400 italic">None (Hotline priority)</span>
+                        <span className="text-slate-400 italic">None (Direct Hotline & Security Priority)</span>
                       )}
                     </td>
                     <td className="py-3 px-3">
@@ -578,7 +578,7 @@ export default function EmergencyManagementPage() {
               value={catDeptId}
               onChange={(e) => setCatDeptId(e.target.value)}
               options={[
-                { value: "", label: "None (Fire/Medical or Campus-wide)" },
+                { value: "", label: "None (Direct Hotline 112 / Campus Security Priority)" },
                 ...departments.map((d) => ({ value: d.department_id, label: d.name })),
               ]}
             />

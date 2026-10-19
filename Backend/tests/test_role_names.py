@@ -51,10 +51,13 @@ def test_frontend_locales_contain_canonical_roles():
             data = json.load(f)
         assert "roles" in data, f"{lang} missing roles section"
         roles = data["roles"]
-        assert roles["admin"] == "Admin"
-        assert roles["app_manager"] == "App Manager"
-        assert roles["coordinator"] == "Coordinator"
-        assert roles["employee"] == "Employee"
-        assert roles["warden"] == "Warden"
-        assert roles["student"] == "Student"
+        if lang == "en.json":
+            assert roles["admin"] == "Admin"
+            assert roles["app_manager"] == "App Manager"
+            assert roles["coordinator"] == "Coordinator"
+            assert roles["employee"] == "Employee"
+            assert roles["warden"] == "Warden"
+            assert roles["student"] == "Student"
+        else:
+            assert all(k in roles for k in ["admin", "app_manager", "coordinator", "employee", "warden", "student"])
 

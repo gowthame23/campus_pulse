@@ -29,15 +29,7 @@ import { locationService } from "../../services/locationService.js";
 import { attachmentService } from "../../services/attachmentService.js";
 import { getApiError } from "../../api/axios.js";
 
-const QUICK_CATEGORIES = [
-  { key: "electrical", label: "Electrical", icon: "⚡", keyword: "elec" },
-  { key: "plumbing", label: "Plumbing", icon: "🚿", keyword: "plumb" },
-  { key: "carpentry", label: "Carpentry", icon: "🚪", keyword: "carpent" },
-  { key: "housekeeping", label: "Cleaning", icon: "🧹", keyword: "clean" },
-  { key: "internet", label: "Wi-Fi", icon: "📶", keyword: "net" },
-  { key: "mess", label: "Mess", icon: "🍽️", keyword: "mess" },
-  { key: "general", label: "Other", icon: "📦", keyword: "maint" },
-];
+
 
 export default function CreateComplaintPage() {
   const { user } = useAuth();
@@ -69,25 +61,7 @@ export default function CreateComplaintPage() {
   });
 
   const [outsideHostelConfirmed, setOutsideHostelConfirmed] = useState(false);
-  const [selectedCategoryKey, setSelectedCategoryKey] = useState(null);
 
-  const handleQuickCategory = (cat) => {
-    setSelectedCategoryKey(cat.key);
-    const deptList = availableDepartments.length > 0 ? availableDepartments : departments;
-    const matchedDept = deptList.find(d => 
-      d.name.toLowerCase().includes(cat.keyword) || 
-      (d.complaint_types || []).some(t => t.toLowerCase().includes(cat.keyword))
-    );
-    if (matchedDept) {
-      setValue("department_id", matchedDept.department_id);
-      const matchedIssue = (matchedDept.complaint_types || []).find(t => 
-        t.toLowerCase().includes(cat.keyword)
-      ) || matchedDept.complaint_types?.[0] || cat.label;
-      setValue("complaint_type", matchedIssue);
-    } else {
-      setValue("complaint_type", cat.label);
-    }
-  };
 
   const {
     register,
@@ -115,38 +89,97 @@ export default function CreateComplaintPage() {
   const availableDepartments = useMemo(() => {
     if (!locationVal) return [];
 
+    const allActive = (departments || []).filter((d) => d.active !== false && !d.archived);
+
     // Resolve location_id and location_type (supports both ID and name)
-    const locObj = (locations || []).find(l => l.location_id === locationVal || l.name === locationVal);
-    const locId = locObj ? locObj.location_id : locationVal;
-    const locType = locObj ? (locObj.location_type || locObj.name) : locationVal;
-
-    const typeToTemplateId = {
-      "Hostel": "LOC_HOSTEL_A",
-      "Academic Block": "LOC_ACADEMIC",
-      "Mess": "LOC_MESS",
-      "Student Activity Center": "LOC_SAC",
-      "Sports Complex": "LOC_SPORTS",
-      "Other / Not Sure": "LOC_OTHER",
-    };
-    const templateId = typeToTemplateId[locType] || (locObj ? typeToTemplateId[locObj.name] : null);
-
-    return (departments || []).filter(d =>
-      d.location_id === locId ||
-      d.location_id === locType ||
-      (templateId && d.location_id === templateId)
+    const locObj = (locations || []).find(
+      (l) => l.location_id === locationVal || l.name === locationVal
     );
+    if (!locObj) return allActive;
+
+    // 1. If location has enriched departments list from backend
+    if (locObj.departments && locObj.departments.length > 0) {
+      const locDeptIds = new Set(locObj.departments.map((d) => d.department_id || d.id));
+      const merged = allActive.filter(
+        (d) =>
+          locDeptIds.has(d.department_id) ||
+          !d.location_ids ||
+          d.location_ids.length === 0 ||
+          d.location_ids.includes(locObj.location_id) ||
+          d.location_ids.includes("ALL")
+      );
+      return merged.length > 0 ? merged : allActive;
+    }
+
+    // 2. Match from central departments' operating locations
+    const locId = locObj.location_id;
+    const filtered = allActive.filter(
+      (d) =>
+        !d.location_ids ||
+        d.location_ids.length === 0 ||
+        d.location_ids.includes(locId) ||
+        d.location_ids.includes("ALL") ||
+        d.location_id === locId
+    );
+    return filtered.length > 0 ? filtered : allActive;
   }, [locationVal, departments, locations]);
+
+  // Reset department if not valid for selected location
+  useEffect(() => {
+    if (selectedDepartmentId && availableDepartments.length > 0) {
+      const exists = availableDepartments.some(
+        (d) => d.department_id === selectedDepartmentId
+      );
+      if (!exists) {
+        setValue("department_id", "");
+      }
+    }
+  }, [availableDepartments, selectedDepartmentId, setValue]);
+
+  const selectedLoc = useMemo(() => {
+    return (locations || []).find((l) => l.location_id === locationVal);
+  }, [locationVal, locations]);
+
+  const locationAccessMode = useMemo(() => {
+    if (!selectedLoc) return "everyone";
+    if (selectedLoc.complaint_submission_policy) return selectedLoc.complaint_submission_policy;
+    if (selectedLoc.public_complaint_access) return selectedLoc.public_complaint_access;
+    const isHostel =
+      (selectedLoc.location_type || "").toLowerCase().includes("hostel") ||
+      (selectedLoc.name || "").toLowerCase().includes("hostel");
+    return isHostel ? "location_only" : "everyone";
+  }, [selectedLoc]);
+
+  const isRestrictedLocationOnly = useMemo(() => {
+    if (!selectedLoc) return false;
+    if (locationAccessMode !== "location_only") return false;
+
+    const userLocId = user?.location_id;
+    const userHostel = user?.hostel;
+    const userAssigned = Array.isArray(user?.assigned_locations) ? user.assigned_locations : [];
+
+    const allowed = new Set(
+      [userLocId, userHostel, ...userAssigned]
+        .filter(Boolean)
+        .map((x) => String(x).toLowerCase().trim())
+    );
+
+    const targetId = String(selectedLoc.location_id || "").toLowerCase().trim();
+    const targetName = String(selectedLoc.name || "").toLowerCase().trim();
+
+    const isMember = (targetId && allowed.has(targetId)) || (targetName && allowed.has(targetName));
+    return !isMember;
+  }, [selectedLoc, user, locationAccessMode]);
 
   // Check if student is filing for a hostel outside their own
   const isOutsideHostel = useMemo(() => {
     if (!user?.location_id || !locationVal || user.location_id === locationVal) return false;
     const userLoc = (locations || []).find(l => l.location_id === user.location_id);
-    const selectedLoc = (locations || []).find(l => l.location_id === locationVal);
     if (!userLoc || !selectedLoc) return false;
     const isUserHostel = (userLoc.location_type || "").toLowerCase().includes("hostel") || userLoc.name.toLowerCase().includes("hostel");
     const isSelectedHostel = (selectedLoc.location_type || "").toLowerCase().includes("hostel") || selectedLoc.name.toLowerCase().includes("hostel");
     return isUserHostel && isSelectedHostel;
-  }, [user, locationVal, locations]);
+  }, [user, locationVal, locations, selectedLoc]);
 
   // Group active locations by Location Type for clean UI selection, filtering by locSearch
   const groupedLocations = useMemo(() => {
@@ -315,6 +348,10 @@ export default function CreateComplaintPage() {
 
   const onSubmit = async (values) => {
     setError("");
+    if (isRestrictedLocationOnly) {
+      setError("This location only accepts complaints from residents or assigned students.");
+      return;
+    }
     try {
       const isUrgent = !!values.is_urgent;
       const payload = {
@@ -345,7 +382,14 @@ export default function CreateComplaintPage() {
         }
       }
 
-      navigate(`/complaints/${complaintId}`);
+      const isOtherLocOrDept =
+        values.location_id === "LOC_OTHER" ||
+        values.department_id === "DEPT_OTHER" ||
+        values.department_id === "DEPT_OTHER_GENERAL";
+
+      navigate(`/complaints/${complaintId}`, {
+        state: { isOther: isOtherLocOrDept },
+      });
     } catch (err) {
       setError(getApiError(err, "Unable to submit complaint."));
     }
@@ -447,6 +491,16 @@ export default function CreateComplaintPage() {
                 ))}
               </Select>
 
+              {/* Restricted location-only warning banner */}
+              {isRestrictedLocationOnly && (
+                <div className="p-3.5 rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/30 flex items-start gap-2.5 text-xs text-rose-800 dark:text-rose-200">
+                  <span className="text-base shrink-0 mt-0.5">🚫</span>
+                  <div>
+                    <span className="font-bold">Submission Restricted:</span> {selectedLoc?.name} only accepts complaints from its registered residents or assigned students. As a non-resident, you cannot submit complaints for this location.
+                  </div>
+                </div>
+              )}
+
               {/* Outside hostel confirmation banner */}
               {isOutsideHostel && !outsideHostelConfirmed && (
                 <div className="p-3 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 flex items-center justify-between gap-3 text-xs">
@@ -482,29 +536,7 @@ export default function CreateComplaintPage() {
               </div>
             </div>
 
-            {/* Quick Category Buttons */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
-                Quick Category (One-Tap Pick)
-              </label>
-              <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-                {QUICK_CATEGORIES.map((cat) => (
-                  <button
-                    key={cat.key}
-                    type="button"
-                    onClick={() => handleQuickCategory(cat)}
-                    className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all text-center cursor-pointer ${
-                      selectedCategoryKey === cat.key
-                        ? "border-primary bg-primary/10 text-primary font-bold shadow-xs scale-102"
-                        : "border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                    }`}
-                  >
-                    <span className="text-xl mb-1">{cat.icon}</span>
-                    <span className="text-[10px] font-semibold truncate w-full">{cat.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+
 
             {/* Step 2 - Select Department */}
             <Select
@@ -780,7 +812,7 @@ export default function CreateComplaintPage() {
 
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isRestrictedLocationOnly}
               className="font-bold py-2.5 flex items-center justify-center gap-1.5"
             >
               {isSubmitting ? (

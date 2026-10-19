@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 
 export default function Modal({ title, children, open, isOpen, onClose }) {
   const isModalOpen = open !== undefined ? open : (isOpen !== undefined ? isOpen : true);
@@ -16,7 +17,7 @@ export default function Modal({ title, children, open, isOpen, onClose }) {
 
   if (!isModalOpen) return null;
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-200">
       {/* Clickable Backdrop overlay */}
       <div className="absolute inset-0" onClick={onClose} />
@@ -51,4 +52,8 @@ export default function Modal({ title, children, open, isOpen, onClose }) {
       </section>
     </div>
   );
+
+  return typeof document !== "undefined"
+    ? createPortal(modalContent, document.body)
+    : modalContent;
 }

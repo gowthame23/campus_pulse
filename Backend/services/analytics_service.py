@@ -549,44 +549,48 @@ class AnalyticsService:
     def get_department_analytics(self, filters, user=None):
         with self._connect() as conn:
             depts = conn.execute("SELECT * FROM departments").fetchall()
-            result = []
             today = datetime.now().strftime("%Y-%m-%d")
 
+            # Single aggregated query for all departments
+            stats_rows = conn.execute("""
+                SELECT 
+                    department_id,
+                    COUNT(*) as assigned,
+                    SUM(CASE WHEN status IN ('Closed', 'Closed (Auto Closed)', 'Resolved') THEN 1 ELSE 0 END) as completed,
+                    SUM(CASE WHEN status IN ('Pending', 'Submitted', 'Assigned', 'In Progress') THEN 1 ELSE 0 END) as pending,
+                    SUM(CASE WHEN verification_due_at < ? AND status NOT IN ('Closed', 'Closed (Auto Closed)') THEN 1 ELSE 0 END) as breaches,
+                    SUM(CASE WHEN reopen_count > 0 THEN 1 ELSE 0 END) as reopened
+                FROM complaints
+                WHERE department_id IS NOT NULL
+                GROUP BY department_id
+            """, (today,)).fetchall()
+            dept_stats = {r["department_id"]: r for r in stats_rows}
+
+            dur_rows = conn.execute("""
+                SELECT department_id, created_at, resolved_at 
+                FROM complaints 
+                WHERE department_id IS NOT NULL AND resolved_at IS NOT NULL
+            """).fetchall()
+            dept_durations = {}
+            for r in dur_rows:
+                did = r["department_id"]
+                c_d = self._parse_date(r["created_at"])
+                r_d = self._parse_date(r["resolved_at"])
+                if c_d and r_d and r_d >= c_d:
+                    dept_durations.setdefault(did, []).append((r_d - c_d).total_seconds() / 3600.0)
+
+            result = []
             for d in depts:
                 did = d["department_id"]
-                assigned = conn.execute(
-                    "SELECT COUNT(*) FROM complaints WHERE department_id = ?", (did,)
-                ).fetchone()[0]
-                completed = conn.execute(
-                    "SELECT COUNT(*) FROM complaints WHERE department_id = ? AND status IN ('Closed', 'Closed (Auto Closed)', 'Resolved')",
-                    (did,),
-                ).fetchone()[0]
-                pending = conn.execute(
-                    "SELECT COUNT(*) FROM complaints WHERE department_id = ? AND status IN ('Pending', 'Submitted', 'Assigned', 'In Progress')",
-                    (did,),
-                ).fetchone()[0]
-                breaches = conn.execute(
-                    "SELECT COUNT(*) FROM complaints WHERE department_id = ? AND verification_due_at < ? AND status NOT IN ('Closed', 'Closed (Auto Closed)')",
-                    (did, today),
-                ).fetchone()[0]
-                reopened = conn.execute(
-                    "SELECT COUNT(*) FROM complaints WHERE department_id = ? AND reopen_count > 0",
-                    (did,),
-                ).fetchone()[0]
+                st = dept_stats.get(did)
+                assigned = st["assigned"] if st else 0
+                completed = st["completed"] if st else 0
+                pending = st["pending"] if st else 0
+                breaches = st["breaches"] if st else 0
+                reopened = st["reopened"] if st else 0
 
-                rows = conn.execute(
-                    "SELECT created_at, resolved_at FROM complaints WHERE department_id = ? AND resolved_at IS NOT NULL",
-                    (did,),
-                ).fetchall()
-                durations = []
-                for r in rows:
-                    c_d = self._parse_date(r["created_at"])
-                    r_d = self._parse_date(r["resolved_at"])
-                    if c_d and r_d and r_d >= c_d:
-                        durations.append((r_d - c_d).total_seconds() / 3600.0)
-                avg_res_hours = (
-                    round(sum(durations) / len(durations), 1) if durations else 0.0
-                )
+                durs = dept_durations.get(did, [])
+                avg_res_hours = round(sum(durs) / len(durs), 1) if durs else 0.0
 
                 result.append(
                     {
@@ -616,48 +620,49 @@ class AnalyticsService:
             coords = conn.execute(
                 "SELECT * FROM users WHERE role = 'coordinator' AND (is_deleted = 0 OR is_deleted IS NULL)"
             ).fetchall()
-            result = []
             today = datetime.now().strftime("%Y-%m-%d")
 
+            stats_rows = conn.execute("""
+                SELECT 
+                    assigned_to,
+                    COUNT(*) as assigned,
+                    SUM(CASE WHEN status IN ('Closed', 'Closed (Auto Closed)', 'Resolved') THEN 1 ELSE 0 END) as resolved,
+                    SUM(CASE WHEN status IN ('Pending', 'Submitted', 'Assigned', 'In Progress') THEN 1 ELSE 0 END) as pending,
+                    SUM(CASE WHEN reopen_count > 0 THEN 1 ELSE 0 END) as reopened,
+                    SUM(CASE WHEN escalated = 1 THEN 1 ELSE 0 END) as escalated,
+                    SUM(CASE WHEN verification_due_at < ? AND status NOT IN ('Closed', 'Closed (Auto Closed)') THEN 1 ELSE 0 END) as breaches
+                FROM complaints
+                WHERE assigned_to IS NOT NULL
+                GROUP BY assigned_to
+            """, (today,)).fetchall()
+            coord_stats = {r["assigned_to"]: r for r in stats_rows}
+
+            dur_rows = conn.execute("""
+                SELECT assigned_to, created_at, resolved_at 
+                FROM complaints 
+                WHERE assigned_to IS NOT NULL AND resolved_at IS NOT NULL
+            """).fetchall()
+            coord_durations = {}
+            for r in dur_rows:
+                cid = r["assigned_to"]
+                c_d = self._parse_date(r["created_at"])
+                r_d = self._parse_date(r["resolved_at"])
+                if c_d and r_d and r_d >= c_d:
+                    coord_durations.setdefault(cid, []).append((r_d - c_d).total_seconds() / 3600.0)
+
+            result = []
             for c in coords:
                 cid = c["user_id"]
-                assigned = conn.execute(
-                    "SELECT COUNT(*) FROM complaints WHERE assigned_to = ?", (cid,)
-                ).fetchone()[0]
-                resolved = conn.execute(
-                    "SELECT COUNT(*) FROM complaints WHERE assigned_to = ? AND status IN ('Closed', 'Closed (Auto Closed)', 'Resolved')",
-                    (cid,),
-                ).fetchone()[0]
-                pending = conn.execute(
-                    "SELECT COUNT(*) FROM complaints WHERE assigned_to = ? AND status IN ('Pending', 'Submitted', 'Assigned', 'In Progress')",
-                    (cid,),
-                ).fetchone()[0]
-                reopened = conn.execute(
-                    "SELECT COUNT(*) FROM complaints WHERE assigned_to = ? AND reopen_count > 0",
-                    (cid,),
-                ).fetchone()[0]
-                escalated = conn.execute(
-                    "SELECT COUNT(*) FROM complaints WHERE assigned_to = ? AND escalated = 1",
-                    (cid,),
-                ).fetchone()[0]
-                breaches = conn.execute(
-                    "SELECT COUNT(*) FROM complaints WHERE assigned_to = ? AND verification_due_at < ? AND status NOT IN ('Closed', 'Closed (Auto Closed)')",
-                    (cid, today),
-                ).fetchone()[0]
+                st = coord_stats.get(cid)
+                assigned = st["assigned"] if st else 0
+                resolved = st["resolved"] if st else 0
+                pending = st["pending"] if st else 0
+                reopened = st["reopened"] if st else 0
+                escalated = st["escalated"] if st else 0
+                breaches = st["breaches"] if st else 0
 
-                rows = conn.execute(
-                    "SELECT created_at, resolved_at FROM complaints WHERE assigned_to = ? AND resolved_at IS NOT NULL",
-                    (cid,),
-                ).fetchall()
-                durations = []
-                for r in rows:
-                    c_d = self._parse_date(r["created_at"])
-                    r_d = self._parse_date(r["resolved_at"])
-                    if c_d and r_d and r_d >= c_d:
-                        durations.append((r_d - c_d).total_seconds() / 3600.0)
-                avg_res = (
-                    round(sum(durations) / len(durations), 1) if durations else 0.0
-                )
+                durs = coord_durations.get(cid, [])
+                avg_res = round(sum(durs) / len(durs), 1) if durs else 0.0
 
                 ranking = (
                     "Best Performer"
@@ -692,32 +697,45 @@ class AnalyticsService:
     def get_hostel_analytics(self, filters, user=None):
         with self._connect() as conn:
             hostels = conn.execute("SELECT * FROM hostels").fetchall()
-            result = []
 
+            # Single aggregated query for all hostels
+            stats_rows = conn.execute("""
+                SELECT 
+                    location_id,
+                    COUNT(*) as total,
+                    SUM(CASE WHEN priority = 'Critical' THEN 1 ELSE 0 END) as critical,
+                    SUM(CASE WHEN status IN ('Closed', 'Closed (Auto Closed)', 'Resolved') THEN 1 ELSE 0 END) as resolved,
+                    SUM(CASE WHEN status IN ('Pending', 'Submitted', 'Assigned', 'In Progress') THEN 1 ELSE 0 END) as pending
+                FROM complaints
+                WHERE location_id IS NOT NULL
+                GROUP BY location_id
+            """).fetchall()
+            loc_stats = {r["location_id"]: r for r in stats_rows}
+
+            # Most common categories
+            cat_rows = conn.execute("""
+                SELECT location_id, category, COUNT(*) as cnt
+                FROM complaints
+                WHERE location_id IS NOT NULL AND category IS NOT NULL
+                GROUP BY location_id, category
+                ORDER BY location_id, cnt DESC
+            """).fetchall()
+            top_cats = {}
+            for r in cat_rows:
+                lid = r["location_id"]
+                if lid not in top_cats:
+                    top_cats[lid] = r["category"]
+
+            result = []
             for h in hostels:
                 hid = h["building_id"]
                 hname = h["hostel_name"]
-                total = conn.execute(
-                    "SELECT COUNT(*) FROM complaints WHERE location_id = ?", (hid,)
-                ).fetchone()[0]
-                critical = conn.execute(
-                    "SELECT COUNT(*) FROM complaints WHERE location_id = ? AND priority = 'Critical'",
-                    (hid,),
-                ).fetchone()[0]
-                resolved = conn.execute(
-                    "SELECT COUNT(*) FROM complaints WHERE location_id = ? AND status IN ('Closed', 'Closed (Auto Closed)', 'Resolved')",
-                    (hid,),
-                ).fetchone()[0]
-                pending = conn.execute(
-                    "SELECT COUNT(*) FROM complaints WHERE location_id = ? AND status IN ('Pending', 'Submitted', 'Assigned', 'In Progress')",
-                    (hid,),
-                ).fetchone()[0]
-
-                top_cat_row = conn.execute(
-                    "SELECT category, COUNT(*) as cnt FROM complaints WHERE location_id = ? AND category IS NOT NULL GROUP BY category ORDER BY cnt DESC LIMIT 1",
-                    (hid,),
-                ).fetchone()
-                top_cat = top_cat_row["category"] if top_cat_row else "General"
+                st = loc_stats.get(hid)
+                total = st["total"] if st else 0
+                critical = st["critical"] if st else 0
+                resolved = st["resolved"] if st else 0
+                pending = st["pending"] if st else 0
+                top_cat = top_cats.get(hid, "General")
 
                 result.append(
                     {

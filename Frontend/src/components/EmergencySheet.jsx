@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Button from "./Button.jsx";
 import { emergencyService } from "../services/emergencyService.js";
+import { useLanguage } from "../context/LanguageContext.jsx";
 
 const CATEGORY_ICONS = {
   electrical: Zap,
@@ -37,7 +38,20 @@ export function getCategoryIcon(name = "") {
   return AlertTriangle;
 }
 
+export function getCategoryLabel(name = "", t) {
+  if (!t) return name;
+  const lower = name.toLowerCase();
+  if (lower.includes("elec")) return t("emergency.cat_electrical", name);
+  if (lower.includes("plumb") || lower.includes("water")) return t("emergency.cat_plumbing", name);
+  if (lower.includes("lift")) return t("emergency.cat_lift", name);
+  if (lower.includes("fire") || lower.includes("smoke")) return t("emergency.cat_fire", name);
+  if (lower.includes("med")) return t("emergency.cat_medical", name);
+  if (lower.includes("oth")) return t("emergency.cat_other", name);
+  return name;
+}
+
 export default function EmergencySheet({ isOpen, onClose, userLocationId, onEmergencyCreated }) {
+  const { t } = useLanguage();
   const [step, setStep] = useState("categories"); // "categories" | "calling"
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
@@ -65,7 +79,17 @@ export default function EmergencySheet({ isOpen, onClose, userLocationId, onEmer
     setLoadingCategories(true);
     try {
       const res = await emergencyService.getCategories(true);
-      setCategories(res.data || []);
+      const raw = res.data || [];
+      const seen = new Set();
+      const unique = [];
+      for (const cat of raw) {
+        const key = (cat.name || "").trim().toLowerCase();
+        if (key && !seen.has(key)) {
+          seen.add(key);
+          unique.push(cat);
+        }
+      }
+      setCategories(unique);
     } catch (err) {
       console.error("Failed to load emergency categories:", err);
     } finally {
@@ -148,11 +172,13 @@ export default function EmergencySheet({ isOpen, onClose, userLocationId, onEmer
             </div>
             <div>
               <h2 className="text-lg font-extrabold tracking-tight">
-                {step === "categories" ? "🚨 What's the emergency?" : `🚨 Emergency: ${selectedCategory?.name || "Incident"}`}
+                {step === "categories"
+                  ? `🚨 ${t("emergency.sheet_title", "What's the emergency?")}`
+                  : `🚨 ${t("emergency.emergency_badge", "Emergency")}: ${selectedCategory ? getCategoryLabel(selectedCategory.name, t) : "Incident"}`}
               </h2>
               <p className="text-xs text-rose-100 font-medium">
                 {step === "categories"
-                  ? "Select a category to immediately connect and alert staff"
+                  ? t("emergency.sheet_desc", "Select a category to immediately connect and alert staff")
                   : "Critical complaint logged. Staff alerted."}
               </p>
             </div>
@@ -180,6 +206,11 @@ export default function EmergencySheet({ isOpen, onClose, userLocationId, onEmer
                   {categories.map((cat) => {
                     const IconComponent = getCategoryIcon(cat.name);
                     const isFireOrMedical = /fire|smoke|medical/i.test(cat.name);
+                    const label = getCategoryLabel(cat.name, t);
+                    const hasSubtext =
+                      cat.department_name &&
+                      cat.department_name.toLowerCase() !== cat.name.toLowerCase() &&
+                      !cat.department_name.startsWith("DEPT");
                     return (
                       <button
                         key={cat.category_id || cat.name}
@@ -199,8 +230,8 @@ export default function EmergencySheet({ isOpen, onClose, userLocationId, onEmer
                         >
                           <IconComponent className="h-6 w-6" />
                         </div>
-                        <span className="text-sm font-bold line-clamp-1">{cat.name}</span>
-                        {cat.department_name && (
+                        <span className="text-sm font-bold line-clamp-1">{label}</span>
+                        {hasSubtext && (
                           <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
                             {cat.department_name}
                           </span>
@@ -214,13 +245,13 @@ export default function EmergencySheet({ isOpen, onClose, userLocationId, onEmer
               <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                 <span className="flex items-center gap-1.5">
                   <Shield className="h-3.5 w-3.5 text-rose-500" />
-                  National Hotline 112 always accessible
+                  {t("emergency.national_hotline", "National Hotline 112 always accessible")}
                 </span>
                 <a
                   href="tel:112"
                   className="font-bold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1"
                 >
-                  <Phone className="h-3 w-3" /> Call 112
+                  <Phone className="h-3 w-3" /> {t("emergency.call_112", "Call 112")}
                 </a>
               </div>
             </div>
@@ -275,7 +306,7 @@ export default function EmergencySheet({ isOpen, onClose, userLocationId, onEmer
               {/* "Did you reach someone?" (Rule 2.3f) */}
               <div className="pt-3 border-t border-slate-200 dark:border-slate-800">
                 <div className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
-                  Did you reach someone?
+                  {t("emergency.did_you_reach", "Did you reach someone?")}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -284,7 +315,7 @@ export default function EmergencySheet({ isOpen, onClose, userLocationId, onEmer
                     className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-100 font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
                   >
                     <CheckCircle className="h-4 w-4 text-emerald-600" />
-                    Yes, Reached
+                    {t("emergency.yes_reached", "Yes, I spoke to them")}
                   </button>
                   <button
                     disabled={submittingReached}
@@ -292,7 +323,7 @@ export default function EmergencySheet({ isOpen, onClose, userLocationId, onEmer
                     className="py-2.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
                   >
                     <RefreshCw className="h-4 w-4 text-rose-600" />
-                    No Answer (Re-alert)
+                    {t("emergency.no_answer", "No answer / Couldn't reach")}
                   </button>
                 </div>
               </div>

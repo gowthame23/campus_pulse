@@ -51,7 +51,7 @@ const HealthMapPage = lazy(() => import("../pages/admin/HealthMapPage.jsx"));
 const SafetyReportPage = lazy(() => import("../pages/student/SafetyReportPage.jsx"));
 const SafetyReportsAdminPage = lazy(() => import("../pages/admin/SafetyReportsAdminPage.jsx"));
 const EmployeeDashboard = lazy(() => import("../pages/employee/EmployeeDashboard.jsx"));
-const TeamsManagementPage = lazy(() => import("../pages/admin/TeamsManagementPage.jsx"));
+const EmployeeAssignmentsPage = lazy(() => import("../pages/admin/EmployeeAssignmentsPage.jsx"));
 const CoverageGapsPage = lazy(() => import("../pages/admin/CoverageGapsPage.jsx"));
 const EmergencyManagementPage = lazy(() => import("../pages/admin/EmergencyManagementPage.jsx"));
 
@@ -177,6 +177,14 @@ export default function AppRoutes() {
           }
         />
         <Route
+          path="/complaints/create"
+          element={
+            <ProtectedRoute roles={[ROLES.STUDENT, ROLES.LOCATION_IN_CHARGE]}>
+              <CreateComplaintPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/complaints/:complaintId"
           element={
             <ProtectedRoute>
@@ -253,10 +261,18 @@ export default function AppRoutes() {
           }
         />
         <Route
+          path="/admin/employee-assignments"
+          element={
+            <ProtectedRoute roles={[ROLES.ADMINISTRATOR, ROLES.APP_MANAGER]}>
+              <EmployeeAssignmentsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/teams"
           element={
             <ProtectedRoute roles={[ROLES.ADMINISTRATOR, ROLES.APP_MANAGER]}>
-              <TeamsManagementPage />
+              <EmployeeAssignmentsPage />
             </ProtectedRoute>
           }
         />

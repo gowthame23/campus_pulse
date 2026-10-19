@@ -301,7 +301,7 @@ export default function AdminDashboard() {
           value={adminReviewComplaints.length}
           accent={adminReviewComplaints.length > 0}
           subtext={adminReviewComplaints.length > 0 ? "Disputes requiring decision" : "No pending disputes"}
-          onClick={() => {}}
+          onClick={() => navigate("/complaints", { state: { status: "Admin Review" } })}
         />
         <StatCard
           label="Overdue / SLA Risk"

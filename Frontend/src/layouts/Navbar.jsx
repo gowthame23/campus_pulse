@@ -16,28 +16,34 @@ import {
   Sun,
   Moon,
   Monitor,
+  Globe,
 } from "lucide-react";
 import Button from "../components/Button.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import EmergencyButton from "../components/EmergencyButton.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
+import { useLanguage } from "../context/LanguageContext.jsx";
 import { complaintService } from "../services/complaintService.js";
 import { userService } from "../services/userService.js";
 import { departmentService } from "../services/departmentService.js";
 import { locationService } from "../services/locationService.js";
-import { ROLES } from "../utils/constants.js";
+import { ROLES, getRoleDisplayName } from "../utils/constants.js";
 
 import { notificationService } from "../services/notificationService.js";
 
 export default function Navbar({ onMenuClick }) {
   const { user, logout } = useAuth();
   const { themeMode, setThemeMode, toggleTheme, isDark } = useTheme();
+  const { language, setLanguage, t } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const langDropdownRef = useRef(null);
 
   // Unread Notification Count
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
@@ -166,11 +172,14 @@ export default function Navbar({ onMenuClick }) {
     });
   }, [searchVal, dbData]);
 
-  // Close search and profile dropdown on click outside
+  // Close search, lang and profile dropdown on click outside
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setDropdownOpen(false);
+      }
+      if (langDropdownRef.current && !langDropdownRef.current.contains(event.target)) {
+        setLangDropdownOpen(false);
       }
       if (searchRef.current && !searchRef.current.contains(event.target)) {
         setSearchOpen(false);
@@ -235,8 +244,8 @@ export default function Navbar({ onMenuClick }) {
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#101726]/95 backdrop-blur-sm h-14 flex items-center text-slate-900 dark:text-slate-100">
       <div className="flex w-full items-center justify-between gap-4 px-4 md:px-6">
-        {/* Left Section: Menu Toggle & Breadcrumbs */}
-        <div className="flex items-center gap-3">
+        {/* Left Section: Menu Toggle, Portal Badge & Breadcrumbs */}
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <button
             onClick={onMenuClick}
             className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 lg:hidden"
@@ -245,7 +254,14 @@ export default function Navbar({ onMenuClick }) {
             <Menu className="h-5 w-5" />
           </button>
 
-          <nav className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 max-w-xs md:max-w-md overflow-hidden whitespace-nowrap">
+          {user?.role && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-bold shrink-0">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span>{getRoleDisplayName(user.role)} Portal</span>
+            </div>
+          )}
+
+          <nav className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 max-w-xs md:max-w-md overflow-hidden whitespace-nowrap">
             {crumbs.map((crumb, idx) => (
               <span key={idx} className="flex items-center gap-1.5">
                 {idx > 0 && (
@@ -400,10 +416,75 @@ export default function Navbar({ onMenuClick }) {
             <Link to="/complaints/new">
               <Button size="sm" className="font-bold text-xs gap-1 hidden sm:flex min-h-9">
                 <Plus className="h-4 w-4" />
-                File Complaint
+                {t("nav.new_complaint", "File Complaint")}
               </Button>
             </Link>
           )}
+
+          {/* Language Selector Dropdown */}
+          <div className="relative" ref={langDropdownRef}>
+            <button
+              onClick={() => setLangDropdownOpen(!langDropdownOpen)}
+              className="flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-200/80 dark:border-slate-800 cursor-pointer shadow-2xs"
+              title={t("select_language", "Language")}
+              aria-label="Change Language"
+            >
+              <Globe className="h-4 w-4 text-primary shrink-0" />
+              <span className="font-bold text-[11px]">
+                {language === "te" ? "తెలుగు" : language === "hi" ? "हिन्दी" : "EN"}
+              </span>
+            </button>
+
+            {langDropdownOpen && (
+              <div className="absolute right-0 mt-1.5 w-36 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#101726] p-1.5 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLanguage("en");
+                    setLangDropdownOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    language === "en"
+                      ? "bg-primary/10 text-primary font-bold"
+                      : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <span>English</span>
+                  <span className="text-[10px] text-slate-400 font-semibold">EN</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLanguage("te");
+                    setLangDropdownOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    language === "te"
+                      ? "bg-primary/10 text-primary font-bold"
+                      : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <span>తెలుగు</span>
+                  <span className="text-[10px] text-slate-400 font-semibold">TE</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLanguage("hi");
+                    setLangDropdownOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    language === "hi"
+                      ? "bg-primary/10 text-primary font-bold"
+                      : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <span>हिन्दी</span>
+                  <span className="text-[10px] text-slate-400 font-semibold">HI</span>
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Theme Switcher */}
           <button
@@ -436,15 +517,21 @@ export default function Navbar({ onMenuClick }) {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center gap-2 rounded-xl p-1 hover:bg-slate-50 transition-colors"
+              className="flex items-center gap-2 rounded-xl p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               aria-label="User menu"
+              title="Account & Portal Menu"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary capitalize">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary capitalize shrink-0">
                 {user?.name?.charAt(0) || "U"}
               </div>
-              <span className="hidden text-sm font-semibold text-slate-700 md:block">
-                {user?.name}
-              </span>
+              <div className="hidden text-left md:block">
+                <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate max-w-[120px]">
+                  {user?.name}
+                </div>
+                <div className="text-[10px] font-bold text-primary dark:text-primary-light uppercase">
+                  {getRoleDisplayName(user?.role)}
+                </div>
+              </div>
             </button>
 
             {dropdownOpen && (
@@ -456,6 +543,10 @@ export default function Navbar({ onMenuClick }) {
                   <div className="text-[10px] font-semibold text-slate-400 truncate">
                     {user?.email}
                   </div>
+                  <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-primary/10 text-primary border border-primary/20">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    <span>{getRoleDisplayName(user?.role)} Portal</span>
+                  </div>
                 </div>
                 <Link
                   to="/profile"
@@ -463,7 +554,7 @@ export default function Navbar({ onMenuClick }) {
                   className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
                   <User className="h-4 w-4 text-slate-400" />
-                  My Profile
+                  {t("nav.profile", "My Profile")}
                 </Link>
                 <Link
                   to="/change-password"
@@ -471,13 +562,13 @@ export default function Navbar({ onMenuClick }) {
                   className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
                   <Settings className="h-4 w-4 text-slate-400" />
-                  Change Password
+                  {t("profile.change_password", "Change Password")}
                 </Link>
 
                 {/* Theme Selector inside Dropdown */}
                 <div className="my-1.5 border-t border-b border-slate-100 dark:border-slate-800 py-2 px-3">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                    Appearance
+                    {t("nav.appearance", "Appearance")}
                   </div>
                   <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                     <button
@@ -524,14 +615,25 @@ export default function Navbar({ onMenuClick }) {
                     setDropdownOpen(false);
                     setConfirmLogout(true);
                   }}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
                 >
                   <LogOut className="h-4 w-4" />
-                  Logout
+                  {t("nav.logout", "Sign Out")}
                 </button>
               </div>
             )}
           </div>
+
+          {/* Direct Quick Logout Button */}
+          <button
+            onClick={() => setConfirmLogout(true)}
+            className="flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 border border-red-200/60 dark:border-red-900/40 transition-colors cursor-pointer"
+            title="Logout"
+            aria-label="Logout"
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            <span className="hidden sm:inline">Logout</span>
+          </button>
         </div>
       </div>
 
@@ -545,6 +647,7 @@ export default function Navbar({ onMenuClick }) {
         onConfirm={() => {
           setConfirmLogout(false);
           logout();
+          navigate("/login", { replace: true });
         }}
       />
     </header>

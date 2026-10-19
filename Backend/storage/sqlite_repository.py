@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import time
 from pathlib import Path
 
 
@@ -8,15 +9,24 @@ from storage.migrations import run_migrations
 
 class SQLiteRepository:
     def __init__(self, db_path, default_data):
+        from utils.db import is_postgres_configured
         self.path = Path(db_path)
         self.default_data = default_data
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._initialize_schema()
-        run_migrations(str(self.path))
-        if self._is_empty():
-            self.save(default_data)
+        if not is_postgres_configured():
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self._initialize_schema()
+            run_migrations(str(self.path))
+            if self._is_empty():
+                self.save(default_data)
+        else:
+            run_migrations()
+            if self._is_empty():
+                self.save(default_data)
 
     def _connect(self):
+        from utils.db import is_postgres_configured, get_db_connection
+        if is_postgres_configured():
+            return get_db_connection()
         connection = sqlite3.connect(self.path)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
@@ -48,6 +58,7 @@ class SQLiteRepository:
                     sla_days INTEGER NOT NULL,
                     complaint_types TEXT NOT NULL,
                     coordinator_id TEXT,
+                    coordinator_2_id TEXT,
                     active INTEGER NOT NULL DEFAULT 1,
                     archived INTEGER NOT NULL DEFAULT 0,
                     location_id TEXT
@@ -85,6 +96,11 @@ class SQLiteRepository:
                 connection.execute("ALTER TABLE locations ADD COLUMN app_manager_id TEXT")
             except Exception:
                 pass
+            try:
+                connection.execute("ALTER TABLE departments ADD COLUMN coordinator_2_id TEXT")
+            except Exception:
+                pass
+
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_locations_app_mgr ON locations(app_manager_id)"
             )
@@ -1034,6 +1050,26 @@ class SQLiteRepository:
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_coord_assign ON coordinator_assignments(department_id, location_id)"
             )
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS employee_work_memberships (
+                    membership_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    department_id TEXT NOT NULL,
+                    location_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    created_by TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+                    FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE CASCADE,
+                    FOREIGN KEY (location_id) REFERENCES locations(location_id) ON DELETE CASCADE,
+                    UNIQUE (user_id, department_id, location_id)
+                )
+            """)
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ewm_user ON employee_work_memberships(user_id)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ewm_dept_loc ON employee_work_memberships(department_id, location_id)"
+            )
 
             connection.execute("""
                 CREATE TABLE IF NOT EXISTS affected_students (
@@ -1180,6 +1216,18 @@ class SQLiteRepository:
                 pass
             try:
                 connection.execute(
+                    "ALTER TABLE complaints ADD COLUMN deleted_at TEXT"
+                )
+            except sqlite3.OperationalError:
+                pass
+            try:
+                connection.execute(
+                    "ALTER TABLE complaints ADD COLUMN deleted_by TEXT"
+                )
+            except sqlite3.OperationalError:
+                pass
+            try:
+                connection.execute(
                     "ALTER TABLE dashboard_widgets ADD COLUMN widget_name TEXT"
                 )
             except sqlite3.OperationalError:
@@ -1235,6 +1283,18 @@ class SQLiteRepository:
             try:
                 connection.execute(
                     "ALTER TABLE comments ADD COLUMN is_internal INTEGER NOT NULL DEFAULT 0"
+                )
+            except sqlite3.OperationalError:
+                pass
+            try:
+                connection.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_complaints_team ON complaints(team_id)"
+                )
+                connection.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_complaints_deleted ON complaints(is_deleted)"
+                )
+                connection.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_complaints_loc_dept ON complaints(location_id, department_id)"
                 )
             except sqlite3.OperationalError:
                 pass
@@ -1402,8 +1462,8 @@ class SQLiteRepository:
                 connection.executemany(
                     """
                     INSERT INTO departments (
-                        department_id, name, sla_days, complaint_types, coordinator_id, active, archived, location_id
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        department_id, name, sla_days, complaint_types, coordinator_id, coordinator_2_id, active, archived, location_id, description
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     [
                         self._department_to_values(item)
@@ -1414,8 +1474,8 @@ class SQLiteRepository:
                 connection.execute("DELETE FROM locations")
                 connection.executemany(
                     """
-                    INSERT INTO locations (location_id, name, in_charge_id, coordinator_id, active, archived, location_type, app_manager_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO locations (location_id, name, in_charge_id, coordinator_id, active, archived, location_type, app_manager_id, public_complaint_access, complaint_submission_policy)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     [
                         self._location_to_values(item)
@@ -1449,12 +1509,18 @@ class SQLiteRepository:
                         assign_escalation_level, marked_by, team_id,
                         returned_reason, assignee_on_leave_flag, assignee_removed_flag,
                         is_emergency, emergency_category, reached, reached_at,
-                        acknowledged_by, acknowledged_at, emergency_outcome, emergency_realert_sent
+                        acknowledged_by, acknowledged_at, emergency_outcome, emergency_realert_sent,
+                        is_deleted, deleted_at, deleted_by,
+                        cancellation_requested, cancellation_requested_by, cancellation_reason,
+                        cancellation_requested_at, cancellation_decided_by, cancellation_decided_at,
+                        cancellation_decision_note, previous_status
                     ) VALUES (
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?, ?
                     )
                     """,
@@ -1556,6 +1622,167 @@ class SQLiteRepository:
                     ],
                 )
 
+    def get_complaint(self, complaint_id):
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM complaints WHERE complaint_id = ?",
+                (complaint_id,),
+            ).fetchone()
+            if not row:
+                return None
+            return self._row_to_complaint(row)
+
+    def get_all_complaints(self, exclude_deleted=True):
+        query = "SELECT * FROM complaints"
+        if exclude_deleted:
+            query += " WHERE is_deleted = 0 OR is_deleted IS NULL"
+        query += " ORDER BY created_at"
+        with self._connect() as connection:
+            return [self._row_to_complaint(row) for row in connection.execute(query)]
+
+    def save_single_complaint(self, item):
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO complaints (
+                    complaint_id, created_by, creator_role, location_id, department_id,
+                    complaint_type, description, status, assigned_to, created_at, updated_at,
+                    resolved_at, verification_due_at, reopen_count, auto_closed, escalated,
+                    admin_notified, resolution_notes, verification_reports, history, archived,
+                    priority, category, visibility_type, attachment_url, title,
+                    sla_deadline, assigned_at, started_at, auto_assigned, blocked_reason,
+                    blocked_until, blocked_at, sla_reminders_sent, escalation_level,
+                    warden_escalation_level, team_location_id, team_department_id,
+                    is_urgent, urgent_reason, fixed_at, fixed_by, warden_verified_at,
+                    warden_verified_by, warden_verdict, warden_notes, student_stage_at,
+                    closed_at, closed_by, requires_warden_check, is_spot_check,
+                    auto_close_reminded, admin_review_reason, admin_decision,
+                    admin_decided_by, admin_decided_at, deletion_requested,
+                    deletion_requested_by, deletion_requested_name, deletion_requested_role,
+                    deletion_reason, deletion_requested_at,
+                    wrong_location_corrected_at, wrong_location_corrections,
+                    last_progress_code, photo_skipped, photo_skip_reason,
+                    reopen_notes, resolution_proof_url, affected_upgraded,
+                    exact_spot, awaiting_assign_since, assigned_by,
+                    assign_escalation_level, marked_by, team_id,
+                    returned_reason, assignee_on_leave_flag, assignee_removed_flag,
+                    is_emergency, emergency_category, reached, reached_at,
+                    acknowledged_by, acknowledged_at, emergency_outcome, emergency_realert_sent,
+                    is_deleted, deleted_at, deleted_by,
+                    cancellation_requested, cancellation_requested_by, cancellation_reason,
+                    cancellation_requested_at, cancellation_decided_by, cancellation_decided_at,
+                    cancellation_decision_note, previous_status
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?
+                )
+                ON CONFLICT(complaint_id) DO UPDATE SET
+                    created_by=excluded.created_by,
+                    creator_role=excluded.creator_role,
+                    location_id=excluded.location_id,
+                    department_id=excluded.department_id,
+                    complaint_type=excluded.complaint_type,
+                    description=excluded.description,
+                    status=excluded.status,
+                    assigned_to=excluded.assigned_to,
+                    created_at=excluded.created_at,
+                    updated_at=excluded.updated_at,
+                    resolved_at=excluded.resolved_at,
+                    verification_due_at=excluded.verification_due_at,
+                    reopen_count=excluded.reopen_count,
+                    auto_closed=excluded.auto_closed,
+                    escalated=excluded.escalated,
+                    admin_notified=excluded.admin_notified,
+                    resolution_notes=excluded.resolution_notes,
+                    verification_reports=excluded.verification_reports,
+                    history=excluded.history,
+                    archived=excluded.archived,
+                    priority=excluded.priority,
+                    category=excluded.category,
+                    visibility_type=excluded.visibility_type,
+                    attachment_url=excluded.attachment_url,
+                    title=excluded.title,
+                    sla_deadline=excluded.sla_deadline,
+                    assigned_at=excluded.assigned_at,
+                    started_at=excluded.started_at,
+                    auto_assigned=excluded.auto_assigned,
+                    blocked_reason=excluded.blocked_reason,
+                    blocked_until=excluded.blocked_until,
+                    blocked_at=excluded.blocked_at,
+                    sla_reminders_sent=excluded.sla_reminders_sent,
+                    escalation_level=excluded.escalation_level,
+                    warden_escalation_level=excluded.warden_escalation_level,
+                    team_location_id=excluded.team_location_id,
+                    team_department_id=excluded.team_department_id,
+                    is_urgent=excluded.is_urgent,
+                    urgent_reason=excluded.urgent_reason,
+                    fixed_at=excluded.fixed_at,
+                    fixed_by=excluded.fixed_by,
+                    warden_verified_at=excluded.warden_verified_at,
+                    warden_verified_by=excluded.warden_verified_by,
+                    warden_verdict=excluded.warden_verdict,
+                    warden_notes=excluded.warden_notes,
+                    student_stage_at=excluded.student_stage_at,
+                    closed_at=excluded.closed_at,
+                    closed_by=excluded.closed_by,
+                    requires_warden_check=excluded.requires_warden_check,
+                    is_spot_check=excluded.is_spot_check,
+                    auto_close_reminded=excluded.auto_close_reminded,
+                    admin_review_reason=excluded.admin_review_reason,
+                    admin_decision=excluded.admin_decision,
+                    admin_decided_by=excluded.admin_decided_by,
+                    admin_decided_at=excluded.admin_decided_at,
+                    deletion_requested=excluded.deletion_requested,
+                    deletion_requested_by=excluded.deletion_requested_by,
+                    deletion_requested_name=excluded.deletion_requested_name,
+                    deletion_requested_role=excluded.deletion_requested_role,
+                    deletion_reason=excluded.deletion_reason,
+                    deletion_requested_at=excluded.deletion_requested_at,
+                    wrong_location_corrected_at=excluded.wrong_location_corrected_at,
+                    wrong_location_corrections=excluded.wrong_location_corrections,
+                    last_progress_code=excluded.last_progress_code,
+                    photo_skipped=excluded.photo_skipped,
+                    photo_skip_reason=excluded.photo_skip_reason,
+                    reopen_notes=excluded.reopen_notes,
+                    resolution_proof_url=excluded.resolution_proof_url,
+                    affected_upgraded=excluded.affected_upgraded,
+                    exact_spot=excluded.exact_spot,
+                    awaiting_assign_since=excluded.awaiting_assign_since,
+                    assigned_by=excluded.assigned_by,
+                    assign_escalation_level=excluded.assign_escalation_level,
+                    marked_by=excluded.marked_by,
+                    team_id=excluded.team_id,
+                    returned_reason=excluded.returned_reason,
+                    assignee_on_leave_flag=excluded.assignee_on_leave_flag,
+                    assignee_removed_flag=excluded.assignee_removed_flag,
+                    is_emergency=excluded.is_emergency,
+                    emergency_category=excluded.emergency_category,
+                    reached=excluded.reached,
+                    reached_at=excluded.reached_at,
+                    acknowledged_by=excluded.acknowledged_by,
+                    acknowledged_at=excluded.acknowledged_at,
+                    emergency_outcome=excluded.emergency_outcome,
+                    emergency_realert_sent=excluded.emergency_realert_sent,
+                    is_deleted=excluded.is_deleted,
+                    deleted_at=excluded.deleted_at,
+                    deleted_by=excluded.deleted_by,
+                    cancellation_requested=excluded.cancellation_requested,
+                    cancellation_requested_by=excluded.cancellation_requested_by,
+                    cancellation_reason=excluded.cancellation_reason,
+                    cancellation_requested_at=excluded.cancellation_requested_at,
+                    cancellation_decided_by=excluded.cancellation_decided_by,
+                    cancellation_decided_at=excluded.cancellation_decided_at,
+                    cancellation_decision_note=excluded.cancellation_decision_note,
+                    previous_status=excluded.previous_status
+                """,
+                self._complaint_to_values(item),
+            )
+
     def _user_to_values(self, item):
         return (
             item["user_id"],
@@ -1590,12 +1817,16 @@ class SQLiteRepository:
             int(item.get("sla_days", 3)),
             json.dumps(item.get("complaint_types", [])),
             item.get("coordinator_id"),
+            item.get("coordinator_2_id"),
             int(item.get("active", True)),
             int(item.get("archived", False)),
             item.get("location_id"),
+            item.get("description"),
         )
 
+
     def _location_to_values(self, item):
+        policy = item.get("complaint_submission_policy") or item.get("public_complaint_access", "everyone")
         return (
             item["location_id"],
             item["name"],
@@ -1605,6 +1836,8 @@ class SQLiteRepository:
             int(item.get("archived", False)),
             item.get("location_type"),
             item.get("app_manager_id"),
+            policy,
+            policy,
         )
 
     def _complaint_to_values(self, item):
@@ -1700,6 +1933,17 @@ class SQLiteRepository:
             item.get("acknowledged_at"),
             item.get("emergency_outcome"),
             int(bool(item.get("emergency_realert_sent", False))),
+            int(bool(item.get("is_deleted", False))),
+            item.get("deleted_at"),
+            item.get("deleted_by"),
+            int(bool(item.get("cancellation_requested", False))),
+            item.get("cancellation_requested_by"),
+            item.get("cancellation_reason"),
+            item.get("cancellation_requested_at"),
+            item.get("cancellation_decided_by"),
+            item.get("cancellation_decided_at"),
+            item.get("cancellation_decision_note"),
+            item.get("previous_status"),
         )
 
     def _row_to_user(self, row):
@@ -1736,10 +1980,13 @@ class SQLiteRepository:
             "sla_days": row["sla_days"],
             "complaint_types": json.loads(row["complaint_types"]),
             "coordinator_id": row["coordinator_id"],
+            "coordinator_2_id": row["coordinator_2_id"] if "coordinator_2_id" in row.keys() else None,
             "active": bool(row["active"]) if "active" in row.keys() else True,
             "archived": bool(row["archived"]) if "archived" in row.keys() else False,
             "location_id": row["location_id"] if "location_id" in row.keys() else None,
+            "description": row["description"] if "description" in row.keys() else None,
         }
+
 
     def _row_to_location(self, row):
         return {
@@ -1752,6 +1999,8 @@ class SQLiteRepository:
             "active": bool(row["active"]) if "active" in row.keys() else True,
             "archived": bool(row["archived"]) if "archived" in row.keys() else False,
             "parent_id": row["parent_id"] if "parent_id" in row.keys() else None,
+            "public_complaint_access": row["public_complaint_access"] if "public_complaint_access" in row.keys() else None,
+            "complaint_submission_policy": row["complaint_submission_policy"] if "complaint_submission_policy" in row.keys() else (row["public_complaint_access"] if "public_complaint_access" in row.keys() else None),
         }
 
     def _row_to_complaint(self, row):
@@ -1859,4 +2108,126 @@ class SQLiteRepository:
             "acknowledged_at": row["acknowledged_at"] if "acknowledged_at" in row.keys() else None,
             "emergency_outcome": row["emergency_outcome"] if "emergency_outcome" in row.keys() else None,
             "emergency_realert_sent": bool(row["emergency_realert_sent"]) if "emergency_realert_sent" in row.keys() and row["emergency_realert_sent"] is not None else False,
+            "is_deleted": bool(row["is_deleted"]) if "is_deleted" in row.keys() and row["is_deleted"] is not None else False,
+            "deleted_at": row["deleted_at"] if "deleted_at" in row.keys() else None,
+            "deleted_by": row["deleted_by"] if "deleted_by" in row.keys() else None,
+            "cancellation_requested": bool(row["cancellation_requested"]) if "cancellation_requested" in row.keys() and row["cancellation_requested"] is not None else False,
+            "cancellation_requested_by": row["cancellation_requested_by"] if "cancellation_requested_by" in row.keys() else None,
+            "cancellation_reason": row["cancellation_reason"] if "cancellation_reason" in row.keys() else None,
+            "cancellation_requested_at": row["cancellation_requested_at"] if "cancellation_requested_at" in row.keys() else None,
+            "cancellation_decided_by": row["cancellation_decided_by"] if "cancellation_decided_by" in row.keys() else None,
+            "cancellation_decided_at": row["cancellation_decided_at"] if "cancellation_decided_at" in row.keys() else None,
+            "cancellation_decision_note": row["cancellation_decision_note"] if "cancellation_decision_note" in row.keys() else None,
+            "previous_status": row["previous_status"] if "previous_status" in row.keys() else None,
         }
+
+    def get_department_sla_config(self, department_id: str):
+        with self.get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM department_sla_configs WHERE department_id = ?",
+                (department_id,),
+            ).fetchone()
+            if not row:
+                return {
+                    "config_id": f"SLA_{department_id}",
+                    "department_id": department_id,
+                    "normal_start_time": "10:00",
+                    "normal_end_time": "16:00",
+                    "normal_duration_hours": 72,
+                    "medium_start_time": "10:00",
+                    "medium_end_time": "16:00",
+                    "medium_duration_hours": 48,
+                    "high_start_time": "10:00",
+                    "high_end_time": "18:00",
+                    "high_duration_hours": 24,
+                    "critical_start_time": "00:00",
+                    "critical_end_time": "23:59",
+                    "critical_duration_hours": 4,
+                    "app_manager_escalation_hours": 24,
+                    "admin_escalation_hours": 48,
+                    "updated_at": None,
+                    "updated_by": None,
+                }
+            return dict(row)
+
+    def save_department_sla_config(self, config_data: dict) -> dict:
+        dept_id = config_data["department_id"]
+        config_id = config_data.get("config_id") or f"SLA_{dept_id}"
+        from datetime import datetime, timezone
+        now_ts = config_data.get("updated_at") or datetime.now(timezone.utc).isoformat()
+        with self.get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO department_sla_configs (
+                    config_id, department_id,
+                    normal_start_time, normal_end_time, normal_duration_hours,
+                    medium_start_time, medium_end_time, medium_duration_hours,
+                    high_start_time, high_end_time, high_duration_hours,
+                    critical_start_time, critical_end_time, critical_duration_hours,
+                    app_manager_escalation_hours, admin_escalation_hours,
+                    updated_at, updated_by
+                ) VALUES (
+                    ?, ?,
+                    ?, ?, ?,
+                    ?, ?, ?,
+                    ?, ?, ?,
+                    ?, ?, ?,
+                    ?, ?,
+                    ?, ?
+                )
+                ON CONFLICT(department_id) DO UPDATE SET
+                    normal_start_time=excluded.normal_start_time,
+                    normal_end_time=excluded.normal_end_time,
+                    normal_duration_hours=excluded.normal_duration_hours,
+                    medium_start_time=excluded.medium_start_time,
+                    medium_end_time=excluded.medium_end_time,
+                    medium_duration_hours=excluded.medium_duration_hours,
+                    high_start_time=excluded.high_start_time,
+                    high_end_time=excluded.high_end_time,
+                    high_duration_hours=excluded.high_duration_hours,
+                    critical_start_time=excluded.critical_start_time,
+                    critical_end_time=excluded.critical_end_time,
+                    critical_duration_hours=excluded.critical_duration_hours,
+                    app_manager_escalation_hours=excluded.app_manager_escalation_hours,
+                    admin_escalation_hours=excluded.admin_escalation_hours,
+                    updated_at=excluded.updated_at,
+                    updated_by=excluded.updated_by
+                """,
+                (
+                    config_id,
+                    dept_id,
+                    config_data.get("normal_start_time", "10:00"),
+                    config_data.get("normal_end_time", "16:00"),
+                    int(config_data.get("normal_duration_hours", 72)),
+                    config_data.get("medium_start_time", "10:00"),
+                    config_data.get("medium_end_time", "16:00"),
+                    int(config_data.get("medium_duration_hours", 48)),
+                    config_data.get("high_start_time", "10:00"),
+                    config_data.get("high_end_time", "18:00"),
+                    int(config_data.get("high_duration_hours", 24)),
+                    config_data.get("critical_start_time", "00:00"),
+                    config_data.get("critical_end_time", "23:59"),
+                    int(config_data.get("critical_duration_hours", 4)),
+                    int(config_data.get("app_manager_escalation_hours", 24)),
+                    int(config_data.get("admin_escalation_hours", 48)),
+                    now_ts,
+                    config_data.get("updated_by", "system"),
+                ),
+            )
+            # Log audit trail
+            conn.execute(
+                """
+                INSERT INTO sla_config_audit_logs (
+                    audit_id, department_id, changed_by, changed_at, changes_json
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    f"AUD_{config_id}_{int(time.time())}",
+                    dept_id,
+                    config_data.get("updated_by", "system"),
+                    now_ts,
+                    json.dumps(config_data),
+                ),
+            )
+        return self.get_department_sla_config(dept_id)
+

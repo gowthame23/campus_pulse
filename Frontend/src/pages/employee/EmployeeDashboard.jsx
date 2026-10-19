@@ -28,18 +28,24 @@ import { complaintService } from "../../services/complaintService.js";
 import { locationService } from "../../services/locationService.js";
 import { teamService } from "../../services/teamService.js";
 import { formatDate } from "../../utils/dateFormatter.js";
-import { getStatusTone, getPriorityTone } from "../../utils/statusColor.js";
-
-const PRESET_WORKER_NOTES = [
-  { code: "NEED_PARTS", label: "Need parts" },
-  { code: "WAITING_ACCESS", label: "Waiting for access" },
-  { code: "WORKSHOP", label: "Sent to workshop" },
-  { code: "INVESTIGATING", label: "Investigating on site" },
-];
+import {
+  getStatusTone,
+  getPriorityTone,
+  getStatusLabel,
+  getPriorityLabel,
+} from "../../utils/statusColor.js";
 
 export default function EmployeeDashboard() {
   const { user } = useAuth();
   const { t } = useLanguage();
+
+  const presetNotes = [
+    { code: "NEED_PARTS", label: t("presets.need_parts", "Need parts") },
+    { code: "WAITING_ACCESS", label: t("presets.waiting_access", "Waiting for access") },
+    { code: "WORKSHOP", label: t("presets.workshop", "Sent to workshop") },
+    { code: "INVESTIGATING", label: t("presets.investigating", "Investigating on site") },
+  ];
+
   const [complaints, setComplaints] = useState([]);
   const [locations, setLocations] = useState([]);
   const [teams, setTeams] = useState([]);
@@ -115,7 +121,8 @@ export default function EmployeeDashboard() {
     }
   };
 
-  const myTeam = teams.find((t) => t.member_ids?.includes(user?.user_id));
+  const myTeams = teams.filter((t) => t.member_ids?.includes(user?.user_id));
+  const myTeam = myTeams[0] || null;
   const coveringTeam = teams.find(
     (t) =>
       t.backup_coordinator_id === user?.user_id &&
@@ -127,7 +134,7 @@ export default function EmployeeDashboard() {
   const handleStartJob = async (job) => {
     try {
       await complaintService.updateStatus(job.complaint_id, "In Progress");
-      showToast("Job started — status set to In Progress.");
+      showToast(t("employee.toast_job_started", "Job started — status set to In Progress."));
       loadData();
     } catch (err) {
       alert(err.response?.data?.detail || "Failed to start job.");
@@ -138,7 +145,7 @@ export default function EmployeeDashboard() {
   const handlePresetNote = async (job, noteObj) => {
     try {
       await complaintService.recordProgress(job.complaint_id, noteObj.label, null, noteObj.code);
-      showToast(`Progress note added: ${noteObj.label}`);
+      showToast(t("employee.toast_progress_note", { note: noteObj.label }));
       loadData();
     } catch (err) {
       alert(err.response?.data?.detail || "Failed to record progress.");
@@ -151,7 +158,7 @@ export default function EmployeeDashboard() {
     setReturning(true);
     try {
       await complaintService.returnToCoordinator(selectedJob.complaint_id, returnReason.trim());
-      showToast("Returned complaint to coordinator.");
+      showToast(t("employee.toast_returned", "Returned complaint to coordinator."));
       setShowReturnModal(false);
       setSelectedJob(null);
       setReturnReason("");
@@ -173,7 +180,7 @@ export default function EmployeeDashboard() {
         partsReason.trim(),
         partsExpectedDate || null
       );
-      showToast("Job marked as Waiting for Parts.");
+      showToast(t("employee.toast_waiting_parts", "Job marked as Waiting for Parts."));
       setShowPartsModal(false);
       setSelectedJob(null);
       setPartsReason("");
@@ -196,7 +203,7 @@ export default function EmployeeDashboard() {
         newLocationId,
         wrongLocNote.trim()
       );
-      showToast("Location updated. Re-routed to the correct team.");
+      showToast(t("employee.toast_location_updated", "Location updated. Re-routed to the correct team."));
       setShowWrongLocModal(false);
       setSelectedJob(null);
       setNewLocationId("");
@@ -245,7 +252,7 @@ export default function EmployeeDashboard() {
         skip_photo: skipPhoto,
         photo_skip_reason: skipPhoto ? skipPhotoReason.trim() : undefined,
       });
-      showToast("Complaint marked as resolved!");
+      showToast(t("employee.toast_resolved", "Complaint marked as resolved!"));
       setShowResolveModal(false);
       setSelectedJob(null);
       loadData();
@@ -271,13 +278,16 @@ export default function EmployeeDashboard() {
         <div>
           <div className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Wrench className="h-5 w-5 text-blue-600" />
-            {user?.name || "Employee"}
+            {user?.name || t("roles.employee", "Employee")}
             <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium">
-              Employee
+              {t("roles.employee", "Employee")}
             </span>
           </div>
-          <div className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Team: <span className="font-medium text-slate-700 dark:text-slate-300">{myTeam?.name || "Campus Maintenance"}</span>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="font-semibold">{t("employee.department", "Department:")}</span>
+            <span className="px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-semibold text-[11px] border border-blue-200 dark:border-blue-800">
+              {user?.department_name || user?.department_id || t("employee.campus_maintenance", "Campus Maintenance")}
+            </span>
           </div>
         </div>
 
@@ -288,13 +298,13 @@ export default function EmployeeDashboard() {
             onClick={() => setShowLeaveModal(true)}
           >
             <Calendar className="h-4 w-4 text-amber-500" />
-            I am on leave
+            {t("employee.on_leave_btn", "I am on leave")}
           </Button>
           <Button
             variant="ghost"
             className="p-2"
             onClick={loadData}
-            title="Refresh"
+            title={t("common.refresh", "Refresh")}
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
@@ -306,7 +316,10 @@ export default function EmployeeDashboard() {
         <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 rounded-2xl p-4 flex items-center gap-3">
           <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
           <div className="text-sm">
-            You are covering for <span className="font-bold">{coveringTeam.coordinator_name || "Coordinator"}</span> until <span className="font-bold">{coveringTeam.coordinator_leave_until || "leave ends"}</span>
+            {t("employee.covering_banner", {
+              name: coveringTeam.coordinator_name || t("roles.coordinator", "Coordinator"),
+              date: coveringTeam.coordinator_leave_until || "leave ends"
+            })}
           </div>
         </div>
       )}
@@ -329,24 +342,24 @@ export default function EmployeeDashboard() {
         <button
           type="button"
           onClick={() => setActiveTab("jobs")}
-          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
             activeTab === "jobs"
               ? "border-blue-600 text-blue-600 dark:text-blue-400"
               : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}
         >
-          My Jobs ({complaints.length})
+          {t("employee.my_jobs_tab", "My Jobs")} ({complaints.length})
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("stats")}
-          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
             activeTab === "stats"
               ? "border-blue-600 text-blue-600 dark:text-blue-400"
               : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}
         >
-          My Stats
+          {t("employee.my_stats_tab", "My Stats")}
         </button>
       </div>
 
@@ -354,22 +367,21 @@ export default function EmployeeDashboard() {
       {activeTab === "jobs" && (
         <div className="space-y-4">
           {loading ? (
-            <div className="text-center py-12 text-slate-500">Loading assigned jobs...</div>
+            <div className="text-center py-12 text-slate-500">{t("employee.loading_jobs", "Loading assigned jobs...")}</div>
           ) : complaints.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-12 text-center border border-slate-200 dark:border-slate-800">
               <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto mb-3" />
               <div className="text-lg font-bold text-slate-800 dark:text-slate-100">
-                All caught up!
+                {t("employee.all_caught_up", "All caught up!")}
               </div>
               <div className="text-sm text-slate-500 mt-1">
-                You currently have no open jobs assigned.
+                {t("employee.no_jobs_desc", "You currently have no open jobs assigned.")}
               </div>
             </div>
           ) : (
             complaints.map((job) => {
               const loc = locations.find((l) => l.location_id === job.location_id);
               const locName = loc ? loc.name : job.location_id;
-              const isWaitingParts = job.status === "Waiting for Parts" || job.status === "Blocked";
               const isMenuOpen = openMenuJobId === job.complaint_id;
 
               return (
@@ -385,18 +397,18 @@ export default function EmployeeDashboard() {
                             getPriorityTone(job.priority) || "bg-slate-100 text-slate-700"
                           }`}
                         >
-                          {job.priority}
+                          {getPriorityLabel(job.priority, t)}
                         </span>
                         <span
                           className={`px-2 py-0.5 rounded text-xs font-semibold ${
                             getStatusTone(job.status) || "bg-slate-100 text-slate-700"
                           }`}
                         >
-                          {job.status}
+                          {getStatusLabel(job.status, t)}
                         </span>
                         {job.assignee_on_leave_flag && (
                           <span className="px-2 py-0.5 rounded text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300">
-                            On Leave
+                            {t("employee.on_leave_badge", "On Leave")}
                           </span>
                         )}
                       </div>
@@ -413,7 +425,7 @@ export default function EmployeeDashboard() {
                         {job.sla_deadline && (
                           <span className="flex items-center gap-1">
                             <Clock className="h-3.5 w-3.5 text-slate-400" />
-                            SLA: {formatDate(job.sla_deadline)}
+                            {t("employee.sla", "SLA:")} {formatDate(job.sla_deadline)}
                           </span>
                         )}
                       </div>
@@ -430,7 +442,7 @@ export default function EmployeeDashboard() {
                       <button
                         type="button"
                         onClick={() => setOpenMenuJobId(isMenuOpen ? null : job.complaint_id)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                       >
                         <MoreVertical className="h-5 w-5" />
                       </button>
@@ -444,18 +456,18 @@ export default function EmployeeDashboard() {
                                 setOpenMenuJobId(null);
                                 handleStartJob(job);
                               }}
-                              className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200"
+                              className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 cursor-pointer"
                             >
                               <Play className="h-3.5 w-3.5 text-emerald-500" />
-                              Start Job (In Progress)
+                              {t("employee.start_job", "Start Job (In Progress)")}
                             </button>
                           )}
 
                           <div className="border-t border-slate-100 dark:border-slate-700 my-1" />
                           <div className="px-3 py-1 text-[10px] font-semibold text-slate-400 uppercase">
-                            Preset Notes
+                            {t("employee.preset_notes", "Preset Notes")}
                           </div>
-                          {PRESET_WORKER_NOTES.map((preset) => (
+                          {presetNotes.map((preset) => (
                             <button
                               key={preset.code}
                               type="button"
@@ -463,7 +475,7 @@ export default function EmployeeDashboard() {
                                 setOpenMenuJobId(null);
                                 handlePresetNote(job, preset);
                               }}
-                              className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+                              className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 cursor-pointer"
                             >
                               <FileText className="h-3 w-3 text-blue-500" />
                               {preset.label}
@@ -479,10 +491,10 @@ export default function EmployeeDashboard() {
                               setSelectedJob(job);
                               setShowPartsModal(true);
                             }}
-                            className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200"
+                            className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 cursor-pointer"
                           >
                             <Pause className="h-3.5 w-3.5 text-amber-500" />
-                            Waiting for parts
+                            {t("employee.waiting_parts", "Waiting for parts")}
                           </button>
 
                           <button
@@ -492,10 +504,10 @@ export default function EmployeeDashboard() {
                               setSelectedJob(job);
                               setShowWrongLocModal(true);
                             }}
-                            className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200"
+                            className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 cursor-pointer"
                           >
                             <Navigation className="h-3.5 w-3.5 text-indigo-500" />
-                            Wrong location
+                            {t("employee.wrong_location", "Wrong location")}
                           </button>
 
                           <button
@@ -505,28 +517,28 @@ export default function EmployeeDashboard() {
                               setSelectedJob(job);
                               setShowReturnModal(true);
                             }}
-                            className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-rose-600 dark:text-rose-400"
+                            className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-rose-600 dark:text-rose-400 cursor-pointer"
                           >
                             <RotateCcw className="h-3.5 w-3.5" />
-                            Return to coordinator
+                            {t("employee.return_coordinator", "Return to coordinator")}
                           </button>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Big Green Mark Done Button (Rule K2) */}
+                  {/* Big Green Mark Done Button */}
                   <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
                     <span className="text-xs text-slate-500 dark:text-slate-400">
-                      ID: #{job.complaint_id.slice(-6)}
+                      {t("employee.id", "ID:")} #{job.complaint_id.slice(-6)}
                     </span>
                     <Button
                       variant="primary"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2 text-sm rounded-xl flex items-center gap-2 shadow-sm"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2 text-sm rounded-xl flex items-center gap-2 shadow-sm cursor-pointer"
                       onClick={() => handleOpenResolve(job)}
                     >
                       <Check className="h-4 w-4" />
-                      Mark Done
+                      {t("employee.mark_done", "Mark Done")}
                     </Button>
                   </div>
                 </div>
@@ -536,36 +548,36 @@ export default function EmployeeDashboard() {
         </div>
       )}
 
-      {/* TAB 2: MY STATS (Rule J1 & K2) */}
+      {/* TAB 2: MY STATS */}
       {activeTab === "stats" && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
-              <div className="text-xs font-semibold text-slate-500 uppercase">Open Jobs</div>
+              <div className="text-xs font-semibold text-slate-500 uppercase">{t("employee.stats_open_jobs", "Open Jobs")}</div>
               <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">
                 {stats?.open_jobs ?? complaints.length}
               </div>
             </div>
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
-              <div className="text-xs font-semibold text-slate-500 uppercase">Completed This Month</div>
+              <div className="text-xs font-semibold text-slate-500 uppercase">{t("employee.stats_completed_month", "Completed This Month")}</div>
               <div className="text-2xl font-black text-emerald-600 mt-1">
                 {stats?.completed_this_month ?? 0}
               </div>
             </div>
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
-              <div className="text-xs font-semibold text-slate-500 uppercase">Avg Time to Fix</div>
+              <div className="text-xs font-semibold text-slate-500 uppercase">{t("employee.stats_avg_fix_time", "Avg Time to Fix")}</div>
               <div className="text-2xl font-black text-blue-600 mt-1">
                 {stats?.avg_time_to_fix ? `${stats.avg_time_to_fix}h` : "N/A"}
               </div>
             </div>
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
-              <div className="text-xs font-semibold text-slate-500 uppercase">On-time Rate</div>
+              <div className="text-xs font-semibold text-slate-500 uppercase">{t("employee.stats_on_time_rate", "On-time Rate")}</div>
               <div className="text-2xl font-black text-indigo-600 mt-1">
                 {stats?.on_time_rate ?? 100}%
               </div>
             </div>
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
-              <div className="text-xs font-semibold text-slate-500 uppercase">Warden Rejections</div>
+              <div className="text-xs font-semibold text-slate-500 uppercase">{t("employee.stats_warden_rejections", "Warden Rejections")}</div>
               <div className="text-2xl font-black text-rose-600 mt-1">
                 {stats?.warden_rejections ?? 0}
               </div>
@@ -578,7 +590,7 @@ export default function EmployeeDashboard() {
       <Modal
         isOpen={showResolveModal}
         onClose={() => setShowResolveModal(false)}
-        title="Mark Job as Resolved"
+        title={t("employee.modal_resolve_title", "Mark Job as Resolved")}
       >
         <form onSubmit={handleConfirmResolve} className="space-y-4">
           {resolveError && (
@@ -591,9 +603,9 @@ export default function EmployeeDashboard() {
             <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl text-sm">
               <div className="font-semibold">{selectedJob.title || selectedJob.category}</div>
               <div className="text-xs text-slate-500 mt-0.5">
-                Student Photo:{" "}
+                {t("employee.student_photo", "Student Photo:")}{" "}
                 <span className="font-medium text-slate-700 dark:text-slate-300">
-                  {selectedJob.attachment_url ? "Provided (After photo mandatory or skip)" : "None"}
+                  {selectedJob.attachment_url ? t("employee.photo_provided", "Provided (After photo mandatory or skip)") : t("common.none", "None")}
                 </span>
               </div>
             </div>
@@ -601,11 +613,11 @@ export default function EmployeeDashboard() {
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">
-              After-repair Photo URL
+              {t("employee.photo_url_label", "After-repair Photo URL")}
             </label>
             <input
               type="text"
-              placeholder="https://... or uploaded image URL"
+              placeholder={t("employee.photo_url_placeholder", "https://... or uploaded image URL")}
               value={proofUrl}
               onChange={(e) => setProofUrl(e.target.value)}
               disabled={skipPhoto}
@@ -622,12 +634,12 @@ export default function EmployeeDashboard() {
                   onChange={(e) => setSkipPhoto(e.target.checked)}
                   className="rounded text-blue-600"
                 />
-                Skip after-repair photo
+                {t("employee.skip_photo", "Skip after-repair photo")}
               </label>
               {skipPhoto && (
                 <input
                   type="text"
-                  placeholder="Reason for skipping photo..."
+                  placeholder={t("employee.skip_photo_placeholder", "Reason for skipping photo...")}
                   value={skipPhotoReason}
                   onChange={(e) => setSkipPhotoReason(e.target.value)}
                   className="w-full text-xs rounded border border-amber-300 bg-white dark:bg-slate-900 p-1.5 text-slate-900 dark:text-slate-100 outline-none"
@@ -639,11 +651,11 @@ export default function EmployeeDashboard() {
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">
-              Resolution Notes
+              {t("employee.resolution_notes_label", "Resolution Notes")}
             </label>
             <textarea
               rows={2}
-              placeholder="What was fixed..."
+              placeholder={t("employee.resolution_notes_placeholder", "What was fixed...")}
               value={resolveNotes}
               onChange={(e) => setResolveNotes(e.target.value)}
               className="w-full text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500"
@@ -652,10 +664,10 @@ export default function EmployeeDashboard() {
 
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
             <Button variant="secondary" onClick={() => setShowResolveModal(false)} disabled={resolving}>
-              Cancel
+              {t("common.cancel", "Cancel")}
             </Button>
-            <Button variant="primary" type="submit" disabled={resolving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              {resolving ? "Resolving..." : "Confirm Done"}
+            <Button variant="primary" type="submit" disabled={resolving} className="bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer font-bold">
+              {resolving ? t("employee.submitting", "Submitting...") : t("employee.confirm_mark_done", "Mark Done")}
             </Button>
           </div>
         </form>
@@ -665,19 +677,19 @@ export default function EmployeeDashboard() {
       <Modal
         isOpen={showReturnModal}
         onClose={() => setShowReturnModal(false)}
-        title="Return Complaint to Coordinator"
+        title={t("employee.modal_return_title", "Return Job to Coordinator")}
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-500">
-            This complaint will return to the "To assign" queue, and the coordinator will be notified.
+            {t("employee.modal_return_desc", "This complaint will return to the 'To assign' queue, and the coordinator will be notified.")}
           </p>
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">
-              Reason for Return <span className="text-rose-500">*</span>
+              {t("employee.return_reason_label", "Reason for Return")} <span className="text-rose-500">*</span>
             </label>
             <textarea
               rows={3}
-              placeholder="e.g. Requires specialized tools, wrong specialty..."
+              placeholder={t("employee.return_reason_placeholder", "e.g. Requires specialized tools, wrong specialty...")}
               value={returnReason}
               onChange={(e) => setReturnReason(e.target.value)}
               className="w-full text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500"
@@ -686,14 +698,15 @@ export default function EmployeeDashboard() {
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setShowReturnModal(false)} disabled={returning}>
-              Cancel
+              {t("common.cancel", "Cancel")}
             </Button>
             <Button
               variant="danger"
               disabled={!returnReason.trim() || returning}
               onClick={handleConfirmReturn}
+              className="cursor-pointer font-bold"
             >
-              {returning ? "Returning..." : "Return Job"}
+              {returning ? t("employee.submitting", "Submitting...") : t("employee.return_queue_btn", "Return to Queue")}
             </Button>
           </div>
         </div>
@@ -703,16 +716,16 @@ export default function EmployeeDashboard() {
       <Modal
         isOpen={showPartsModal}
         onClose={() => setShowPartsModal(false)}
-        title="Waiting for Parts"
+        title={t("employee.modal_parts_title", "Waiting for Parts")}
       >
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">
-              Parts Details / Reason <span className="text-rose-500">*</span>
+              {t("employee.parts_needed_label", "Parts Details / Reason")} <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
-              placeholder="e.g. 25W LED tube light ordered from supplier"
+              placeholder={t("employee.parts_needed_placeholder", "e.g. 25W LED tube light ordered from supplier")}
               value={partsReason}
               onChange={(e) => setPartsReason(e.target.value)}
               className="w-full text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500"
@@ -720,7 +733,7 @@ export default function EmployeeDashboard() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">
-              Expected Arrival Date (Optional)
+              {t("employee.expected_date_label", "Expected Arrival Date (Optional)")}
             </label>
             <input
               type="date"
@@ -731,14 +744,15 @@ export default function EmployeeDashboard() {
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setShowPartsModal(false)} disabled={pausingParts}>
-              Cancel
+              {t("common.cancel", "Cancel")}
             </Button>
             <Button
               variant="primary"
               disabled={!partsReason.trim() || pausingParts}
               onClick={handleConfirmParts}
+              className="cursor-pointer font-bold"
             >
-              {pausingParts ? "Pausing..." : "Pause for Parts"}
+              {pausingParts ? t("employee.submitting", "Submitting...") : t("employee.confirm_pause", "Pause for Parts")}
             </Button>
           </div>
         </div>
@@ -748,19 +762,19 @@ export default function EmployeeDashboard() {
       <Modal
         isOpen={showWrongLocModal}
         onClose={() => setShowWrongLocModal(false)}
-        title="Report Wrong Location"
+        title={t("employee.modal_wrong_loc_title", "Report Wrong Location")}
       >
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">
-              Correct Location <span className="text-rose-500">*</span>
+              {t("employee.actual_location_label", "Correct Location")} <span className="text-rose-500">*</span>
             </label>
             <select
               value={newLocationId}
               onChange={(e) => setNewLocationId(e.target.value)}
               className="w-full text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Select location...</option>
+              <option value="">{t("employee.select_location", "Select location...")}</option>
               {locations.map((loc) => (
                 <option key={loc.location_id} value={loc.location_id}>
                   {loc.name}
@@ -770,11 +784,11 @@ export default function EmployeeDashboard() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">
-              Note (Optional)
+              {t("employee.additional_details_label", "Note (Optional)")}
             </label>
             <input
               type="text"
-              placeholder="e.g. Found in Block B instead of Block A"
+              placeholder={t("employee.additional_details_placeholder", "e.g. Found in Block B instead of Block A")}
               value={wrongLocNote}
               onChange={(e) => setWrongLocNote(e.target.value)}
               className="w-full text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500"
@@ -782,14 +796,15 @@ export default function EmployeeDashboard() {
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setShowWrongLocModal(false)} disabled={reportingWrongLoc}>
-              Cancel
+              {t("common.cancel", "Cancel")}
             </Button>
             <Button
               variant="primary"
               disabled={!newLocationId || reportingWrongLoc}
               onClick={handleConfirmWrongLocation}
+              className="cursor-pointer font-bold"
             >
-              {reportingWrongLoc ? "Updating..." : "Submit New Location"}
+              {reportingWrongLoc ? t("employee.submitting", "Submitting...") : t("employee.reroute_btn", "Submit New Location")}
             </Button>
           </div>
         </div>

@@ -13,23 +13,29 @@ from api.dependencies import _service_cache
 
 client = TestClient(app)
 
+def get_db_path():
+    p = os.path.join(ROOT, "storage", "campus_pulse.db")
+    if os.path.exists(p):
+        return p
+    return "storage/campus_pulse.db"
+
 def _reset_limiter():
     auth_limiter._requests.clear()
     auth_limiter._lockouts.clear()
     _service_cache.clear()
     import sqlite3
     from utils.passwords import hash_password
-    for db_p in ("storage/campus_pulse.db", "Backend/storage/campus_pulse.db", "storage/pytest_isolated.db", "Backend/storage/pytest_isolated.db"):
-        if os.path.exists(db_p):
-            try:
-                conn = sqlite3.connect(db_p)
-                conn.execute("DELETE FROM login_attempts")
-                conn.execute("UPDATE users SET password = ?, active = 1, status = 'Active' WHERE email = ?", (hash_password("Student@123"), "student@example.com"))
-                conn.execute("UPDATE users SET password = ?, active = 1, status = 'Active' WHERE email = ?", (hash_password("Admin@123"), "admin@example.com"))
-                conn.commit()
-                conn.close()
-            except Exception:
-                pass
+    target_db = get_db_path()
+    if os.path.exists(target_db):
+        try:
+            conn = sqlite3.connect(target_db)
+            conn.execute("DELETE FROM login_attempts")
+            conn.execute("UPDATE users SET password = ?, active = 1, status = 'Active' WHERE email = ?", (hash_password("Student@123"), "student@example.com"))
+            conn.execute("UPDATE users SET password = ?, active = 1, status = 'Active' WHERE email = ?", (hash_password("Admin@123"), "admin@example.com"))
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
     _service_cache.clear()
 
 

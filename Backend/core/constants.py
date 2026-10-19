@@ -43,6 +43,7 @@ STATUS_CLOSED = "Closed"                            # Verified and closed
 STATUS_AUTO_CLOSED = "Closed (Auto Closed)"         # Student inactive 48h after resolution
 STATUS_REJECTED = "Rejected"                        # Rejected
 STATUS_CANCELLED = "Cancelled"                      # Cancelled by submitter
+STATUS_CANCELLATION_REQUESTED = "Cancellation Requested" # Cancellation requested by submitter, awaiting review
 
 # Legacy status compatibility: old 'Resolved' rows are treated as 'Waiting for Verification'
 STATUS_LEGACY_RESOLVED = "Resolved"

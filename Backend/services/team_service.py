@@ -28,23 +28,44 @@ class TeamService:
     # ---------------------------------------------------------
     # Leaves
     # ---------------------------------------------------------
-    def is_user_on_leave(self, user_id: str, check_date: Optional[str] = None) -> bool:
-        """Returns True if user_id is on an active leave on check_date (default: today)."""
+    def is_user_on_leave(
+        self,
+        user_id: str,
+        department_id: Optional[str] = None,
+        check_date: Optional[str] = None,
+    ) -> bool:
+        """Returns True if user_id is on an active leave on check_date (default: today).
+        If department_id is supplied, checks for leaves specifically for that department
+        or general (campus-wide) leaves.
+        """
         if not user_id:
             return False
         if not check_date:
             check_date = date.today().isoformat()
         with self._connect() as conn:
-            row = conn.execute(
-                """
-                SELECT 1 FROM user_leaves
-                WHERE user_id = ?
-                  AND date(from_date) <= date(?)
-                  AND date(?) <= date(to_date)
-                LIMIT 1
-                """,
-                (user_id, check_date, check_date),
-            ).fetchone()
+            if department_id:
+                row = conn.execute(
+                    """
+                    SELECT 1 FROM user_leaves
+                    WHERE user_id = ?
+                      AND date(from_date) <= date(?)
+                      AND date(?) <= date(to_date)
+                      AND (department_id IS NULL OR department_id = '' OR department_id = 'ALL' OR department_id = ?)
+                    LIMIT 1
+                    """,
+                    (user_id, check_date, check_date, department_id),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    """
+                    SELECT 1 FROM user_leaves
+                    WHERE user_id = ?
+                      AND date(from_date) <= date(?)
+                      AND date(?) <= date(to_date)
+                    LIMIT 1
+                    """,
+                    (user_id, check_date, check_date),
+                ).fetchone()
             return row is not None
 
     def get_user_leaves(self, user_id: Optional[str] = None, active_only: bool = False) -> List[Dict[str, Any]]:
@@ -71,9 +92,11 @@ class TeamService:
         reason: Optional[str] = None,
         set_by: str = "system",
         caller_user: Optional[Any] = None,
+        department_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Sets a leave record for user_id.
         Who can set: self, App Manager, Admin, or warden for members at their locations.
+        Can optionally be scoped to a specific department_id.
         """
         # Authorization check
         if caller_user:
@@ -148,28 +171,42 @@ class TeamService:
         with self._connect() as conn:
             conn.execute(
                 """
-                INSERT INTO user_leaves (leave_id, user_id, from_date, to_date, reason, set_by, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO user_leaves (leave_id, user_id, from_date, to_date, reason, set_by, created_at, department_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (leave_id, user_id, from_date, to_date, reason or "", set_by, now_str),
+                (leave_id, user_id, from_date, to_date, reason or "", set_by, now_str, department_id or None),
             )
             # Flag open jobs of this user as assignee on leave
-            conn.execute(
-                """
-                UPDATE complaints
-                SET assignee_on_leave_flag = 1
-                WHERE assigned_to = ?
-                  AND status IN ('Assigned', 'In Progress', 'Waiting for Parts')
-                """,
-                (user_id,),
-            )
+            if department_id and department_id != "ALL":
+                conn.execute(
+                    """
+                    UPDATE complaints
+                    SET assignee_on_leave_flag = 1
+                    WHERE assigned_to = ?
+                      AND department_id = ?
+                      AND status IN ('Assigned', 'In Progress', 'Waiting for Parts')
+                    """,
+                    (user_id, department_id),
+                )
+            else:
+                conn.execute(
+                    """
+                    UPDATE complaints
+                    SET assignee_on_leave_flag = 1
+                    WHERE assigned_to = ?
+                      AND status IN ('Assigned', 'In Progress', 'Waiting for Parts')
+                    """,
+                    (user_id,),
+                )
 
-        # Notify backup coordinator if this user is a coordinator of any team
+        # Notify backup coordinator if this user is a coordinator of any matching team
         user_obj = self.auth_service.get_user(user_id) if self.auth_service else None
         user_name = user_obj.name if user_obj else user_id
         teams = self.list_teams(active_only=True)
         for t in teams:
-            if t["coordinator_id"] == user_id and t.get("backup_coordinator_id"):
+            team_dept = t.get("department_id")
+            dept_matches = (not department_id) or (department_id in ("ALL", team_dept))
+            if dept_matches and t["coordinator_id"] == user_id and t.get("backup_coordinator_id"):
                 backup_id = t["backup_coordinator_id"]
                 if self.notification_service:
                     self.notification_service.notify(
@@ -337,24 +374,25 @@ class TeamService:
 
     def get_acting_coordinator(self, team: Dict[str, Any]) -> Optional[Any]:
         """Rule B4:
-        = the coordinator, if he is active and NOT on leave today
-        otherwise = the backup, if the backup is set, active and NOT on leave
+        = the coordinator, if active and NOT on leave in this department today
+        otherwise = the backup, if set, active and NOT on leave in this department
         otherwise = None (handled by escalation in Part F)
         """
         if not team or not self.auth_service:
             return None
 
         today = date.today().isoformat()
+        dept_id = team.get("department_id")
         coord_id = team.get("coordinator_id")
         if coord_id:
             coord_user = self.auth_service.get_user(coord_id)
-            if coord_user and coord_user.active and not self.is_user_on_leave(coord_id, today):
+            if coord_user and coord_user.active and not self.is_user_on_leave(coord_id, department_id=dept_id, check_date=today):
                 return coord_user
 
         backup_id = team.get("backup_coordinator_id")
         if backup_id:
             backup_user = self.auth_service.get_user(backup_id)
-            if backup_user and backup_user.active and not self.is_user_on_leave(backup_id, today):
+            if backup_user and backup_user.active and not self.is_user_on_leave(backup_id, department_id=dept_id, check_date=today):
                 return backup_user
 
         return None
@@ -415,6 +453,20 @@ class TeamService:
                 })
             return result
 
+    def validate_coordinator_uniqueness(
+        self,
+        coordinator_id: Optional[str],
+        backup_coordinator_id: Optional[str] = None,
+        exclude_team_id: Optional[str] = None,
+    ) -> None:
+        """Rules:
+        1. An employee CANNOT be both Coordinator 1 and Coordinator 2 within the SAME team.
+        2. An employee CAN coordinate multiple departments/teams simultaneously.
+        3. An employee may occupy Coordinator 1 in one department/team and Coordinator 2 in another.
+        """
+        if coordinator_id and backup_coordinator_id and coordinator_id == backup_coordinator_id:
+            raise ValueError("The same employee cannot be both Coordinator 1 and Coordinator 2 on the same team.")
+
     def create_team(
         self,
         name: str,
@@ -426,6 +478,7 @@ class TeamService:
     ) -> Dict[str, Any]:
         """Creates a new team in a single transaction, validating Rule C2:
         each (location, department) pair belongs to EXACTLY ONE active team.
+        Also validates Global One-Coordinator-Position Rule.
         """
         if not name or not name.strip():
             raise ValueError("Team name is required.")
@@ -435,6 +488,9 @@ class TeamService:
             raise ValueError("Coordinator is required.")
         if not location_ids:
             raise ValueError("At least one location must be assigned to the team.")
+
+        # Global One-Coordinator-Position Rule validation
+        self.validate_coordinator_uniqueness(coordinator_id, backup_coordinator_id, exclude_team_id=None)
 
         member_ids = list(member_ids or [])
         if coordinator_id not in member_ids:
@@ -480,6 +536,14 @@ class TeamService:
                     "INSERT INTO team_locations (team_id, location_id) VALUES (?, ?)",
                     (team_id, lid),
                 )
+                conn.execute(
+                    """
+                    INSERT INTO location_departments (id, location_id, department_id, created_at, created_by, is_active)
+                    VALUES (?, ?, ?, ?, 'system', 1)
+                    ON CONFLICT(location_id, department_id) DO UPDATE SET is_active = 1
+                    """,
+                    (f"LD_{uuid.uuid4().hex[:12]}", lid, department_id, now_str),
+                )
             for mid in member_ids:
                 conn.execute(
                     "INSERT INTO team_members (team_id, user_id) VALUES (?, ?)",
@@ -516,6 +580,7 @@ class TeamService:
         with self._connect() as conn:
             # Rule C2: Check conflict if active
             if active:
+                self.validate_coordinator_uniqueness(coordinator_id, backup_coordinator_id, exclude_team_id=team_id)
                 dept_row = conn.execute("SELECT name FROM departments WHERE department_id = ?", (department_id,)).fetchone()
                 dept_name = dept_row["name"] if dept_row else department_id
                 for loc_id in location_ids:
@@ -601,36 +666,55 @@ class TeamService:
     # ---------------------------------------------------------
     def get_coverage_gaps(self) -> Dict[str, Any]:
         """Returns:
-        - (location, department) pairs with no team
+        - departments with no coordinator or team (campus-wide)
         - teams with no backup (warning)
         - teams whose coordinator is deactivated
         - locations with no warden
         """
         with self._connect() as conn:
-            # 1. (location, department) with no team
-            depts = conn.execute("SELECT department_id, name FROM departments WHERE active = 1").fetchall()
+            # 1. Departments with no coordinator or team (campus-wide)
+            depts = conn.execute("SELECT department_id, name, coordinator_id FROM departments WHERE active = 1").fetchall()
             locs = conn.execute("SELECT location_id, name, in_charge_id FROM locations WHERE active = 1").fetchall()
 
-            team_pairs = conn.execute(
-                """
-                SELECT DISTINCT t.department_id, tl.location_id
-                FROM teams t
-                JOIN team_locations tl ON t.team_id = tl.team_id
-                WHERE t.active = 1
-                """
-            ).fetchall()
-            covered = {(tp[0], tp[1]) for tp in team_pairs}
+            # Active teams with an assigned coordinator
+            active_team_depts = {
+                t[0] for t in conn.execute(
+                    "SELECT DISTINCT department_id FROM teams WHERE active = 1 AND coordinator_id IS NOT NULL"
+                ).fetchall()
+            }
+            # Departments with directly assigned active Coordinator 1
+            active_dept_coords = {
+                d[0] for d in conn.execute(
+                    """
+                    SELECT d.department_id FROM departments d
+                    JOIN users u ON d.coordinator_id = u.user_id
+                    WHERE d.active = 1 AND u.active = 1 AND (u.is_deleted IS NULL OR u.is_deleted = 0)
+                    """
+                ).fetchall()
+            }
+            # Departments with active coordinator assignment mapping
+            active_asgn_depts = {
+                ca[0] for ca in conn.execute(
+                    """
+                    SELECT DISTINCT ca.department_id FROM coordinator_assignments ca
+                    JOIN users u ON ca.coordinator_id = u.user_id
+                    WHERE (ca.status IS NULL OR ca.status = 'Active')
+                      AND u.active = 1 AND (u.is_deleted IS NULL OR u.is_deleted = 0)
+                    """
+                ).fetchall()
+            }
 
-            missing_teams = []
+            covered_depts = active_team_depts | active_dept_coords | active_asgn_depts
+
+            missing_departments = []
             for d in depts:
-                for l in locs:
-                    if (d["department_id"], l["location_id"]) not in covered:
-                        missing_teams.append({
-                            "department_id": d["department_id"],
-                            "department_name": d["name"],
-                            "location_id": l["location_id"],
-                            "location_name": l["name"],
-                        })
+                if d["department_id"] not in covered_depts:
+                    missing_departments.append({
+                        "department_id": d["department_id"],
+                        "department_name": d["name"],
+                        "location_id": "ALL",
+                        "location_name": "Campus-wide",
+                    })
 
             # 2. Teams with no backup
             no_backup_teams = []
@@ -652,8 +736,368 @@ class TeamService:
                     missing_wardens.append({"location_id": l["location_id"], "location_name": l["name"]})
 
             return {
-                "uncovered_pairs": missing_teams,
+                "uncovered_departments": missing_departments,
+                "uncovered_pairs": missing_departments,  # Retained for backwards compatibility
                 "teams_without_backup": no_backup_teams,
                 "teams_with_inactive_coordinator": inactive_coord_teams,
                 "locations_without_warden": missing_wardens,
             }
+
+    # ---------------------------------------------------------
+    # Coordinator Selection & Eligibility (Phase 3)
+    # ---------------------------------------------------------
+    def get_eligible_coordinators(
+        self, team_id: Optional[str] = None, position: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Returns employees and their eligibility for holding a coordinator role.
+        An employee can coordinate multiple departments/teams simultaneously.
+        Only within the same team, the same employee cannot be both Coordinator 1 and Coordinator 2.
+        """
+        with self._connect() as conn:
+            active_teams = conn.execute(
+                "SELECT team_id, name, department_id, coordinator_id, backup_coordinator_id FROM teams WHERE active = 1"
+            ).fetchall()
+            coord_map = {}
+            for t in active_teams:
+                for cid, pos in [(t["coordinator_id"], "Coordinator 1"), (t["backup_coordinator_id"], "Coordinator 2")]:
+                    if cid:
+                        if cid not in coord_map:
+                            coord_map[cid] = []
+                        coord_map[cid].append({
+                            "team_id": t["team_id"],
+                            "team_name": t["name"],
+                            "position": pos,
+                        })
+
+            users_rows = conn.execute("""
+                SELECT user_id, name, email, role, department_id, active 
+                FROM users 
+                WHERE role IN ('employee', 'coordinator') AND active = 1 AND (is_deleted = 0 OR is_deleted IS NULL)
+                ORDER BY name ASC
+            """).fetchall()
+
+            target_team = next((t for t in active_teams if t["team_id"] == team_id), None) if team_id else None
+
+            results = []
+            for u in users_rows:
+                uid = u["user_id"]
+                holding_list = coord_map.get(uid, [])
+                is_eligible = True
+                ineligible_reason = None
+
+                # Disallow selecting the same employee for both positions within this same team
+                if target_team:
+                    if position == "primary" and target_team["backup_coordinator_id"] == uid:
+                        is_eligible = False
+                        ineligible_reason = "Already selected as Coordinator 2 on this team."
+                    elif position == "backup" and target_team["coordinator_id"] == uid:
+                        is_eligible = False
+                        ineligible_reason = "Already selected as Coordinator 1 on this team."
+
+                results.append({
+                    "user_id": uid,
+                    "name": u["name"],
+                    "email": u["email"],
+                    "role": u["role"],
+                    "department_id": u["department_id"],
+                    "is_eligible": is_eligible,
+                    "ineligible_reason": ineligible_reason,
+                    "current_position": holding_list[0]["position"] if holding_list else None,
+                    "current_team_name": holding_list[0]["team_name"] if holding_list else None,
+                    "assigned_teams": holding_list,
+                })
+            return results
+
+    # ---------------------------------------------------------
+    # Employee Work Memberships (Phase 2)
+    # ---------------------------------------------------------
+    def list_work_memberships(
+        self,
+        user_id: Optional[str] = None,
+        location_id: Optional[str] = None,
+        department_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        query = """
+            SELECT 
+                ewm.membership_id,
+                ewm.user_id,
+                u.name as user_name,
+                u.email as user_email,
+                ewm.department_id,
+                d.name as department_name,
+                ewm.location_id,
+                l.name as location_name,
+                l.location_type,
+                ewm.created_at,
+                ewm.created_by
+            FROM employee_work_memberships ewm
+            JOIN users u ON ewm.user_id = u.user_id
+            JOIN departments d ON ewm.department_id = d.department_id
+            JOIN locations l ON ewm.location_id = l.location_id
+            WHERE 1=1
+        """
+        params = []
+        if user_id:
+            query += " AND ewm.user_id = ?"
+            params.append(user_id)
+        if location_id:
+            query += " AND ewm.location_id = ?"
+            params.append(location_id)
+        if department_id:
+            query += " AND ewm.department_id = ?"
+            params.append(department_id)
+        query += " ORDER BY u.name ASC, d.name ASC, l.name ASC"
+
+        with self._connect() as conn:
+            rows = conn.execute(query, params).fetchall()
+            return [dict(r) for r in rows]
+
+    def assign_work_membership(
+        self,
+        user_id: str,
+        department_id: str,
+        location_id: str,
+        created_by: str = "admin",
+        caller_user: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """Assigns an employee to work in a specific (department, location) pair.
+        Enforces App Manager location scoping. Synchronizes with team_members.
+        """
+        if caller_user and getattr(caller_user, "role", "").lower() == "app_manager":
+            allowed_locs = [
+                loc.location_id
+                for loc in (
+                    self.auth_service.get_app_manager_locations(caller_user.user_id)
+                    if self.auth_service
+                    else []
+                )
+            ]
+            if location_id not in allowed_locs:
+                raise PermissionError("App Managers can only assign memberships for locations within their assigned scope.")
+
+        with self._connect() as conn:
+            u = conn.execute(
+                "SELECT user_id, name FROM users WHERE user_id = ? AND active = 1 AND (is_deleted = 0 OR is_deleted IS NULL)",
+                (user_id,),
+            ).fetchone()
+            if not u:
+                raise ValueError("Active employee user not found.")
+            d = conn.execute(
+                "SELECT department_id, name FROM departments WHERE department_id = ?",
+                (department_id,),
+            ).fetchone()
+            if not d:
+                raise ValueError("Department not found.")
+            l = conn.execute(
+                "SELECT location_id, name FROM locations WHERE location_id = ?",
+                (location_id,),
+            ).fetchone()
+            if not l:
+                raise ValueError("Location not found.")
+
+            existing = conn.execute(
+                "SELECT membership_id FROM employee_work_memberships WHERE user_id = ? AND department_id = ? AND location_id = ?",
+                (user_id, department_id, location_id),
+            ).fetchone()
+            if existing:
+                res = self.list_work_memberships(user_id=user_id, location_id=location_id, department_id=department_id)
+                return res[0] if res else {"membership_id": existing["membership_id"]}
+
+            membership_id = f"EWM_{uuid.uuid4().hex[:12]}"
+            now_str = datetime.now().isoformat()
+            conn.execute(
+                """
+                INSERT INTO employee_work_memberships (membership_id, user_id, department_id, location_id, created_at, created_by)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (membership_id, user_id, department_id, location_id, now_str, created_by),
+            )
+
+            # Sync with active team covering this (dept, loc)
+            team_row = conn.execute(
+                """
+                SELECT t.team_id
+                FROM teams t
+                JOIN team_locations tl ON t.team_id = tl.team_id
+                WHERE t.department_id = ? AND (tl.location_id = ? OR tl.location_id = 'ALL') AND t.active = 1
+                LIMIT 1
+                """,
+                (department_id, location_id),
+            ).fetchone()
+            if team_row:
+                conn.execute(
+                    "INSERT OR IGNORE INTO team_members (team_id, user_id) VALUES (?, ?)",
+                    (team_row["team_id"], user_id),
+                )
+
+        res = self.list_work_memberships(user_id=user_id, location_id=location_id, department_id=department_id)
+        return res[0] if res else {"membership_id": membership_id}
+
+    def remove_work_membership(self, membership_id: str, caller_user: Optional[Any] = None) -> bool:
+        """Removes an employee's department-location work membership.
+        Enforces App Manager location scoping. Synchronizes with team_members.
+        """
+        with self._connect() as conn:
+            m_row = conn.execute(
+                "SELECT membership_id, user_id, department_id, location_id FROM employee_work_memberships WHERE membership_id = ?",
+                (membership_id,),
+            ).fetchone()
+            if not m_row:
+                raise ValueError("Work membership not found.")
+
+            m_dict = dict(m_row)
+            user_id = m_dict["user_id"]
+            dept_id = m_dict["department_id"]
+            loc_id = m_dict["location_id"]
+
+            if caller_user and getattr(caller_user, "role", "").lower() == "app_manager":
+                allowed_locs = [
+                    loc.location_id
+                    for loc in (
+                        self.auth_service.get_app_manager_locations(caller_user.user_id)
+                        if self.auth_service
+                        else []
+                    )
+                ]
+                if loc_id not in allowed_locs:
+                    raise PermissionError("App Managers can only remove memberships for locations within their assigned scope.")
+
+            conn.execute("DELETE FROM employee_work_memberships WHERE membership_id = ?", (membership_id,))
+
+            # Check if user has other memberships in any team covering (dept, loc)
+            team_rows = conn.execute(
+                """
+                SELECT t.team_id, t.coordinator_id, t.backup_coordinator_id
+                FROM teams t
+                JOIN team_locations tl ON t.team_id = tl.team_id
+                WHERE t.department_id = ? AND (tl.location_id = ? OR tl.location_id = 'ALL') AND t.active = 1
+                """,
+                (dept_id, loc_id),
+            ).fetchall()
+
+            for trow in team_rows:
+                tid = trow["team_id"]
+                if trow["coordinator_id"] == user_id or trow["backup_coordinator_id"] == user_id:
+                    continue
+                remaining = conn.execute(
+                    """
+                    SELECT 1 FROM employee_work_memberships ewm
+                    JOIN team_locations tl ON ewm.location_id = tl.location_id
+                    WHERE tl.team_id = ? AND ewm.department_id = ? AND ewm.user_id = ?
+                    LIMIT 1
+                    """,
+                    (tid, dept_id, user_id),
+                ).fetchone()
+                if not remaining:
+                    conn.execute("DELETE FROM team_members WHERE team_id = ? AND user_id = ?", (tid, user_id))
+
+        return True
+
+    def list_employees_overview(self, caller_user: Optional[Any] = None) -> List[Dict[str, Any]]:
+        """Returns all employees with their work memberships, coordinator assignments, open jobs, and leave status."""
+        with self._connect() as conn:
+            dept_coords = conn.execute(
+                "SELECT department_id, name, coordinator_id, coordinator_2_id FROM departments WHERE active = 1"
+            ).fetchall()
+            coord_roles_map = {}
+            for d in dept_coords:
+                if d["coordinator_id"]:
+                    cid = d["coordinator_id"]
+                    if cid not in coord_roles_map:
+                        coord_roles_map[cid] = []
+                    coord_roles_map[cid].append({
+                        "position": f"Coordinator 1 ({d['name']})",
+                        "department_name": d["name"],
+                        "department_id": d["department_id"],
+                    })
+                if d["coordinator_2_id"]:
+                    cid = d["coordinator_2_id"]
+                    if cid not in coord_roles_map:
+                        coord_roles_map[cid] = []
+                    coord_roles_map[cid].append({
+                        "position": f"Coordinator 2 ({d['name']})",
+                        "department_name": d["name"],
+                        "department_id": d["department_id"],
+                    })
+
+            coord_asgns = conn.execute("""
+                SELECT ca.coordinator_id, ca.department_id, d.name as department_name, ca.location_id, l.name as location_name
+                FROM coordinator_assignments ca
+                LEFT JOIN departments d ON ca.department_id = d.department_id
+                LEFT JOIN locations l ON ca.location_id = l.location_id
+                WHERE (ca.status IS NULL OR ca.status = 'Active')
+            """).fetchall()
+            for ca in coord_asgns:
+                cid = ca["coordinator_id"]
+                dept_n = ca["department_name"] or "Department"
+                if cid not in coord_roles_map:
+                    coord_roles_map[cid] = []
+                # Check if already present
+                if not any(r["department_id"] == ca["department_id"] for r in coord_roles_map[cid]):
+                    coord_roles_map[cid].append({
+                        "position": f"Coordinator ({dept_n})",
+                        "department_name": dept_n,
+                        "location_name": ca["location_name"] or "Campus",
+                        "department_id": ca["department_id"],
+                    })
+
+            users_rows = conn.execute("""
+                SELECT user_id, name, email, phone_number as phone, role, department_id, active 
+                FROM users 
+                WHERE role IN ('employee', 'coordinator') AND active = 1 AND (is_deleted = 0 OR is_deleted IS NULL)
+                ORDER BY name ASC
+            """).fetchall()
+
+            m_rows = conn.execute("""
+                SELECT 
+                    ewm.membership_id,
+                    ewm.user_id,
+                    ewm.department_id,
+                    d.name as department_name,
+                    ewm.location_id,
+                    l.name as location_name,
+                    ewm.created_at
+                FROM employee_work_memberships ewm
+                JOIN departments d ON ewm.department_id = d.department_id
+                JOIN locations l ON ewm.location_id = l.location_id
+                ORDER BY d.name ASC, l.name ASC
+            """).fetchall()
+
+            user_memberships = {}
+            for mr in m_rows:
+                uid = mr["user_id"]
+                if uid not in user_memberships:
+                    user_memberships[uid] = []
+                user_memberships[uid].append(dict(mr))
+
+            results = []
+            for u in users_rows:
+                uid = u["user_id"]
+                coord_roles = coord_roles_map.get(uid, [])
+                coord_pos = coord_roles[0] if coord_roles else None
+                m_list = user_memberships.get(uid, [])
+
+                oj_row = conn.execute(
+                    "SELECT COUNT(*) FROM complaints WHERE assigned_to = ? AND status IN ('Assigned', 'In Progress', 'Waiting for Parts')",
+                    (uid,),
+                ).fetchone()
+                open_jobs = oj_row[0] if oj_row else 0
+                on_leave = self.is_user_on_leave(uid)
+
+                results.append({
+                    "user_id": uid,
+                    "name": u["name"],
+                    "email": u["email"],
+                    "phone": u["phone"],
+                    "role": u["role"],
+                    "department_id": u["department_id"],
+                    "active": bool(u["active"]),
+                    "coordinator_role": coord_pos,
+                    "coordinator_roles": coord_roles,
+                    "memberships": m_list,
+                    "open_jobs": open_jobs,
+                    "on_leave": on_leave,
+                })
+
+            return results
+

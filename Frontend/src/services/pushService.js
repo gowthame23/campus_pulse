@@ -81,7 +81,8 @@ export const pushService = {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
     try {
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration || !registration.pushManager) return;
       const subscription = await registration.pushManager.getSubscription();
       if (subscription) {
         await apiClient.post("/push/unsubscribe", {

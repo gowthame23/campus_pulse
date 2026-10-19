@@ -39,7 +39,10 @@ def coord_headers():
 
 @pytest.fixture(scope="module")
 def warden_headers():
-    return _login("warden@example.com", "warden@123")
+    try:
+        return _login("naveen@campus.edu", "warden@123")
+    except Exception:
+        return _login("warden@example.com", "warden@123")
 
 
 def _create_test_student(admin_headers):

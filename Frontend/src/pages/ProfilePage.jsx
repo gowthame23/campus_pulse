@@ -15,6 +15,7 @@ import {
   Save,
   Camera,
   Upload,
+  Globe,
 } from "lucide-react";
 import Badge from "../components/Badge.jsx";
 import Button from "../components/Button.jsx";
@@ -22,12 +23,15 @@ import Card from "../components/Card.jsx";
 import Input from "../components/Input.jsx";
 import PageHeader from "../components/PageHeader.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useLanguage } from "../context/LanguageContext.jsx";
 import { formatDate } from "../utils/dateFormatter.js";
 import { userService } from "../services/userService.js";
 import { getRoleDisplayName } from "../utils/constants.js";
 
 export default function ProfilePage() {
   const { user, setUser, refreshUser } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
+  const [langSaved, setLangSaved] = useState(false);
 
   const roleTitle = useMemo(() => {
     if (!user) return "";
@@ -490,6 +494,96 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+      </Card>
+
+      {/* Language Preference Card */}
+      <Card>
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
+          <div className="flex items-center gap-2.5">
+            <Globe className="h-5 w-5 text-primary" />
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                {t("profile.language_preference", "Language Preference")}
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {t("profile.choose_language_desc", "Choose your default application and complaint translation language")}
+              </p>
+            </div>
+          </div>
+          {langSaved && (
+            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+              ✓ {t("profile.language_updated", "Language updated successfully")}
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <button
+            type="button"
+            onClick={async () => {
+              await setLanguage("en");
+              setLangSaved(true);
+              setTimeout(() => setLangSaved(false), 3000);
+            }}
+            className={`flex items-center justify-between p-3.5 rounded-xl border text-sm font-semibold transition-all cursor-pointer ${
+              language === "en"
+                ? "border-primary bg-primary/10 text-primary shadow-xs ring-1 ring-primary"
+                : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
+            }`}
+          >
+            <div>
+              <div className="font-bold">English</div>
+              <div className="text-[10px] text-slate-400 font-normal">Default Interface</div>
+            </div>
+            <span className="text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+              EN
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={async () => {
+              await setLanguage("te");
+              setLangSaved(true);
+              setTimeout(() => setLangSaved(false), 3000);
+            }}
+            className={`flex items-center justify-between p-3.5 rounded-xl border text-sm font-semibold transition-all cursor-pointer ${
+              language === "te"
+                ? "border-primary bg-primary/10 text-primary shadow-xs ring-1 ring-primary"
+                : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
+            }`}
+          >
+            <div>
+              <div className="font-bold">తెలుగు</div>
+              <div className="text-[10px] text-slate-400 font-normal">Telugu Translation</div>
+            </div>
+            <span className="text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+              TE
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={async () => {
+              await setLanguage("hi");
+              setLangSaved(true);
+              setTimeout(() => setLangSaved(false), 3000);
+            }}
+            className={`flex items-center justify-between p-3.5 rounded-xl border text-sm font-semibold transition-all cursor-pointer ${
+              language === "hi"
+                ? "border-primary bg-primary/10 text-primary shadow-xs ring-1 ring-primary"
+                : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
+            }`}
+          >
+            <div>
+              <div className="font-bold">हिन्दी</div>
+              <div className="text-[10px] text-slate-400 font-normal">Hindi Translation</div>
+            </div>
+            <span className="text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+              HI
+            </span>
+          </button>
+        </div>
       </Card>
     </div>
   );

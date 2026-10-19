@@ -12,7 +12,12 @@ function readStoredUser() {
   const value = localStorage.getItem(USER_KEY);
   if (!value) return null;
   try {
-    return JSON.parse(value);
+    const parsed = JSON.parse(value);
+    if (parsed && typeof parsed.name === "string" && parsed.name.startsWith("=")) {
+      parsed.name = "Student User";
+      localStorage.setItem(USER_KEY, JSON.stringify(parsed));
+    }
+    return parsed;
   } catch {
     localStorage.removeItem(USER_KEY);
     return null;
@@ -83,6 +88,7 @@ export function AuthProvider({ children }) {
         if (!active) return;
         localStorage.setItem(USER_KEY, JSON.stringify(response.data));
         setUser(response.data);
+        window.dispatchEvent(new CustomEvent("campus-pulse-user-loaded", { detail: response.data }));
       } catch (error) {
         if (error.response?.status === 401) {
           clearSession("Your session expired. Please login again.");
@@ -142,14 +148,33 @@ export function AuthProvider({ children }) {
             window.dispatchEvent(new CustomEvent("campus-pulse-reconnected"));
           }
           reconnectAttempts = 0;
+          authService
+            .me()
+            .then((res) => {
+              if (!isCancelled && res?.data) {
+                localStorage.setItem(USER_KEY, JSON.stringify(res.data));
+                setUser((prev) =>
+                  JSON.stringify(prev) === JSON.stringify(res.data)
+                    ? prev
+                    : res.data
+                );
+              }
+            })
+            .catch(() => {});
           try {
             ws.send("ping");
           } catch {}
         });
 
         ws.addEventListener("message", (evt) => {
+          if (!evt.data) return;
+          if (typeof evt.data === "string") {
+            const trimmed = evt.data.trim().toLowerCase();
+            if (trimmed === "pong" || trimmed === "ping") return;
+          }
           try {
             const payload = JSON.parse(evt.data);
+            if (payload?.type === "pong" || payload?.type === "ping" || payload?.event === "pong" || payload?.event === "ping") return;
             window.dispatchEvent(
               new CustomEvent("campus-pulse-notification", { detail: payload }),
             );
@@ -219,6 +244,7 @@ export function AuthProvider({ children }) {
     setToken(accessToken);
     setUser(currentUser);
     setSessionMessage("");
+    window.dispatchEvent(new CustomEvent("campus-pulse-user-loaded", { detail: currentUser }));
 
     // Trigger push notification subscription after login (not on first page load)
     try {
@@ -229,13 +255,20 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
+    const activeToken = token || localStorage.getItem(TOKEN_KEY);
+    clearSession();
     try {
       try {
-        await pushService.unsubscribeUser();
+        await Promise.race([
+          pushService.unsubscribeUser(),
+          new Promise((resolve) => setTimeout(resolve, 500)),
+        ]);
       } catch {}
-      if (token) await authService.logout();
-    } finally {
-      clearSession();
+      if (activeToken) {
+        await authService.logout(activeToken);
+      }
+    } catch {
+      // Ignore network errors on logout
     }
   };
 

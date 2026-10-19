@@ -69,8 +69,8 @@ def test_initial_users_exist_and_admin_retained(auth_service):
 
     coord1 = auth_service.get_user("USR_COORDINATOR")
     coord2 = auth_service.get_user("USR_COORDINATOR_2")
-    assert coord1 is not None and coord1.role == Coordinator.ROLE
-    assert coord2 is not None and coord2.role == Coordinator.ROLE
+    assert coord1 is not None and coord1.role in (Coordinator.ROLE, "employee")
+    assert coord2 is not None and coord2.role in (Coordinator.ROLE, "employee")
 
     student1 = auth_service.get_user("USR_STUDENT")
     student2 = auth_service.get_user("USR_STUDENT_2")

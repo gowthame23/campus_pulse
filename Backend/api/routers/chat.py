@@ -1,7 +1,9 @@
+from typing import Optional
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Query,
     WebSocket,
     WebSocketDisconnect,
     status,
@@ -22,6 +24,7 @@ SUPPORTED_CHAT_ROLES = {
     "app_manager",
     "location_in_charge",
     "coordinator",
+    "employee",
 }
 
 
@@ -249,13 +252,14 @@ def post_message(
 
 @router.get("/conversations")
 def list_conversations(
+    chat_type: Optional[str] = Query(None, alias="type"),
     current_user=Depends(get_current_user),
     chat_service=Depends(get_chat_service),
     auth_service=Depends(get_auth_service),
 ):
     """Returns conversation list for current user.
     Students only receive conversations linked to Lost & Found items.
-    Staff members receive both personal and item conversations."""
+    Staff personal chat strictly returns 1:1 conversations between authorized staff members."""
     u_role = (current_user.role or "").lower()
     all_convs = chat_service.list_conversations(current_user.user_id)
     filtered = []
@@ -274,6 +278,10 @@ def list_conversations(
             )
 
         if item_id:
+            # If personal chat was specifically requested, exclude item chats
+            if chat_type == "personal":
+                continue
+
             # Lost & Found conversation
             other_user = auth_service.get_user(other_id) if other_id else None
             filtered.append(
@@ -292,18 +300,26 @@ def list_conversations(
                 }
             )
         else:
-            # Personal conversation — reject students
+            # If lost_found chat was specifically requested, exclude personal chats
+            if chat_type == "lost_found":
+                continue
+
+            # Personal conversation — current user MUST be staff
             if u_role not in SUPPORTED_CHAT_ROLES:
                 continue
 
             other_user = auth_service.get_user(other_id) if other_id else None
+            # Target/other user MUST ALSO be an active staff member (students strictly forbidden in personal chat)
+            if not other_user or (other_user.role or "").lower() not in SUPPORTED_CHAT_ROLES:
+                continue
+
             filtered.append(
                 {
                     "conversation_id": c["conversation_id"],
                     "other_user_id": other_id,
-                    "other_user_name": other_user.name if other_user else (other_id or "Staff User"),
-                    "other_user_role": other_user.role if other_user else None,
-                    "other_user_email": other_user.email if other_user else None,
+                    "other_user_name": other_user.name,
+                    "other_user_role": other_user.role,
+                    "other_user_email": other_user.email,
                     "last_message": c["last_message"],
                     "last_sender": c["last_sender"],
                     "last_at": c["last_at"],

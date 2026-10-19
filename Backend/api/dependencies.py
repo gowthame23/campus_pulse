@@ -29,6 +29,8 @@ from services.program_service import ProgramService
 from services.public_complaint_service import PublicComplaintService
 from services.emergency_service import EmergencyService
 from services.setup_import_service import SetupImportService
+from services.translation_service import TranslationService
+from utils.db import get_db_connection
 
 
 from pathlib import Path
@@ -82,7 +84,8 @@ def _get_services_for_db(path: str = None):
         aud_svc = AuditService(db_path=path)
         val_svc = ValidationService(auth_svc)
         dep_svc = DependencyService(auth_svc, cmpl_svc, notif_svc)
-        dept_svc = DepartmentService(auth_svc, val_svc, dep_svc)
+        dept_svc = DepartmentService(auth_svc, val_svc, dep_svc, team_service=tm_svc)
+
         loc_svc = LocationService(auth_svc, val_svc, dep_svc)
         lf_svc = LostFoundService(notification_service=notif_svc, audit_service=aud_svc, db_path=path, auth_service=auth_svc)
         anc_svc = AnnouncementService(notification_service=notif_svc, audit_service=aud_svc, db_path=path)
@@ -119,6 +122,8 @@ def _get_services_for_db(path: str = None):
             complaint_service=cmpl_svc,
         )
 
+        trans_svc = TranslationService(db_connect_func=lambda: get_db_connection(path))
+
         _service_cache[path] = {
             "dashboard": dash_svc,
             "notification": notif_svc,
@@ -147,6 +152,7 @@ def _get_services_for_db(path: str = None):
             "team": tm_svc,
             "emergency": emg_svc,
             "setup_import": setup_svc,
+            "translation": trans_svc,
         }
     return _service_cache[path]
 
@@ -279,5 +285,9 @@ def get_emergency_service() -> EmergencyService:
 
 def get_setup_import_service() -> SetupImportService:
     return _get_services_for_db()["setup_import"]
+
+
+def get_translation_service() -> TranslationService:
+    return _get_services_for_db()["translation"]
 
 

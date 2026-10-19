@@ -119,7 +119,7 @@ def _lookup_session(token: str):
     conn = _get_db_conn()
     try:
         row = conn.execute(
-            "SELECT user_id, expires_at, status FROM user_sessions WHERE session_id = ? AND status = 'Active'",
+            "SELECT user_id, expires_at, status, created_at, login_time FROM user_sessions WHERE session_id = ? AND status = 'Active'",
             (hash_token(token),),
         ).fetchone()
         if row:
@@ -143,7 +143,14 @@ def _lookup_session(token: str):
                         exp_time = new_exp
                     except Exception:
                         pass
-                created_ts = exp_time - SESSION_LIFETIME
+                # Use stored created_at / login_time if present to maintain genuine session creation timestamp
+                created_raw = r_dict.get("created_at") or r_dict.get("login_time")
+                try:
+                    from utils.helper import parse_date
+                    parsed_dt = parse_date(created_raw) if isinstance(created_raw, str) else None
+                    created_ts = parsed_dt.timestamp() if parsed_dt else float(created_raw)
+                except Exception:
+                    created_ts = exp_time - SESSION_LIFETIME
                 return {"user_id": r_dict["user_id"], "created_at": created_ts, "expires_at": exp_time}
     except Exception as err:
         logger.warning(f"DB session lookup failed: {err}")
@@ -325,6 +332,7 @@ def consume_ws_ticket(ticket: str, db_path: str = None):
                         user
                         and not user.is_deleted
                         and user.active
+                        and not getattr(user, "first_login", False)
                         and user.status not in ("Inactive", "Suspended", "Archived")
                     ):
                         return user
@@ -345,6 +353,7 @@ def get_ws_user(token: Optional[str] = None, ticket: Optional[str] = None):
             not user
             or user.is_deleted
             or not user.active
+            or getattr(user, "first_login", False)
             or user.status in ("Inactive", "Suspended", "Archived")
         ):
             return None

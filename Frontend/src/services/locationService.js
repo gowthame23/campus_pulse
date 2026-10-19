@@ -29,4 +29,10 @@ export const locationService = {
     }),
   unassignCoordinator: (locationId) =>
     apiClient.delete(`/locations/${locationId}/coordinator`),
+  getDepartments: (locationId) =>
+    apiClient.get(`/locations/${locationId}/departments`),
+  assignDepartments: (locationId, departmentIds) =>
+    apiClient.put(`/locations/${locationId}/departments`, {
+      department_ids: departmentIds,
+    }),
 };

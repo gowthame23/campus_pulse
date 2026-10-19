@@ -22,12 +22,14 @@ def _get_student_headers():
     _reset_limiter()
     login_res = client.post("/auth/login", json={"username": "student@example.com", "password": "Student@123"})
     token = login_res.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    user_id = login_res.json().get("user", {}).get("user_id") or "USR_STUDENT_EX"
+    return {"Authorization": f"Bearer {token}"}, user_id
 
 def test_workflow_7_publish_and_structured_payload():
+    _, user_id = _get_student_headers()
     # Publish notification to student
     notif = notification_service.publish(
-        receiver_id="USR_STUDENT",
+        receiver_id=user_id,
         title="Test Notification Title",
         message="Test notification message content.",
         module="Complaint",
@@ -42,12 +44,12 @@ def test_workflow_7_publish_and_structured_payload():
     assert notif["payload"]["reference_id"] == "CP-2026-TEST"
 
 def test_workflow_7_notification_endpoints():
-    std_headers = _get_student_headers()
+    std_headers, user_id = _get_student_headers()
 
     # 1. Publish fresh notification
     ref_id = f"REF-{uuid.uuid4().hex[:6]}"
     notif = notification_service.publish(
-        receiver_id="USR_STUDENT",
+        receiver_id=user_id,
         title="Complaint Resolved Notification",
         message="Your complaint has been resolved.",
         module="Complaint",

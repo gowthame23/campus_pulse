@@ -44,3 +44,39 @@ export function getPriorityTone(priority) {
   if (p === "low") return "default";
   return "default";
 }
+
+export function getStatusLabel(status, t) {
+  if (!status) return "";
+  if (!t) return status;
+  const map = {
+    "Submitted": t("submitted", "Submitted"),
+    "Pending": t("pending", "Pending"),
+    "Assigned": t("assigned", "Assigned"),
+    "In Progress": t("in_progress", "In Progress"),
+    "Waiting for Parts": t("waiting_for_parts", "Waiting for Parts"),
+    "Blocked": t("waiting_for_parts", "Waiting for Parts"),
+    "Pending Warden Verification": t("pending_warden", "Pending Warden Verification"),
+    "Waiting for Verification": t("waiting_verification", "Waiting for Verification"),
+    "Closed": t("closed", "Closed"),
+    "Closed (Auto Closed)": t("auto_closed", "Closed (Auto Closed)"),
+    "Reopened": t("reopened", "Reopened"),
+    "Admin Review": t("admin_review", "Admin Review"),
+    "Cancelled": t("cancelled", "Cancelled"),
+    "Rejected": t("rejected", "Rejected"),
+  };
+  return map[status] || status;
+}
+
+export function getPriorityLabel(priority, t) {
+  if (!priority) return "";
+  if (!t) return priority;
+  const p = priority.toLowerCase();
+  const map = {
+    "critical": t("priorities.critical", "Critical"),
+    "high": t("priorities.high", "High"),
+    "medium": t("priorities.medium", "Medium"),
+    "low": t("priorities.low", "Low"),
+  };
+  return map[p] || priority;
+}
+

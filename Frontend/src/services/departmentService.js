@@ -12,6 +12,11 @@ export const departmentService = {
       coordinator_id: coordinatorId || "",
       confirm_replacement: true,
     }),
+  assignDepartmentCoordinators: (departmentId, payload) =>
+    apiClient.put(`/departments/${departmentId}/coordinators`, payload),
+  getEligibleCoordinators: (departmentId) =>
+    apiClient.get(`/departments/${departmentId}/eligible-coordinators`),
+
   listAssignments: (params) =>
     apiClient.get("/departments/coordinators/assignments", { params }),
   assignCoordinatorPair: (payload) =>
@@ -21,4 +26,12 @@ export const departmentService = {
   getUnassignedCombinations: () =>
     apiClient.get("/departments/coordinators/unassigned-combinations"),
   getCoverageGaps: () => apiClient.get("/departments/coverage-gaps"),
+  getSlaConfig: (departmentId) => apiClient.get(`/departments/${departmentId}/sla-config`),
+  updateSlaConfig: (departmentId, payload) => apiClient.put(`/departments/${departmentId}/sla-config`, payload),
+  getOperatingLocations: (departmentId) => apiClient.get(`/departments/${departmentId}/locations`),
+  assignLocations: (departmentId, locationIds) =>
+    apiClient.put(`/departments/${departmentId}/locations`, {
+      location_ids: locationIds,
+    }),
+  getEligibleEmployees: (departmentId) => apiClient.get(`/departments/${departmentId}/eligible-employees`),
 };

@@ -1,6 +1,7 @@
-export default function Toast({ message, tone = "info", onClose }) {
+export default function Toast({ message, tone, type, onClose }) {
   if (!message) return null;
 
+  const activeTone = tone || type || "info";
   const tones = {
     info: "border-blue-200/80 dark:border-blue-900/50 bg-blue-50/80 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200",
     success: "border-emerald-200/80 dark:border-emerald-900/50 bg-emerald-50/80 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200",
@@ -12,7 +13,7 @@ export default function Toast({ message, tone = "info", onClose }) {
   return (
     <div
       role="alert"
-      className={`flex items-center justify-between gap-3 rounded-xl border p-3.5 text-xs sm:text-sm font-medium transition-all duration-200 shadow-2xs ${tones[tone] || tones.info}`}
+      className={`flex items-center justify-between gap-3 rounded-xl border p-3.5 text-xs sm:text-sm font-medium transition-all duration-200 shadow-2xs ${tones[activeTone] || tones.info}`}
     >
       <span className="leading-snug">{message}</span>
       {onClose && (

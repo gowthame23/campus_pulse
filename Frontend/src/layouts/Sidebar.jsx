@@ -29,22 +29,94 @@ import {
   UserCheck,
   MessageSquare,
   PhoneCall,
+  LogOut,
+  GraduationCap,
+  ShieldCheck,
+  Wrench,
 } from "lucide-react";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
+import { useLanguage } from "../context/LanguageContext.jsx";
 import { ROLES, getRoleDisplayName } from "../utils/constants.js";
 
 export default function Sidebar({ isOpen, onClose }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { toggleTheme, isDark } = useTheme();
+  const { language, t } = useLanguage();
   const location = useLocation();
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
   const [openSections, setOpenSections] = useState({});
+  const [openSubMenus, setOpenSubMenus] = useState({ "User Management": true });
+
+  const toggleSubMenu = (label) => {
+    setOpenSubMenus((prev) => ({
+      ...prev,
+      [label]: !prev[label],
+    }));
+  };
+
+  const getNavLabel = (label) => {
+    const labelKeyMap = {
+      "Dashboard": "nav.dashboard",
+      "Home": "nav.dashboard",
+      "Complaints": "nav.complaints",
+      "Workload": "nav.workload",
+      "Resolved Views": "nav.resolved",
+      "Lost & Found": "nav.lost_found",
+      "Announcements": "nav.announcements",
+      "Chat": "nav.chat",
+      "Notifications": "nav.notifications",
+      "Users": "nav.user_management",
+      "User Management": "nav.user_management",
+      "Students": "Students",
+      "App Managers & Wardens": "App Managers & Wardens",
+      "Employees & Coordinators": "Employees & Coordinators",
+      "Employee Assignments": "nav.employee_assignments",
+      "Locations": "nav.locations",
+      "Departments": "nav.departments",
+      "Coverage Gaps": "Coverage Gaps",
+      "Emergency Setup": "nav.emergency",
+      "Issues Taxonomy": "Issues Taxonomy",
+      "Campus Health Map": "nav.health_map",
+      "Reports": "nav.reports",
+      "Analytics": "nav.analytics",
+      "Safety Reports": "nav.safety_reports",
+      "Report Safely": "nav.safety_reports",
+      "Audit Log": "nav.audit_logs",
+      "Backups": "Backups",
+      "Settings": "nav.settings",
+      "Technical Support": "Technical Support",
+      "Profile": "nav.profile",
+      "My Jobs": "nav.my_tasks",
+      "Institutions": "Institutions",
+      "Support Requests": "Support Requests",
+      "Platform Health": "Platform Health",
+    };
+    const key = labelKeyMap[label];
+    return key ? t(key, label) : label;
+  };
+
+  const getSectionTitle = (title) => {
+    const titleKeyMap = {
+      "MAIN": "nav.main",
+      "PLATFORM": "nav.platform",
+      "MANAGEMENT": "nav.management",
+      "INSIGHTS": "nav.insights",
+      "SYSTEM": "nav.system",
+      "ACCOUNT": "nav.account",
+      "WORK": "nav.work",
+    };
+    const key = titleKeyMap[title];
+    return key ? t(key, title) : title;
+  };
 
   const roleTitle = useMemo(() => {
     if (!user) return "";
-    return getRoleDisplayName(user.role);
-  }, [user]);
+    const rawRole = (user.role || "").toLowerCase();
+    return t(`roles.${rawRole}`, getRoleDisplayName(user.role));
+  }, [user, language, t]);
 
   const navSections = useMemo(() => {
     const role = (user?.role || "").toLowerCase();
@@ -87,8 +159,17 @@ export default function Sidebar({ isOpen, onClose }) {
         {
           title: "MANAGEMENT",
           items: [
-            { to: "/admin/users", label: "Users", icon: Users },
-            { to: "/admin/teams", label: "Teams", icon: Layers },
+            {
+              to: "/admin/users",
+              label: "User Management",
+              icon: Users,
+              subItems: [
+                { to: "/admin/users?tab=students", label: "Students", icon: GraduationCap },
+                { to: "/admin/users?tab=supervisors", label: "App Managers & Wardens", icon: ShieldCheck },
+                { to: "/admin/users?tab=staff", label: "Employees & Coordinators", icon: Wrench },
+              ],
+            },
+            { to: "/admin/employee-assignments", label: "Employee Assignments", icon: UserCheck },
             { to: "/admin/locations", label: "Locations", icon: MapPin },
             { to: "/admin/departments", label: "Departments", icon: Building },
             { to: "/admin/coverage-gaps", label: "Coverage Gaps", icon: Activity },
@@ -140,8 +221,17 @@ export default function Sidebar({ isOpen, onClose }) {
         {
           title: "MANAGEMENT",
           items: [
-            { to: "/admin/users", label: "Users", icon: Users },
-            { to: "/admin/teams", label: "Teams", icon: Layers },
+            {
+              to: "/admin/users",
+              label: "User Management",
+              icon: Users,
+              subItems: [
+                { to: "/admin/users?tab=students", label: "Students", icon: GraduationCap },
+                { to: "/admin/users?tab=supervisors", label: "App Managers & Wardens", icon: ShieldCheck },
+                { to: "/admin/users?tab=staff", label: "Employees & Coordinators", icon: Wrench },
+              ],
+            },
+            { to: "/admin/employee-assignments", label: "Employee Assignments", icon: UserCheck },
             { to: "/admin/locations", label: "Locations", icon: MapPin },
             { to: "/admin/departments", label: "Departments", icon: Building },
             { to: "/admin/coverage-gaps", label: "Coverage Gaps", icon: Activity },
@@ -301,7 +391,7 @@ export default function Sidebar({ isOpen, onClose }) {
             {section.title && (
               isAlwaysOpen ? (
                 <div className="px-3 pt-2 pb-1 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                  {section.title}
+                  {getSectionTitle(section.title)}
                 </div>
               ) : (
                 <button
@@ -313,7 +403,7 @@ export default function Sidebar({ isOpen, onClose }) {
                       : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 font-medium"
                   }`}
                 >
-                  <span>{section.title}</span>
+                  <span>{getSectionTitle(section.title)}</span>
                   {isOpen ? (
                     <ChevronDown className="h-3 w-3 shrink-0 text-slate-400 dark:text-slate-500" />
                   ) : (
@@ -329,23 +419,93 @@ export default function Sidebar({ isOpen, onClose }) {
                   !isAlwaysOpen ? "pl-2 border-l border-slate-200/80 dark:border-slate-800 ml-3.5 my-0.5" : ""
                 }`}
               >
-                {section.items.map((link) => (
-                  <NavLink
-                    key={link.to}
-                    to={link.to}
-                    onClick={onClose}
-                    className={({ isActive }) =>
-                      `group flex h-9 items-center gap-3 rounded-xl px-3 text-xs transition-all ${
-                        isActive
-                          ? "bg-primary/10 text-primary font-semibold dark:bg-primary/15 dark:text-primary shadow-2xs"
-                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 font-medium"
-                      }`
-                    }
-                  >
-                    <link.icon className="h-4 w-4 shrink-0 transition-transform group-hover:scale-105" />
-                    <span className="truncate">{link.label}</span>
-                  </NavLink>
-                ))}
+                {section.items.map((link) => {
+                  if (link.subItems && link.subItems.length > 0) {
+                    const isParentActive = location.pathname === link.to;
+                    const isSubOpen = openSubMenus[link.label] ?? isParentActive;
+
+                    return (
+                      <div key={link.label} className="flex flex-col gap-0.5">
+                        <div
+                          className={`group flex h-9 items-center justify-between rounded-xl px-3 text-xs transition-all cursor-pointer ${
+                            isParentActive
+                              ? "bg-primary/10 text-primary font-semibold dark:bg-primary/15 dark:text-primary shadow-2xs"
+                              : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 font-medium"
+                          }`}
+                          onClick={() => toggleSubMenu(link.label)}
+                        >
+                          <NavLink
+                            to={link.to}
+                            onClick={onClose}
+                            className="flex items-center gap-3 flex-1 min-w-0"
+                          >
+                            <link.icon className="h-4 w-4 shrink-0 transition-transform group-hover:scale-105" />
+                            <span className="truncate">{getNavLabel(link.label)}</span>
+                          </NavLink>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleSubMenu(link.label);
+                            }}
+                            className="p-1 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded"
+                          >
+                            <ChevronDown
+                              className={`h-3.5 w-3.5 text-slate-400 dark:text-slate-500 transition-transform duration-200 ${
+                                isSubOpen ? "" : "-rotate-90"
+                              }`}
+                            />
+                          </button>
+                        </div>
+
+                        {isSubOpen && (
+                          <div className="pl-3.5 ml-3 my-0.5 border-l-2 border-slate-200/80 dark:border-slate-800 flex flex-col gap-0.5 animate-in fade-in duration-150">
+                            {link.subItems.map((sub) => {
+                              const [subPath, subQuery] = sub.to.split("?");
+                              const isSubActive =
+                                location.pathname === subPath &&
+                                (subQuery ? location.search === `?${subQuery}` : !location.search);
+
+                              return (
+                                <NavLink
+                                  key={sub.to}
+                                  to={sub.to}
+                                  onClick={onClose}
+                                  className={`group flex h-8 items-center gap-2 rounded-lg px-2.5 text-xs transition-all ${
+                                    isSubActive
+                                      ? "bg-primary/15 text-primary font-bold dark:bg-primary/20 dark:text-primary shadow-2xs"
+                                      : "text-slate-500 dark:text-slate-400 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 font-medium"
+                                  }`}
+                                >
+                                  <sub.icon className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:scale-105" />
+                                  <span className="truncate">{getNavLabel(sub.label)}</span>
+                                </NavLink>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <NavLink
+                      key={link.to}
+                      to={link.to}
+                      onClick={onClose}
+                      className={({ isActive }) =>
+                        `group flex h-9 items-center gap-3 rounded-xl px-3 text-xs transition-all ${
+                          isActive
+                            ? "bg-primary/10 text-primary font-semibold dark:bg-primary/15 dark:text-primary shadow-2xs"
+                            : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 font-medium"
+                        }`
+                      }
+                    >
+                      <link.icon className="h-4 w-4 shrink-0 transition-transform group-hover:scale-105" />
+                      <span className="truncate">{getNavLabel(link.label)}</span>
+                    </NavLink>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -370,15 +530,15 @@ export default function Sidebar({ isOpen, onClose }) {
         </div>
       </div>
       {/* Role Pill */}
-      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-800 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-800 text-[11px] font-bold text-slate-700 dark:text-slate-200">
         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-        <span className="truncate">{roleTitle || "User"}</span>
+        <span className="truncate">{roleTitle ? `${roleTitle} Portal` : "Portal"}</span>
       </div>
     </div>
   );
 
-  const themeToggleRow = (
-    <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 mt-auto flex flex-col gap-2">
+  const footerRow = (
+    <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 mt-auto flex flex-col gap-1.5">
       <button
         onClick={toggleTheme}
         className="flex w-full h-9 items-center justify-between rounded-xl px-2.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
@@ -394,6 +554,15 @@ export default function Sidebar({ isOpen, onClose }) {
         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
           {isDark ? "Dark" : "Light"}
         </span>
+      </button>
+
+      <button
+        onClick={() => setConfirmLogout(true)}
+        className="flex w-full h-9 items-center gap-2 rounded-xl px-2.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+        aria-label="Logout"
+      >
+        <LogOut className="h-4 w-4 text-red-500" />
+        <span>{t("nav.logout", "Sign Out")}</span>
       </button>
     </div>
   );
@@ -422,13 +591,26 @@ export default function Sidebar({ isOpen, onClose }) {
           </button>
         </div>
         {renderNavLinks()}
-        {themeToggleRow}
+        {footerRow}
       </aside>
       <aside className="hidden shrink-0 border-r border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#101726] p-4 lg:flex lg:w-[250px] lg:flex-col">
         <div className="mb-4">{brandHeader}</div>
         {renderNavLinks()}
-        {themeToggleRow}
+        {footerRow}
       </aside>
+
+      <ConfirmDialog
+        open={confirmLogout}
+        title="Logout"
+        message="Are you sure you want to logout of Campus Pulse?"
+        confirmLabel="Logout"
+        tone="danger"
+        onCancel={() => setConfirmLogout(false)}
+        onConfirm={() => {
+          setConfirmLogout(false);
+          logout();
+        }}
+      />
     </>
   );
 }

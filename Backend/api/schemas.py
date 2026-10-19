@@ -180,10 +180,27 @@ class UserResponse(BaseModel):
     # Staff details
     employee_id: Optional[str] = None
     designation: Optional[str] = None
+    location_name: Optional[str] = None
+    department_name: Optional[str] = None
     assigned_locations: Optional[List[str]] = []
+    assigned_location_names: Optional[List[str]] = []
+    assigned_departments: Optional[List[str]] = []
+    assigned_department_names: Optional[List[str]] = []
+    coordinator_position: Optional[str] = None
+    coordinator_department_id: Optional[str] = None
+    coordinator_department_name: Optional[str] = None
+    coordinator_slot: Optional[int] = None
+    work_memberships_count: Optional[int] = 0
     assigned_categories: Optional[List[str]] = []
     language: Optional[str] = "en"
     safety_blocked_until: Optional[str] = None
+
+
+class UserResponsibilityUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    role: Optional[str] = None
+    coordinator_type: Optional[str] = None  # "none", "coordinator_1", "coordinator_2"
+    department_id: Optional[str] = None
 
 
 class UserActivityResponse(BaseModel):
@@ -199,7 +216,9 @@ class DepartmentCreateRequest(BaseModel):
     name: str
     sla_days: int = Field(gt=0)
     complaint_types: List[str] = []
+    description: Optional[str] = None
     location_id: Optional[str] = None
+    location_ids: Optional[List[str]] = None
 
 
 class DepartmentResponse(BaseModel):
@@ -207,12 +226,59 @@ class DepartmentResponse(BaseModel):
     name: str
     sla_days: int
     complaint_types: List[str]
+    description: Optional[str] = None
     coordinator_id: Optional[str] = None
+    coordinator_2_id: Optional[str] = None
     active: bool = True
     archived: bool = False
     location_id: Optional[str] = None
     archived_by_role: Optional[str] = None
     archived_by: Optional[str] = None
+    operating_locations: Optional[List[Dict[str, Any]]] = []
+    location_count: Optional[int] = 0
+    eligible_employee_count: Optional[int] = 0
+    active_complaints_count: Optional[int] = 0
+    coordinator_1: Optional[Dict[str, Any]] = None
+    coordinator_2: Optional[Dict[str, Any]] = None
+    location_ids: Optional[List[str]] = []
+
+
+class DepartmentSlaConfigResponse(BaseModel):
+    config_id: Optional[str] = None
+    department_id: str
+    normal_start_time: str = "10:00"
+    normal_end_time: str = "16:00"
+    normal_duration_hours: int = 72
+    medium_start_time: str = "10:00"
+    medium_end_time: str = "16:00"
+    medium_duration_hours: int = 48
+    high_start_time: str = "10:00"
+    high_end_time: str = "18:00"
+    high_duration_hours: int = 24
+    critical_start_time: str = "00:00"
+    critical_end_time: str = "23:59"
+    critical_duration_hours: int = 4
+    app_manager_escalation_hours: int = 24
+    admin_escalation_hours: int = 48
+    updated_at: Optional[str] = None
+    updated_by: Optional[str] = None
+
+
+class DepartmentSlaConfigUpdateRequest(BaseModel):
+    normal_start_time: Optional[str] = "10:00"
+    normal_end_time: Optional[str] = "16:00"
+    normal_duration_hours: Optional[int] = Field(72, gt=0)
+    medium_start_time: Optional[str] = "10:00"
+    medium_end_time: Optional[str] = "16:00"
+    medium_duration_hours: Optional[int] = Field(48, gt=0)
+    high_start_time: Optional[str] = "10:00"
+    high_end_time: Optional[str] = "18:00"
+    high_duration_hours: Optional[int] = Field(24, gt=0)
+    critical_start_time: Optional[str] = "00:00"
+    critical_end_time: Optional[str] = "23:59"
+    critical_duration_hours: Optional[int] = Field(4, gt=0)
+    app_manager_escalation_hours: int = Field(24, gt=0)
+    admin_escalation_hours: Optional[int] = Field(None, gt=0)
 
 
 class LocationCreateDepartmentItem(BaseModel):
@@ -225,7 +291,10 @@ class LocationCreateRequest(BaseModel):
     name: str
     location_type: Optional[str] = None
     coordinator_id: Optional[str] = None
-    departments: Optional[List[LocationCreateDepartmentItem]] = None
+    departments: Optional[List[Any]] = None
+    department_ids: Optional[List[str]] = None
+    public_complaint_access: Optional[str] = None
+    complaint_submission_policy: Optional[str] = None
 
 
 class LocationResponse(BaseModel):
@@ -239,6 +308,10 @@ class LocationResponse(BaseModel):
     archived: bool = False
     archived_by_role: Optional[str] = None
     archived_by: Optional[str] = None
+    public_complaint_access: Optional[str] = "everyone"
+    complaint_submission_policy: Optional[str] = "everyone"
+    department_ids: Optional[List[str]] = []
+    departments: Optional[List[Dict[str, Any]]] = []
 
 
 class LocationTypeCreateRequest(BaseModel):
@@ -285,6 +358,15 @@ class AssignLocationsRequest(BaseModel):
     location_ids: list[str]
 
 
+class AssignDepartmentsRequest(BaseModel):
+    department_ids: list[str]
+
+
+class EmployeeWorkAssignmentsRequest(BaseModel):
+    department_ids: list[str]
+    location_ids: list[str]
+
+
 class ComplaintCreateRequest(BaseModel):
     location_id: str
     department_id: str
@@ -319,6 +401,12 @@ class ComplaintAssignRequest(BaseModel):
 
 class ComplaintReturnRequest(BaseModel):
     reason: str
+
+
+class ComplaintRerouteRequest(BaseModel):
+    destination_department_id: str
+    reason: str
+
 
 
 class ComplaintWrongLocationRequest(BaseModel):
@@ -467,12 +555,28 @@ class ComplaintResponse(BaseModel):
     location_in_charge_name: Optional[str] = None
     location_in_charge_id: Optional[str] = None
     progress_updates: Optional[List[Dict[str, Any]]] = None
+    assigned_employee_name: Optional[str] = None
+    assigned_to_name: Optional[str] = None
+    team_name: Optional[str] = None
+    emergency_contacts: Optional[List[Dict[str, Any]]] = None
 
     model_config = ConfigDict(extra="allow")
 
 
 class ComplaintDeleteRequestPayload(BaseModel):
     reason: Optional[str] = ""
+
+
+class ComplaintCancellationRequestPayload(BaseModel):
+    reason: str
+
+
+class ComplaintCancellationReviewPayload(BaseModel):
+    note: Optional[str] = ""
+
+
+class ComplaintCancellationRejectPayload(BaseModel):
+    reason: str
 
 
 class NotificationCreateRequest(BaseModel):
@@ -623,8 +727,24 @@ class DepartmentUpdateRequest(BaseModel):
     sla_days: Optional[int] = None
     complaint_types: Optional[List[str]] = None
     coordinator_id: Optional[str] = None
+    coordinator_2_id: Optional[str] = None
     active: Optional[bool] = None
     archived: Optional[bool] = None
+    description: Optional[str] = None
+    location_ids: Optional[List[str]] = None
+
+
+class AssignDepartmentCoordinatorsRequest(BaseModel):
+    coordinator_1_id: Optional[str] = None
+    coordinator_2_id: Optional[str] = None
+
+
+class AssignLocationsToDepartmentRequest(BaseModel):
+    location_ids: List[str]
+
+
+class AssignDepartmentsToLocationRequest(BaseModel):
+    department_ids: List[str]
 
 
 class LocationUpdateRequest(BaseModel):
@@ -635,6 +755,9 @@ class LocationUpdateRequest(BaseModel):
     coordinator_id: Optional[str] = None
     active: Optional[bool] = None
     archived: Optional[bool] = None
+    public_complaint_access: Optional[str] = None
+    complaint_submission_policy: Optional[str] = None
+    department_ids: Optional[List[str]] = None
 
 
 class ComplaintUpdateRequest(BaseModel):
@@ -703,7 +826,8 @@ class SafetyReportDecisionRequest(BaseModel):
 
 
 class SafetyReportRevealRequest(BaseModel):
-    reason: str = Field(..., min_length=5, description="Mandatory reason for reveal under false_misuse")
+    admin_password: str = Field(..., min_length=1, description="Admin account password for step-up re-authentication")
+    reason: str = Field(..., min_length=5, description="Mandatory reason for reveal under abuse investigation")
 
 
 class CreateLocationFromSpotRequest(BaseModel):
@@ -735,11 +859,18 @@ class TeamUpdateRequest(BaseModel):
     active: Optional[bool] = None
 
 
+class WorkMembershipCreateRequest(BaseModel):
+    user_id: str
+    department_id: str
+    location_id: str
+
+
 class LeaveCreateRequest(BaseModel):
     user_id: Optional[str] = None
     from_date: str = Field(..., description="YYYY-MM-DD")
     to_date: str = Field(..., description="YYYY-MM-DD")
     reason: Optional[str] = None
+    department_id: Optional[str] = None
 
 
 class EmergencyCategoryCreateRequest(BaseModel):

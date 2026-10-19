@@ -16,10 +16,11 @@ The following tables constitute the true Campus Pulse relational data model:
 
 | Category | Active Tables | Purpose |
 | :--- | :--- | :--- |
-| **Authentication & Users** | `users`, `student_profiles`, `staff_profiles`, `user_activities`, `activation_tokens`, `academic_programs`, `push_subscriptions`, `login_rate_limits` | User identity, multi-role profile details, Web Push subscriptions, and brute-force protection. |
+| **Authentication & Users** | `users`, `user_sessions`, `student_profiles`, `staff_profiles`, `user_activities`, `activation_tokens`, `academic_programs`, `push_subscriptions`, `login_rate_limits`, `login_attempts` | User identity, session token SHA-256 hashes, multi-role profile details, Web Push subscriptions, and brute-force protection. |
 | **Organizational Hierarchy** | `departments`, `complaint_categories`, `coordinator_assignments`, `locations`, `location_types`, `campuses`, `buildings`, `hostels`, `blocks`, `floors`, `rooms` | Campus routing tree, physical location mapping, department SLA definitions, and coordinator team assignments. |
 | **Complaint Lifecycle** | `complaints`, `affected_students`, `comments`, `attachments` | Full ticket lifecycle from submission, routing, accept queue, work progress, warden verification, student closure, and dispute review. |
-| **Audit & Governance** | `audit_logs`, `system_settings`, `setting_audit_logs`, `master_references`, `institutions`, `support_tickets` | Append-only audit trails, configurable SLAs/settings, institution metadata, and platform support. |
+| **Safety Reports** | `safety_reports`, `safety_report_identity` | Anonymous safety reports with isolated student identity storage accessible only via Admin step-up password verification. |
+| **Audit & Governance** | `audit_logs`, `system_settings`, `setting_audit_logs`, `master_references`, `institutions`, `support_tickets`, `scheduler_lock` | Append-only audit trails, configurable SLAs/settings, scheduler multi-worker lease locks, institution metadata, and platform support. |
 | **Communications & Alerts** | `notifications`, `chat_messages`, `highlights`, `announcements`, `announcement_targets`, `announcement_attachments`, `announcement_reads`, `announcement_acknowledgements` | In-app alerts, real-time WebSocket chat, bulletin board announcements, and read receipts. |
 | **Community Features** | `lost_found_items`, `lost_found_images`, `ownership_claims` | Campus lost and found registry, claims management, and item verification. |
 | **Reports, Search & Backups**| `feedback`, `reports`, `report_templates`, `scheduled_reports`, `report_downloads`, `documents`, `document_versions`, `search_index`, `search_history`, `saved_searches`, `backups`, `backup_schedules`, `backup_files`, `restore_history` | Historical reporting, full-text index cache, feedback forms, and database backup management. |
@@ -48,8 +49,8 @@ The following 135 tables are speculative scaffolding and are **not** part of the
 - `api_keys`, `oauth_clients`, `webhook_endpoints`, `api_usage_logs`, `integration_registry`: Developer third-party API gateway.
 - `integration_connectors`, `integration_jobs`, `integration_mappings`, `integration_logs`, `integration_errors`: University ERP ETL connectors.
 
-### 3.6 Advanced Device & Security Tracking (11 Tables)
-- `user_sessions`, `password_resets`, `trusted_devices`, `login_history`, `security_alerts`, `password_policy`, `mfa_settings`, `ip_access_rules`: Speculative hardware token and IP firewall tables.
+### 3.6 Advanced Device & Security Tracking (10 Tables)
+- `password_resets`, `trusted_devices`, `login_history`, `security_alerts`, `password_policy`, `mfa_settings`, `ip_access_rules`: Speculative hardware token and IP firewall tables.
 
 ### 3.7 Platform Health & Media (11 Tables)
 - `system_services`, `health_metrics`, `incident_logs`, `monitoring_rules`, `uptime_history`: Infrastructure monitoring agent logs.
