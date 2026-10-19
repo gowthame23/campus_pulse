@@ -254,10 +254,9 @@ export default function Navbar({ onMenuClick }) {
           </button>
 
           {user?.role && (
-            <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-bold shrink-0">
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-bold shrink-0">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <span className="hidden sm:inline">{getRoleDisplayName(user.role)} Portal</span>
-              <span className="sm:hidden">{getRoleDisplayName(user.role).replace("Location In Charge", "Warden").replace("Administrator", "Admin").replace("App Manager", "Manager")}</span>
+              <span>{getRoleDisplayName(user.role)} Portal</span>
             </div>
           )}
 
