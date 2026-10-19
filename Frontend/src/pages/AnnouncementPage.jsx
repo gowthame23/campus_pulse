@@ -12,11 +12,9 @@ import {
   CheckSquare,
   Layers,
   Sparkles,
-  Mail,
 } from "lucide-react";
 import Button from "../components/Button.jsx";
 import Card from "../components/Card.jsx";
-import StatCard from "../components/StatCard.jsx";
 import EmptyState from "../components/EmptyState.jsx";
 import Loader from "../components/Loader.jsx";
 import PageHeader from "../components/PageHeader.jsx";
@@ -54,10 +52,6 @@ export default function AnnouncementPage() {
   const [targetVal, setTargetVal] = useState("All");
   const [saving, setSaving] = useState(false);
 
-  // Admin Contact Info for Students / Non-staff
-  const [adminContact, setAdminContact] = useState(null);
-  const [loadingContact, setLoadingContact] = useState(false);
-
   const userRole = (user?.role || "").toLowerCase();
   const canCreate = [
     "administrator",
@@ -66,27 +60,6 @@ export default function AnnouncementPage() {
     "location_in_charge",
     "warden",
   ].includes(userRole);
-
-  useEffect(() => {
-    if (!canCreate) {
-      setLoadingContact(true);
-      announcementService
-        .getAdminContact()
-        .then((res) => {
-          setAdminContact(res?.data || null);
-        })
-        .catch(() => {
-          setAdminContact({
-            available: false,
-            message:
-              "Admin contact email is currently unavailable. Please visit the campus administrative office.",
-          });
-        })
-        .finally(() => {
-          setLoadingContact(false);
-        });
-    }
-  }, [canCreate]);
 
   const {
     data: announcements,
@@ -262,96 +235,59 @@ export default function AnnouncementPage() {
         }
       />
 
-      {!canCreate && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-700 dark:text-slate-300">
-          <div className="flex items-center gap-2.5">
-            <Megaphone className="h-4 w-4 text-primary shrink-0" />
-            <div>
-              <p className="font-semibold text-slate-900 dark:text-slate-100">
-                Official Campus Notices & Broadcast Feed
-              </p>
-              <p className="text-slate-500 dark:text-slate-400 text-[11px]">
-                Notices are officially published by College Administration and Location Wardens.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200 dark:border-slate-800">
-            {adminContact?.available && adminContact?.email ? (
-              <div className="flex items-center gap-2 text-xs bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs">
-                <Mail className="h-3.5 w-3.5 text-primary shrink-0" />
-                <span className="text-slate-500 dark:text-slate-400">Admin Contact:</span>
-                <a
-                  href={`mailto:${adminContact.email}`}
-                  className="font-medium text-primary hover:underline"
-                >
-                  {adminContact.email}
-                </a>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 italic">
-                <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                <span>
-                  {adminContact?.message || (loadingContact ? "Loading contact..." : "Admin contact information unavailable.")}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       <Toast message={message} tone="success" onClose={() => setMessage("")} />
       <Toast message={error} tone="danger" onClose={() => setError("")} />
 
-      {/* Dashboard Overview Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div
-          className={`cursor-pointer transition-all rounded-2xl ${
-            quickFilter === "active"
-              ? "ring-2 ring-primary border-l-4 border-l-primary"
-              : ""
-          }`}
-          onClick={() =>
-            setQuickFilter((prev) => (prev === "active" ? "" : "active"))
-          }
-        >
-          <StatCard label="ACTIVE NOTICES" value={metrics.totalActive} accent />
-        </div>
-        <div
-          className={`cursor-pointer transition-all rounded-2xl ${
-            quickFilter === "unread"
-              ? "ring-2 ring-primary border-l-4 border-l-primary"
-              : ""
-          }`}
-          onClick={() =>
-            setQuickFilter((prev) => (prev === "unread" ? "" : "unread"))
-          }
-        >
-          <StatCard label="UNREAD CIRCULARS" value={metrics.unread} />
-        </div>
-        <div
-          className={`cursor-pointer transition-all rounded-2xl ${
-            quickFilter === "critical"
-              ? "ring-2 ring-primary border-l-4 border-l-primary"
-              : ""
-          }`}
-          onClick={() =>
-            setQuickFilter((prev) => (prev === "critical" ? "" : "critical"))
-          }
-        >
-          <StatCard label="CRITICAL ALERTS" value={metrics.critical} />
-        </div>
-        <div
-          className={`cursor-pointer transition-all rounded-2xl ${
-            quickFilter === "pendingAck"
-              ? "ring-2 ring-primary border-l-4 border-l-primary"
-              : ""
-          }`}
-          onClick={() =>
-            setQuickFilter((prev) => (prev === "pendingAck" ? "" : "pendingAck"))
-          }
-        >
-          <StatCard label="PENDING ACKS" value={metrics.pendingAck} />
-        </div>
+      {/* Dashboard Overview Cards — 4 compact filters side-by-side in one row */}
+      <div className="grid grid-cols-4 gap-1.5 sm:gap-3">
+        {[
+          { key: "active", label: "Active", value: metrics.totalActive, accent: true },
+          { key: "unread", label: "Unread", value: metrics.unread },
+          { key: "critical", label: "Critical", value: metrics.critical, critical: true },
+          { key: "pendingAck", label: "Pending", value: metrics.pendingAck },
+        ].map((item) => {
+          const isSelected = quickFilter === item.key;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() =>
+                setQuickFilter((prev) => (prev === item.key ? "" : item.key))
+              }
+              className={`relative flex flex-col sm:flex-row items-center justify-center sm:justify-between px-2 py-2 sm:px-4 sm:py-3 rounded-xl border text-center sm:text-left transition-all duration-150 active:scale-95 shadow-2xs ${
+                isSelected
+                  ? "border-primary bg-primary/10 dark:bg-primary/20 ring-2 ring-primary"
+                  : "border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#101726] hover:border-slate-300 dark:hover:border-slate-700"
+              }`}
+            >
+              <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+                <span
+                  className={`text-[11px] sm:text-xs font-bold uppercase tracking-wider truncate ${
+                    isSelected
+                      ? "text-primary dark:text-primary-light"
+                      : "text-slate-500 dark:text-slate-400"
+                  }`}
+                >
+                  {item.label}
+                </span>
+                {item.accent && metrics.totalActive > 0 && (
+                  <span className="hidden sm:inline-block h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                )}
+              </div>
+              <span
+                className={`mt-1 sm:mt-0 text-xs sm:text-sm font-extrabold tabular-nums px-1.5 sm:px-2 py-0.5 rounded-md shrink-0 ${
+                  isSelected
+                    ? "bg-primary text-white"
+                    : item.critical && item.value > 0
+                    ? "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
+                    : "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
+                }`}
+              >
+                {item.value}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Search & Filter Toolbar */}
