@@ -4,7 +4,6 @@ import {
   FileText,
   ArrowRight,
   Megaphone,
-  Bell,
   Clock,
   Plus,
   CheckCircle2,
@@ -31,7 +30,6 @@ import { useLanguage } from "../../context/LanguageContext.jsx";
 import { useAsyncData } from "../../hooks/useAsyncData.js";
 import { complaintService } from "../../services/complaintService.js";
 import { announcementService } from "../../services/announcementService.js";
-import { notificationService } from "../../services/notificationService.js";
 import { locationService } from "../../services/locationService.js";
 import { COMPLAINT_STATUS } from "../../utils/constants.js";
 import { formatDate } from "../../utils/dateFormatter.js";
@@ -128,17 +126,6 @@ export default function StudentDashboard() {
     return res.data || [];
   }, []);
 
-  const {
-    data: notificationsData,
-    loading: notificationsLoading,
-    reload: reloadNotifications,
-  } = useAsyncData(async () => {
-    const res = await notificationService
-      .listPaginated({ limit: 5 })
-      .catch(() => ({ data: { items: [] } }));
-    return res.data?.items || [];
-  }, []);
-
   const { data: locationsData } = useAsyncData(async () => {
     const res = await locationService.list().catch(() => ({ data: [] }));
     return res.data || [];
@@ -146,7 +133,6 @@ export default function StudentDashboard() {
 
   const complaints = complaintsData || [];
   const announcements = announcementsData || [];
-  const notifications = notificationsData || [];
   const locations = locationsData || [];
 
   const unreadAnnouncements = useMemo(() => {
@@ -186,7 +172,6 @@ export default function StudentDashboard() {
       await complaintService.verify(complaintId);
       setToast({ type: "success", message: "Complaint confirmed and marked closed." });
       reloadComplaints();
-      reloadNotifications();
     } catch (err) {
       setToast({
         type: "danger",
@@ -211,7 +196,6 @@ export default function StudentDashboard() {
       setReopenTarget(null);
       setReopenReason("");
       reloadComplaints();
-      reloadNotifications();
     } catch (err) {
       setToast({
         type: "danger",
@@ -546,60 +530,6 @@ export default function StudentDashboard() {
         })()}
       </Card>
 
-      {/* Recent Activity */}
-      <Card className="!p-4 sm:!p-5 border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 shadow-2xs space-y-3">
-        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-            <Bell className="h-3.5 w-3.5 text-primary" />
-            Recent Activity
-          </h2>
-          <Link
-            to="/notifications"
-            className="text-xs font-medium text-primary hover:underline"
-          >
-            View All
-          </Link>
-        </div>
-
-        {notificationsLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 py-1">
-            <div className="h-14 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800/60" />
-            <div className="h-14 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800/60" />
-          </div>
-        ) : notifications.length === 0 ? (
-          <p className="text-xs text-slate-400 dark:text-slate-500 py-3 text-center">
-            No recent activity.
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {notifications.slice(0, 4).map((n) => (
-              <div
-                key={n.notification_id || n.id}
-                onClick={() => {
-                  if (n.reference_id && n.reference_type === "Complaint") {
-                    navigate(`/complaints/${n.reference_id}`);
-                  } else {
-                    navigate("/notifications");
-                  }
-                }}
-                className="flex items-start justify-between gap-2 p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 cursor-pointer transition-colors text-xs"
-              >
-                <div className="space-y-0.5 min-w-0 pr-1">
-                  <div className="font-medium text-slate-800 dark:text-slate-200 truncate">
-                    {n.title || n.message}
-                  </div>
-                  <div className="text-[11px] text-slate-400 dark:text-slate-500 line-clamp-1">
-                    {n.message}
-                  </div>
-                </div>
-                <span className="text-[10px] text-slate-400 shrink-0">
-                  {formatDate(n.created_at)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
 
       {/* Student Reopen Modal */}
       {reopenTarget && (
