@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Phone,
   AlertTriangle,
@@ -160,9 +161,15 @@ export default function EmergencySheet({ isOpen, onClose, userLocationId, onEmer
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex flex-col justify-end sm:justify-center p-0 sm:p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 w-full sm:max-w-lg mx-auto rounded-t-3xl sm:rounded-3xl shadow-2xl border border-rose-200 dark:border-rose-950/60 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[85vh]">
+  const sheetModal = (
+    <div
+      className="fixed inset-0 z-[100] overflow-y-auto bg-black/75 backdrop-blur-sm flex flex-col justify-end sm:justify-center p-0 sm:p-4 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-slate-900 w-full sm:max-w-lg mx-auto rounded-t-3xl sm:rounded-3xl shadow-2xl border border-rose-200 dark:border-rose-950/60 overflow-hidden flex flex-col max-h-[88vh] sm:max-h-[85vh] my-0 sm:my-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Header */}
         <div className="bg-rose-600 px-5 py-4 text-white flex items-center justify-between shrink-0 shadow-sm">
@@ -333,4 +340,6 @@ export default function EmergencySheet({ isOpen, onClose, userLocationId, onEmer
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(sheetModal, document.body) : sheetModal;
 }

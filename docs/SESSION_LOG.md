@@ -511,5 +511,22 @@
 * **Verification:**
   - `npm run build` completed in 1.22s with 0 errors.
 
+### Entry 35 — Emergency Sheet Modal Portal & Mobile Clipping Resolution
+* **User Directive:** "seee when i am clicking the emergency i am getting like this check it out once" (with screenshot showing the Emergency modal header cut off and clipped at the top of the mobile screen on spulse-rho.vercel.app).
+* **Issues Addressed & Actions Taken:**
+  1. **Root Cause Analysis ([`EmergencySheet.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/components/EmergencySheet.jsx), [`EmergencyButton.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/components/EmergencyButton.jsx), [`Navbar.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/layouts/Navbar.jsx)):**
+     - In CSS/HTML, any parent element with `backdrop-filter` or `transform` becomes the containing block for all its descendants, even those with `position: fixed`.
+     - `EmergencyButton` (which mounts `EmergencySheet`) was rendered directly inside `Navbar.jsx`'s `<header className="... sticky top-0 z-30 ... backdrop-blur-md">`.
+     - As a result, the browser treated the 56px sticky navbar as the viewport boundary for the `fixed inset-0` modal. The bottom-sheet (`justify-end`) was anchored to the bottom of the 56px navbar, pushing the modal upwards and clipping the entire category grid and action buttons off-screen.
+  2. **Portaled Modal to Document Body ([`EmergencySheet.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/components/EmergencySheet.jsx)):**
+     - Imported `createPortal` from `react-dom` and portaled the entire `EmergencySheet` directly into `document.body`.
+     - Elevated z-index to `z-[100]` with a rich backdrop (`bg-black/75 backdrop-blur-sm`).
+     - Added backdrop tap-to-dismiss (`onClick={onClose}`) while preventing inner clicks from propagating (`e.stopPropagation()`).
+     - Configured responsive bottom-sheet behavior on mobile (`justify-end rounded-t-3xl max-h-[88vh]`) and centered dialog on desktop (`sm:justify-center sm:rounded-3xl sm:max-h-[85vh]`).
+  3. **Portaled Emergency Fallback Numbers Modal ([`EmergencyButton.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/components/EmergencyButton.jsx)):**
+     - Also wrapped the fallback emergency numbers dialog in `createPortal(..., document.body)` with `z-[100]` and backdrop tap-to-dismiss.
+* **Verification:**
+  - `npm run build` completed in 1.40s with 0 errors and valid PWA service worker generation.
+
 ---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
