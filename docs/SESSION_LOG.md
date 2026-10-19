@@ -342,9 +342,29 @@
 * **Verification:**
   - `npm run build` completed in 981ms with 0 errors.
 
+### Entry 24 — Complaints Tracker Mobile Responsiveness & 2-Column Shortcut Filter Grid
+* **User Directive:** "Fix the mobile layout problems shown in the supplied screenshot (Complaints Tracker):
+  - Application header occupies only part of screen width (~65% width gap).
+  - Page header & main content alignment.
+  - Status tabs consume unnecessary space.
+  - Location, department, complaint status, and SLA filters stacked as large full-width controls.
+  - Excessive vertical space before showing complaint results."
+* **Root Causes & Solutions Applied:**
+  1. **Application Header Width Fix ([`Navbar.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/layouts/Navbar.jsx)):**
+     - The top `<header>` element inside `MainLayout.jsx` was missing `w-full`. When rendered as a sticky element inside flex body, it shrink-wrapped to mobile contents (~240px wide), stopping short at the user avatar and leaving a blank gap on the right ~35% of the mobile viewport.
+     - Added `w-full` to `<header className="w-full sticky top-0 z-30 ...">`, ensuring the header spans 100% of the mobile viewport with border-to-border styling and properly aligned avatar.
+  2. **Complaints Tracker Filter Toolbar & 2-Column Shortcut Grid ([`ComplaintListPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/complaints/ComplaintListPage.jsx)):**
+     - Restructured the 4 vertically stacked full-width dropdown filters (`Location`, `Department`, `Complaint Status`, `SLA State`) into a compact 2-column mobile shortcut grid:
+       - Row 1: Full-width search bar with compact touch target (`h-9 sm:h-10`).
+       - Row 2: 2-column grid on mobile (`grid grid-cols-2 gap-2 w-full`), transitioning to inline flex on desktop (`sm:flex sm:items-center sm:gap-3 sm:w-auto`).
+       - Top row of grid: `📍 All Locations` | `🏢 All Depts`.
+       - Bottom row of grid: `All Remaining / Statuses` | `All SLA States`.
+       - Added text truncation and compact padding (`px-2.5 sm:px-3 text-xs`) to prevent long option names from blowing out mobile viewport width.
+  3. **PageHeader & Lifecycle Tabs Spacing:**
+     - Streamlined `PageHeader` action buttons to `flex flex-wrap sm:flex-nowrap gap-2` with compact `h-9 sm:h-10` buttons.
+     - Compacted padding on `Card` (`p-3.5 sm:p-6`) and lifecycle tabs (`px-2.5 sm:px-3 py-1.5`) so complaint results appear higher up the mobile fold without unnecessary vertical scroll.
+* **Verification:**
+  - `npm run build` completed cleanly in 1.88s with 0 errors.
+
 ---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
-
-
-
-
