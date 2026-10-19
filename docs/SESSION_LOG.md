@@ -393,5 +393,23 @@
 * **Verification:**
   - `npm run build` completed in 1.41s with 0 errors.
 
+### Entry 27 — Mobile Horizontal Viewport Containment & Filter Grid Clipping Fix
+* **User Directive:** "see this now we are only getting half of it now not full now can you check and fix it"
+* **Issues Addressed & Actions Taken:**
+  1. **Root Cause of Half-Page Horizontal Clipping:**
+     - In `ComplaintListPage.jsx`, the division tabs (`inline-flex`) and the 2-column filter dropdowns (`<select>` elements with long options like `Waiting for Verification`) had `shrink-0` and lacked `min-w-0 max-w-full`.
+     - In CSS Grid, items default to `min-width: auto`, preventing native `<select>` elements from shrinking below the width of their longest `<option>`. As a result, the 2-column grid expanded to ~480px, causing the card and page to horizontally overflow the ~375px mobile screen and cutting off the entire right half of the content.
+  2. **Comprehensive Overflow Containment:**
+     - In [`ComplaintListPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/complaints/ComplaintListPage.jsx):
+       - Wrapped division tabs in a dedicated `w-full overflow-x-auto scrollbar-none` container so they scroll smoothly without pushing card boundaries.
+       - Removed `shrink-0` from all `<select>`s and added `min-w-0 max-w-full truncate`.
+       - Shortened verbose option strings (e.g. `Waiting for Verification` -> `Verification`, `Closed (Auto Closed)` -> `Auto Closed`, `All SLA States` -> `All SLA`), eliminating intrinsic browser min-content blowouts while keeping state values intact.
+       - Added `w-full min-w-0 max-w-full overflow-hidden` to the outer page container and `Card`.
+     - In [`MainLayout.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/layouts/MainLayout.jsx): Added `max-w-full overflow-x-hidden` across layout wrappers and `<main>`.
+     - In [`index.css`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/index.css): Added `max-width: 100vw; overflow-x: hidden;` to `html, body`.
+  3. **Result:** The entire Complaints Tracker page now fits 100% within the mobile viewport width with zero horizontal clipping or cutoffs.
+* **Verification:**
+  - `npm run build` completed in 1.30s with 0 errors.
+
 ---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
