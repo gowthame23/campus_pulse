@@ -118,7 +118,9 @@ export function AuthProvider({ children }) {
       if (isCancelled) return;
       try {
         const apiBase =
-          import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+          import.meta.env.VITE_API_BASE_URL ||
+          import.meta.env.VITE_API_URL ||
+          "http://127.0.0.1:8000";
         const wsBase = apiBase.replace(/^http/, "ws");
         const wsUrl = `${wsBase.replace(/\/$/, "")}/notifications/ws/${user.user_id}`;
 
