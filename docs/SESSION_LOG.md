@@ -185,6 +185,23 @@
 * **Current Status:** PDF deliverable generated and ready for presentation.
 
 ---
+
+### Entry 14 — Zero-Cost Cloud Deployment (Vercel Frontend + Railway Backend)
+* **User Goal:** Deploy full-stack CampusPulse online 100% free with no credit card required, persistent SQLite database, and public web access.
+* **Actions Taken & Code Fixed:**
+  1. **Frontend Deployed on Vercel:**
+     - URL: `https://campuspulse-rho.vercel.app/`
+     - Configured SPA rewrite routing in `Frontend/vercel.json` (`{"source": "/(.*)", "destination": "/index.html"}`) to support direct route visits (`/login`, `/complaints`).
+     - Set environment variable `VITE_API_URL=https://campuspulse-production-4ad2.up.railway.app`.
+     - Confirmed HTTP 200 response on `https://campuspulse-rho.vercel.app/login`.
+  2. **Backend Configured for Railway:**
+     - Relaxed `CORS_ORIGINS` in `Backend/api/main.py` with safe defaults allowing `https://.*\.vercel\.app`, localhost, and `campuspulse-rho.vercel.app`.
+     - Standardized startup command in `Backend/run_api.py` and root `run_api.py` using Python-native environment parsing (`os.environ.get("PORT", "8000")`) and listening on `0.0.0.0` to eliminate shell variable expansion errors (`$PORT`).
+     - Updated `Procfile`, `Backend/Procfile`, and `Backend/Dockerfile` to invoke `python run_api.py`.
+     - Pushed commits `5cdc1f5` and `3b0fc4c` to GitHub main branch.
+* **Current Status:** Vercel frontend is live. Railway backend is configured and ready for service start command update to `python run_api.py`.
+
+---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
 
 
