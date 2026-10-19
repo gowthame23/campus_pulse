@@ -443,5 +443,21 @@
 * **Verification:**
   - `npm run build` completed in 1.30s with 0 errors.
 
+### Entry 30 — Single Theme Toggle, Language Dropdown & Placement Inside Login Card Corner
+* **User Directive:** "make that theme as one button light anf dark no need of system system will be in default and one more thing is language do not all three on top we will have english if we click that we will get other languages we will click that and the theame should be at the cornr in the box where we are loginning in that box"
+* **Issues Addressed & Actions Taken:**
+  1. **Single Button Theme Toggle ([`LoginPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/auth/LoginPage.jsx)):**
+     - Replaced the 3-button theme selector (`[Light] [Dark] [System]`) with a single toggle button (`h-7 w-7`) that flips directly between Light and Dark mode.
+     - Automatically renders a `Sun` icon when in dark mode (to switch to light) and a `Moon` icon when in light mode (to switch to dark).
+     - System theme remains the default background fallback as handled by `ThemeContext`.
+  2. **Compact Language Dropdown ([`LoginPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/auth/LoginPage.jsx)):**
+     - Replaced the 3 side-by-side pills (`[English] [తెలుగు] [हिन्दी]`) with a single compact button displaying the active language (`🌐 English ▾`).
+     - Clicking the button opens an animated dropdown popover containing English, తెలుగు, and हिन्दी with checkmark indicators and click-outside dismissal.
+  3. **Moved Controls Inside the Login Card Corner ([`LoginPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/auth/LoginPage.jsx)):**
+     - Removed the entire floating top-right viewport header that previously hovered awkwardly above the login card.
+     - Placed both controls neatly in the top-right corner of the login card (`absolute top-3.5 right-3.5`), creating a modern, unified card presentation without screen clutter.
+* **Verification:**
+  - `npm run build` completed in 1.35s with 0 errors.
+
 ---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*

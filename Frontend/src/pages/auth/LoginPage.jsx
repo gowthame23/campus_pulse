@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
-import { Loader2, Sun, Moon, Monitor, Globe } from "lucide-react";
+import { Loader2, Sun, Moon, Globe, ChevronDown, Check } from "lucide-react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import Button from "../../components/Button.jsx";
 import Input from "../../components/Input.jsx";
@@ -10,14 +10,32 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import { useLanguage } from "../../context/LanguageContext.jsx";
 
+const LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "te", label: "తెలుగు" },
+  { code: "hi", label: "हिन्दी" },
+];
+
 export default function LoginPage() {
   const { isAuthenticated, login, sessionMessage, clearSessionMessage } =
     useAuth();
-  const { themeMode, setThemeMode, activeTheme } = useTheme();
+  const { setThemeMode, activeTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const langRef = useRef(null);
   const [error, setError] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (langRef.current && !langRef.current.contains(e.target)) {
+        setLangMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
   const {
     register,
     handleSubmit,
@@ -65,96 +83,65 @@ export default function LoginPage() {
 
   return (
     <main className="relative flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 px-4 py-12 transition-colors duration-200">
-      {/* Top Right Controls: Compact Language Selector & Compact Theme Selector */}
-      <div className="absolute top-4 right-4 flex items-center gap-2 flex-wrap justify-end z-20">
-        {/* Compact Language Selector */}
-        <div className="flex items-center gap-0.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 p-0.5 shadow-xs backdrop-blur-xs">
+      <div className="relative w-full max-w-[420px] rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-md md:p-8 animate-in fade-in duration-200">
+        {/* Top-Right Corner Controls inside Login Card */}
+        <div className="absolute top-3.5 right-3.5 flex items-center gap-1.5 z-20">
+          {/* Language Selector Dropdown */}
+          <div className="relative" ref={langRef}>
+            <button
+              type="button"
+              onClick={() => setLangMenuOpen((prev) => !prev)}
+              className="flex items-center gap-1 h-7 px-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+              title="Select language"
+              aria-label="Select language"
+            >
+              <Globe className="h-3 w-3 text-primary" />
+              <span>{LANGUAGES.find((l) => l.code === language)?.label || "English"}</span>
+              <ChevronDown className={`h-3 w-3 text-slate-400 transition-transform ${langMenuOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {langMenuOpen && (
+              <div className="absolute right-0 mt-1 w-28 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg py-1 z-30 animate-in fade-in zoom-in-95 duration-100">
+                {LANGUAGES.map((l) => (
+                  <button
+                    key={l.code}
+                    type="button"
+                    onClick={() => {
+                      setLanguage(l.code);
+                      setLangMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-medium text-left transition-colors cursor-pointer ${
+                      language === l.code
+                        ? "bg-primary/10 text-primary font-bold"
+                        : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    <span>{l.label}</span>
+                    {language === l.code && <Check className="h-3.5 w-3.5 text-primary" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Single Theme Toggle Button (Light <-> Dark) */}
           <button
             type="button"
-            onClick={() => setLanguage("en")}
-            title="English"
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
-              language === "en"
-                ? "bg-primary text-white shadow-2xs"
-                : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
+            onClick={() => setThemeMode(activeTheme === "dark" ? "light" : "dark")}
+            title={activeTheme === "dark" ? "Switch to Light mode" : "Switch to Dark mode"}
+            aria-label="Toggle theme"
+            className="flex items-center justify-center h-7 w-7 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
           >
-            <Globe className="h-3 w-3" />
-            <span>English</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setLanguage("te")}
-            title="తెలుగు (Telugu)"
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
-              language === "te"
-                ? "bg-primary text-white shadow-2xs"
-                : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            <span>తెలుగు</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setLanguage("hi")}
-            title="हिन्दी (Hindi)"
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
-              language === "hi"
-                ? "bg-primary text-white shadow-2xs"
-                : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            <span>हिन्दी</span>
+            {activeTheme === "dark" ? (
+              <Sun className="h-3.5 w-3.5 text-amber-400" />
+            ) : (
+              <Moon className="h-3.5 w-3.5 text-slate-600" />
+            )}
           </button>
         </div>
 
-        {/* Compact Theme Selector */}
-        <div className="flex items-center gap-0.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 p-0.5 shadow-xs backdrop-blur-xs">
-          <button
-            type="button"
-            onClick={() => setThemeMode("light")}
-            title="Light Theme"
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
-              themeMode === "light"
-                ? "bg-primary text-white shadow-2xs"
-                : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            <Sun className="h-3 w-3" />
-            <span>Light</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setThemeMode("dark")}
-            title="Dark Theme"
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
-              themeMode === "dark"
-                ? "bg-primary text-white shadow-2xs"
-                : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            <Moon className="h-3 w-3" />
-            <span>Dark</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setThemeMode("system")}
-            title="System Default Theme"
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
-              themeMode === "system"
-                ? "bg-primary text-white shadow-2xs"
-                : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            <Monitor className="h-3 w-3" />
-            <span>System</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="w-full max-w-[420px] rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-md md:p-8 animate-in fade-in duration-200">
         {/* Header Branding */}
-        <div className="mb-8 text-center">
+        <div className="mb-8 text-center pt-1 sm:pt-0">
           <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-white font-bold text-lg shadow-sm">
             CP
           </div>
