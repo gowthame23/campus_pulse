@@ -6,11 +6,23 @@ export const complaintService = {
   create: (payload) => apiClient.post("/complaints", payload),
   update: (complaintId, payload) => apiClient.patch(`/complaints/${complaintId}`, payload),
   delete: (complaintId, reason = "") => apiClient.delete(`/complaints/${complaintId}`, { data: { reason } }),
-  requestDeletion: (complaintId, reason) => apiClient.delete(`/complaints/${complaintId}`, { data: { reason } }),
-  approveDeletion: (complaintId) => apiClient.post(`/complaints/${complaintId}/approve-deletion`),
-  rejectDeletion: (complaintId) => apiClient.post(`/complaints/${complaintId}/reject-deletion`),
+  requestCancellation: (complaintId, reason) =>
+    apiClient.post(`/complaints/${complaintId}/request-cancellation`, { reason }),
+  approveCancellation: (complaintId, note = "") =>
+    apiClient.post(`/complaints/${complaintId}/approve-cancellation`, { note }),
+  rejectCancellation: (complaintId, reason) =>
+    apiClient.post(`/complaints/${complaintId}/reject-cancellation`, { reason }),
+  requestDeletion: (complaintId, reason) =>
+    apiClient.post(`/complaints/${complaintId}/request-cancellation`, { reason }),
+  approveDeletion: (complaintId, note = "") =>
+    apiClient.post(`/complaints/${complaintId}/approve-cancellation`, { note }),
+  rejectDeletion: (complaintId, reason) =>
+    apiClient.post(`/complaints/${complaintId}/reject-cancellation`, { reason }),
+  getEligibleAssignees: (complaintId) =>
+    apiClient.get(`/complaints/${complaintId}/eligible-assignees`),
   assign: (complaintId, coordinatorId, reason = "") =>
     apiClient.post(`/complaints/${complaintId}/assign`, {
+
       coordinator_id: coordinatorId,
       reason,
     }),
@@ -92,5 +104,12 @@ export const complaintService = {
   getWsTicket: () => apiClient.post("/api/ws-ticket"),
   getFeedback: (complaintId) => apiClient.get(`/complaints/${complaintId}/feedback`),
   submitFeedback: (complaintId, payload) => apiClient.post(`/complaints/${complaintId}/feedback`, payload),
+  translate: (complaintId, targetLanguage) =>
+    apiClient.post(`/complaints/${complaintId}/translate`, { target_language: targetLanguage }),
+  reroute: (complaintId, destinationDepartmentId, reason) =>
+    apiClient.post(`/complaints/${complaintId}/reroute`, {
+      destination_department_id: destinationDepartmentId,
+      reason,
+    }),
 };
 

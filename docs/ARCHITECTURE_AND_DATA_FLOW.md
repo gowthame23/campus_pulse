@@ -135,13 +135,18 @@ graph TD
 #### Layer 16: Background Jobs and Schedulers
 - **Responsibility:** Executes periodic cron tasks without blocking HTTP workers.
 - **Implementation:** [`Backend/services/scheduler_service.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/services/scheduler_service.py).
+- **Concurrency & Lease Locking (Remediation F-14):** Utilizes `scheduler_lock` with dedicated `lock_name` and TTL lease management to prevent multi-worker concurrency collisions; all database connections are strictly guarded with `finally: conn.close()` to eliminate SQLite resource leaks.
 - **Tasks:** Runs every 300 seconds (5 minutes):
   1. *Auto-Close & SLA Escalation:* Auto-closes resolved complaints after the verification window; escalates overdue complaints.
   2. *Cleanup Expired Records:* Purges expired sessions and verification tokens.
+  3. *Automatic Work Routing & Reassignment:* Re-evaluates unassigned tickets and applies business rules with selective `save_complaint` updates (Remediation F-08).
 
 #### Layer 17: WebSocket Connections
 - **Responsibility:** Bi-directional real-time communication for instant notifications and chat messages.
 - **Implementation:** [`Backend/utils/websocket_manager.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/utils/websocket_manager.py). Manages active client socket connections indexed by `user_id`.
+- **Heartbeat & Auth Security (Remediations F-04 & F-11):**
+  - Unauthenticated connections or users with `first_login=True` are rejected at the handshake.
+  - Periodic ping/pong heartbeat control frames are explicitly filtered out on the frontend (`AuthContext.jsx`) so they do not trigger spurious notification unread-count refetches.
 
 #### Layer 18: External Email Services (SMTP)
 - **Responsibility:** Transmits transactional activation codes and password reset links.

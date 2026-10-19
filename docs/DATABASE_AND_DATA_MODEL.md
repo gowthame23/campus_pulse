@@ -293,6 +293,46 @@ Stores Web Push (VAPID) subscription endpoints and crypto keys for browser push 
 
 ---
 
+### 2.15 Table: `scheduler_lock`
+Lease locking mechanism preventing concurrent scheduler task executions across processes.
+
+| Column | Type | Nullable | Default | Constraints & Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `lock_name` | TEXT | NO | None | **PRIMARY KEY** (e.g. `scheduler_lease`) |
+| `locked_by` | TEXT | NO | None | Identifier of process/worker holding lease |
+| `locked_at` | TEXT | NO | None | ISO 8601 acquisition timestamp |
+| `expires_at`| TEXT | NO | None | ISO 8601 lease expiration timestamp |
+
+---
+
+### 2.16 Table: `safety_reports` & `safety_report_identity`
+Confidential student safety reporting and controlled identity disclosure storage.
+
+**`safety_reports`:**
+| Column | Type | Nullable | Default | Constraints & Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `report_id` | TEXT | NO | None | **PRIMARY KEY** (`SR_<UUID>`) |
+| `case_code` | TEXT | NO | None | **UNIQUE** Confidential tracking code (`SAFE-XXXX`) |
+| `title` | TEXT | NO | None | Case subject |
+| `description`| TEXT | NO | None | Confidential case narrative |
+| `status` | TEXT | NO | `'open'` | Enum: `open`, `in_review`, `closed` |
+| `outcome` | TEXT | YES | `NULL` | Enum: `action_taken`, `could_not_confirm`, `not_a_safety_issue`, `false_misuse` |
+| `created_at` | TEXT | NO | `CURRENT_TIMESTAMP` | ISO 8601 submission timestamp |
+
+**`safety_report_identity`:**
+| Column | Type | Nullable | Default | Constraints & Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `report_id` | TEXT | NO | None | **PRIMARY KEY**, **FOREIGN KEY** → `safety_reports(report_id)` ON DELETE CASCADE |
+| `reporter_user_id`| TEXT| NO | None | **FOREIGN KEY** → `users(user_id)` |
+| `revealed` | INTEGER| NO | `0` | 1 if unsealed by Administrator |
+| `revealed_at` | TEXT | YES | `NULL` | Timestamp of disclosure |
+| `revealed_by` | TEXT | YES | `NULL` | Admin user ID who unsealed record |
+| `reveal_reason`| TEXT | YES | `NULL` | Mandatory written justification for abuse investigation |
+| `created_at` | TEXT | NO | `CURRENT_TIMESTAMP` | Sealed mapping creation timestamp |
+
+
+---
+
 ## 3. Data Lifecycle & Deletion Policies
 
 1. **Soft Deletion vs Physical Deletion:**

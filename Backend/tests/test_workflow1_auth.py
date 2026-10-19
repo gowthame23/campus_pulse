@@ -33,7 +33,7 @@ def test_workflow_1_validation_empty_password():
 
 def test_workflow_1_login_by_email_success():
     _reset_limiter()
-    response = client.post("/auth/login", json={"username": "student@example.com", "password": "Student@123"})
+    response = client.post("/auth/login", json={"username": "gowtham.e23@iiits.in", "password": "Student@123"})
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
@@ -49,7 +49,7 @@ def test_workflow_1_login_by_roll_number_or_id():
 
 def test_workflow_1_invalid_credentials():
     _reset_limiter()
-    response = client.post("/auth/login", json={"username": "student@example.com", "password": "WrongPassword123!"})
+    response = client.post("/auth/login", json={"username": "gowtham.e23@iiits.in", "password": "WrongPassword123!"})
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid credentials."
 
@@ -93,7 +93,7 @@ def test_workflow_1_edge_case_coordinator_with_roll_number():
 
 def test_workflow_1_logout():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "student@example.com", "password": "Student@123"})
+    login_res = client.post("/auth/login", json={"username": "gowtham.e23@iiits.in", "password": "Student@123"})
     token = login_res.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 

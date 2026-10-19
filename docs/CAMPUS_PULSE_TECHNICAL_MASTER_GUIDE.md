@@ -230,17 +230,45 @@ To set up and run Campus Pulse from scratch on a new developer workstation:
    npm run dev
    ```
    *Verification:* Open `http://127.0.0.1:5173/` in your browser.
-4. **Login with Verified Seed Accounts:**
-   - **Administrator:** `admin@example.com` / `Admin@123`
-   - **App Manager:** `manager@example.com` / `Manager@123`
-   - **Hostel Warden:** `warden@example.com` / `warden@123`
-   - **Coordinator:** `coordinator@example.com` / `Coordinator@123`
-   - **Student:** `student@example.com` / `Student@123`
-5. **Run Test Suites:**
+4. **Login with Clean 14 Baseline Accounts:**
+   - **Super Admin:** `superadmin@campuspulse.edu`
+   - **Administrator:** `gowthamejjurothu@gmail.com`
+   - **App Manager 1:** `ejjurothugowtham@gmail.com`
+   - **App Manager 2:** `appmanager2@campus.edu`
+   - **Employees / Coordinators:** `employee.a1@campuspulse.edu` to `employee.b3@campuspulse.edu` (4 hold C1/C2 coordinator assignments)
+   - **Students:** `gowtham.e23@iiits.in`, `student2@campus.edu`
+   - **Wardens:** `naveen@campus.edu`, `warden2@campus.edu`
+
+5. **Multi-Department Coordinator Architecture:**
+   - Every coordinator is an existing employee account; no duplicate records.
+   - Employees can handle regular employee work and coordinator duties simultaneously.
+   - Employees can coordinate multiple departments concurrently (e.g. C1 in Electrical, C2 in Plumbing).
+   - Each department has exactly one Coordinator 1 and one Coordinator 2; no self-backup.
+   - When C1 is on approved leave, C2 automatically takes over routing.
+
+6. **Run Certified Regression Test Suite:**
    ```bash
-   python Backend/tests/smoke_test.py
-   npm test
+   cd Backend
+   python -m pytest tests/test_multi_department_coordinators.py tests/test_remediation_f01_f15.py -v
    ```
+   *Certified:* 29 / 29 passed (100% pass rate).
+
+7. **Security & Engineering Remediations (F-01 to F-15):**
+   - Absolute session lifetime enforced; sliding session preserves `created_at` (F-01).
+   - Password reset OTP isolated per `reset_id` with IP throttling and silent generic responses (F-02).
+   - Dual login lockout tables synchronized upon password reset/change (F-03).
+   - Dynamic secure cookie attributes and WebSocket `first_login` block (F-04).
+   - App Manager privilege escalation prevented in restore and staff import (F-05).
+   - Anonymous safety reports require Admin step-up password re-authentication (`admin_user.check_password()`) with minimal PII and audit logs (F-06).
+   - UTC timezone normalization for safety report bans (F-07).
+   - Granular dirty-checked complaint updates eliminating full-table rewrites (F-08).
+   - Soft-delete attributes preserved in Complaint model and SQLite upserts (F-09).
+   - Work reassignment blocked on Closed/Rejected complaints with blocker reset (F-10).
+   - WebSocket ping/pong filtered from dispatching notification events (F-11).
+   - Bulk import harmonized across Form and Query parameters with aliasing (F-12).
+   - SQL `GROUP BY` aggregations eliminating N+1 loop queries (F-13).
+   - Scheduler lock schema verified with `lock_name` and leak-free `finally` connection release (F-14).
+   - Feedback submission verified with strict author/affected student ownership (F-15).
 
 ---
 

@@ -49,7 +49,7 @@ import { teamService } from "../../services/teamService.js";
 import { setupService } from "../../services/setupService.js";
 import { leaveService } from "../../services/leaveService.js";
 import { formatDate } from "../../utils/dateFormatter.js";
-import { getStatusTone, getPriorityTone } from "../../utils/statusColor.js";
+import { getStatusTone, getPriorityTone, getStatusLabel, getPriorityLabel } from "../../utils/statusColor.js";
 
 const getLocationName = (locId, locations = []) => {
   if (!locId) return "";
@@ -58,17 +58,17 @@ const getLocationName = (locId, locations = []) => {
   return locId;
 };
 
-const PRESET_WORKER_NOTES = [
-  { code: "NEED_PARTS", label: "Need parts" },
-  { code: "WAITING_ACCESS", label: "Waiting for access" },
-  { code: "WORKSHOP", label: "Sent to workshop" },
-  { code: "INVESTIGATING", label: "Investigating on site" },
-];
-
 export default function CoordinatorDashboard() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+
+  const presetNotes = [
+    { code: "NEED_PARTS", label: t("presets.need_parts", "Need parts") },
+    { code: "WAITING_ACCESS", label: t("presets.waiting_access", "Waiting for access") },
+    { code: "WORKSHOP", label: t("presets.workshop", "Sent to workshop") },
+    { code: "INVESTIGATING", label: t("presets.investigating", "Investigating on site") },
+  ];
 
   const [activeTab, setActiveTab] = useState("to_assign"); // "to_assign" | "team_board" | "my_jobs" | "stats"
   const [toastMessage, setToastMessage] = useState("");
@@ -221,6 +221,7 @@ export default function CoordinatorDashboard() {
   // Countdown badge for "To assign" (Part K1)
   const getAssignCountdownBadge = (c) => {
     const priority = c.priority || "Medium";
+    const priorityLabel = getPriorityLabel(priority, t);
     const hours = { Critical: 0.5, High: 2, Medium: 4, Low: 8 }[priority] || 4;
     const start = new Date(c.awaiting_assign_since || c.created_at || Date.now()).getTime();
     const deadlineMs = start + hours * 3600 * 1000;
@@ -236,14 +237,14 @@ export default function CoordinatorDashboard() {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 animate-pulse">
           <AlertTriangle className="h-3.5 w-3.5" />
-          {priority} — Overdue by {timeStr}
+          {t("coordinator.badge_overdue", { priority: priorityLabel, time: timeStr })}
         </span>
       );
     }
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
         <Clock className="h-3.5 w-3.5" />
-        {priority} — {timeStr} left to assign
+        {t("coordinator.badge_left", { priority: priorityLabel, time: timeStr })}
       </span>
     );
   };
@@ -253,7 +254,7 @@ export default function CoordinatorDashboard() {
     try {
       await complaintService.updateStatus(job.complaint_id, "In Progress");
       setToastTone("success");
-      setToastMessage("Job started (In Progress).");
+      setToastMessage(t("employee.toast_job_started", "Job started — status set to In Progress."));
       reload();
     } catch (err) {
       setToastTone("danger");
@@ -265,7 +266,7 @@ export default function CoordinatorDashboard() {
     try {
       await complaintService.recordProgress(job.complaint_id, presetObj.label, null, presetObj.code);
       setToastTone("success");
-      setToastMessage(`Progress note logged: ${presetObj.label}`);
+      setToastMessage(t("employee.toast_progress_note", { note: presetObj.label }));
       setOpenMenuComplaintId(null);
       reload();
     } catch (err) {
@@ -311,7 +312,7 @@ export default function CoordinatorDashboard() {
         photo_skip_reason: isPhotoSkipped ? photoSkipReason.trim() : undefined,
       });
       setToastTone("success");
-      setToastMessage("Complaint marked resolved!");
+      setToastMessage(t("employee.toast_resolved", "Complaint marked resolved!"));
       setShowResolveModal(false);
       setSelectedComplaint(null);
       reload();
@@ -328,7 +329,7 @@ export default function CoordinatorDashboard() {
     try {
       await complaintService.block(selectedComplaint.complaint_id, partsReason.trim(), partsExpectedDate || null);
       setToastTone("success");
-      setToastMessage("Complaint marked Waiting for Parts.");
+      setToastMessage(t("employee.toast_waiting_parts", "Complaint marked Waiting for Parts."));
       setShowPartsModal(false);
       setSelectedComplaint(null);
       setPartsReason("");
@@ -346,9 +347,10 @@ export default function CoordinatorDashboard() {
     if (!newLocationId) return;
     setReportingWrongLoc(true);
     try {
-      await complaintService.reportWrongLocation(selectedComplaint.complaint_id, newLocationId, wrongLocNote.trim());
+      const relocatedId = selectedComplaint.complaint_id;
+      await complaintService.reportWrongLocation(relocatedId, newLocationId, wrongLocNote.trim());
       setToastTone("success");
-      setToastMessage("Wrong location updated. Re-routed to the correct team.");
+      setToastMessage(t("employee.toast_location_updated", "Wrong location updated. Re-routed to the correct team."));
       setShowWrongLocModal(false);
       setSelectedComplaint(null);
       setNewLocationId("");
@@ -368,7 +370,7 @@ export default function CoordinatorDashboard() {
     try {
       await complaintService.returnToCoordinator(selectedComplaint.complaint_id, returnReason.trim());
       setToastTone("success");
-      setToastMessage("Returned job to queue.");
+      setToastMessage(t("employee.toast_returned", "Returned job to queue."));
       setShowReturnModal(false);
       setSelectedComplaint(null);
       setReturnReason("");
@@ -394,25 +396,18 @@ export default function CoordinatorDashboard() {
   const loadAllTeamMembers = async () => {
     setLoadingMembers(true);
     try {
-      const allMembers = [];
-      for (const t of [...myPrimaryTeams, ...actingTeams]) {
-        const res = await teamService.getMembers(t.team_id);
-        const mList = res.data || res || [];
-        mList.forEach((m) => {
-          allMembers.push({ ...m, team_id: t.team_id, team_name: t.name });
-        });
-      }
-      const unique = [];
-      const seen = new Set();
-      for (const m of allMembers) {
-        if (!seen.has(m.user_id)) {
-          seen.add(m.user_id);
-          unique.push(m);
-        }
-      }
-      setTeamMembersList(unique);
+      const res = await teamService.listEmployeesOverview();
+      const allEmps = res.data || res || [];
+      const userDept = user?.department_id;
+      const relevant = allEmps.filter((emp) => {
+        if (!userDept) return true;
+        const memberships = emp.memberships || [];
+        const hasDept = memberships.some((m) => m.department_id === userDept);
+        return hasDept || emp.department_id === userDept;
+      });
+      setTeamMembersList(relevant.length > 0 ? relevant : allEmps);
     } catch (err) {
-      console.error("Failed to load team members:", err);
+      console.error("Failed to load staff workforce:", err);
     } finally {
       setLoadingMembers(false);
     }
@@ -428,7 +423,7 @@ export default function CoordinatorDashboard() {
     }
   };
 
-  const teamNameDisplay = myPrimaryTeams.length > 0 ? myPrimaryTeams.map((t) => t.name).join(", ") : "Maintenance Team";
+  const teamNameDisplay = myPrimaryTeams.length > 0 ? myPrimaryTeams.map((tItem) => tItem.name).join(", ") : t("coordinator.maintenance_team", "Maintenance Team");
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-12">
@@ -441,22 +436,22 @@ export default function CoordinatorDashboard() {
       <PinnedEmergenciesBanner onActionDone={reload} />
 
       {/* Acting Coordinator Banner (Rule B4 & K1) */}
-      {actingTeams.map((t) => {
-        const l = leaves.find((lev) => lev.user_id === t.coordinator_id);
+      {actingTeams.map((tItem) => {
+        const l = leaves.find((lev) => lev.user_id === tItem.coordinator_id);
         const leaveTo = l ? l.to_date : "return";
         return (
           <div
-            key={t.team_id}
+            key={tItem.team_id}
             className="p-4 rounded-2xl bg-amber-500/10 border-2 border-amber-500/40 text-amber-900 dark:text-amber-200 text-sm font-bold flex items-center justify-between gap-3 shadow-sm"
           >
             <div className="flex items-center gap-2.5">
               <Shield className="h-5 w-5 text-amber-600 shrink-0" />
               <span>
-                Acting coordinator for Team {t.name} (Coordinator on leave until {leaveTo})
+                {t("coordinator.acting_banner", { name: tItem.name, date: leaveTo })}
               </span>
             </div>
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-200">
-              Active Coverage
+              {t("coordinator.active_coverage", "Active Coverage")}
             </span>
           </div>
         );
@@ -467,10 +462,11 @@ export default function CoordinatorDashboard() {
         <div>
           <div className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Users className="h-5 w-5 text-blue-600" />
-            {user?.name || "Coordinator"}
+            {user?.name || t("roles.coordinator", "Coordinator")}
           </div>
           <div className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Team: <span className="font-semibold text-slate-800 dark:text-slate-200">{teamNameDisplay}</span>
+            {t("coordinator.department", "Department:")}{" "}
+            <span className="font-semibold text-slate-800 dark:text-slate-200">{user?.department_name || user?.department_id || "Campus Maintenance"}</span>
           </div>
         </div>
 
@@ -481,9 +477,9 @@ export default function CoordinatorDashboard() {
             onClick={() => setShowLeaveModal(true)}
           >
             <Calendar className="h-4 w-4 text-amber-500" />
-            I am on leave
+            {t("coordinator.on_leave_btn", "I am on leave")}
           </Button>
-          <Button variant="ghost" className="p-2" onClick={reload} title="Refresh">
+          <Button variant="ghost" className="p-2" onClick={reload} title={t("common.refresh", "Refresh")}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
@@ -501,7 +497,7 @@ export default function CoordinatorDashboard() {
         />
         <ActionPill
           icon={Users}
-          label={t("pills.team_board", "Team board")}
+          label={t("pills.team_board", "Department board")}
           active={activeTab === "team_board"}
           onClick={() => setActiveTab("team_board")}
           tone="purple"
@@ -519,28 +515,28 @@ export default function CoordinatorDashboard() {
       {/* 4 Summary Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         <StatCard
-          label="To Assign"
+          label={t("coordinator.stat_to_assign", "To Assign")}
           value={toAssignComplaints.length}
           accent={toAssignComplaints.length > 0}
-          subtext="Needs worker assignment"
+          subtext={t("coordinator.stat_to_assign_sub", "Needs worker assignment")}
           onClick={() => setActiveTab("to_assign")}
         />
         <StatCard
-          label="Team Board"
+          label={t("coordinator.stat_team_board", "Team Board")}
           value={teamBoardComplaints.length}
-          subtext="Active jobs across team"
+          subtext={t("coordinator.stat_team_board_sub", "Active jobs across team")}
           onClick={() => setActiveTab("team_board")}
         />
         <StatCard
-          label="My Jobs"
+          label={t("coordinator.stat_my_jobs", "My Jobs")}
           value={myJobs.length}
-          subtext="Assigned to me directly"
+          subtext={t("coordinator.stat_my_jobs_sub", "Assigned to me directly")}
           onClick={() => setActiveTab("my_jobs")}
         />
         <StatCard
-          label="Avg Time to Assign"
+          label={t("coordinator.stat_avg_assign_time", "Avg Time to Assign")}
           value={stats?.avg_time_to_assign ? `${stats.avg_time_to_assign}h` : "N/A"}
-          subtext="Team responsiveness"
+          subtext={t("coordinator.stat_avg_assign_sub", "Team responsiveness")}
           onClick={() => setActiveTab("stats")}
         />
       </div>
@@ -562,7 +558,7 @@ export default function CoordinatorDashboard() {
             }`}
           >
             <Clock className="h-4 w-4" />
-            To assign
+            {t("coordinator.tab_to_assign", "To assign")}
             <span className={`px-2 py-0.5 text-[10px] rounded-full font-bold ${
               activeTab === "to_assign" ? "bg-blue-600 text-white" : "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
             }`}>
@@ -580,7 +576,7 @@ export default function CoordinatorDashboard() {
             }`}
           >
             <Users className="h-4 w-4" />
-            Team board
+            {t("coordinator.tab_team_board", "Department board")}
             <span className={`px-2 py-0.5 text-[10px] rounded-full font-bold ${
               activeTab === "team_board" ? "bg-blue-600 text-white" : "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
             }`}>
@@ -598,7 +594,7 @@ export default function CoordinatorDashboard() {
             }`}
           >
             <Wrench className="h-4 w-4" />
-            My jobs
+            {t("coordinator.tab_my_jobs", "My jobs")}
             <span className={`px-2 py-0.5 text-[10px] rounded-full font-bold ${
               activeTab === "my_jobs" ? "bg-blue-600 text-white" : "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
             }`}>
@@ -616,7 +612,7 @@ export default function CoordinatorDashboard() {
             }`}
           >
             <TrendingUp className="h-4 w-4" />
-            Stats & Performance
+            {t("coordinator.tab_stats", "Stats & Performance")}
           </button>
 
           <button
@@ -629,7 +625,7 @@ export default function CoordinatorDashboard() {
             }`}
           >
             <Users className="h-4 w-4" />
-            Team Workforce
+            {t("coordinator.tab_workforce", "Staff Workforce")}
           </button>
         </div>
 
@@ -638,17 +634,17 @@ export default function CoordinatorDashboard() {
           <div className="p-5 space-y-4">
             <div className="flex items-center justify-between pb-2">
               <span className="text-xs text-slate-500 font-medium">
-                Complaints waiting for assignment, sorted by deadline (soonest first).
+                {t("coordinator.to_assign_subtitle", "Complaints waiting for assignment, sorted by deadline (soonest first).")}
               </span>
               <Button size="sm" variant="ghost" onClick={reload} className="text-xs">
-                Refresh Queue
+                {t("coordinator.refresh_queue", "Refresh Queue")}
               </Button>
             </div>
 
             {toAssignComplaints.length === 0 ? (
               <EmptyState
-                title="All Complaints Assigned"
-                description="Your team's intake queue is completely clear! No complaints are currently waiting to be assigned."
+                title={t("coordinator.all_assigned_title", "All Complaints Assigned")}
+                description={t("coordinator.all_assigned_desc", "Your team's intake queue is completely clear! No complaints are currently waiting to be assigned.")}
               />
             ) : (
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -666,7 +662,7 @@ export default function CoordinatorDashboard() {
                           {c.title || c.category}
                         </Link>
                         <Badge tone={getPriorityTone(c.priority)}>
-                          {c.priority || "Medium"}
+                          {getPriorityLabel(c.priority, t)}
                         </Badge>
                         {getAssignCountdownBadge(c)}
                       </div>
@@ -682,12 +678,12 @@ export default function CoordinatorDashboard() {
                           {c.exact_spot ? ` • ${c.exact_spot}` : ""}
                         </span>
                         <span>•</span>
-                        <span>Filed {formatDate(c.created_at)}</span>
+                        <span>{t("coordinator.filed", "Filed")} {formatDate(c.created_at)}</span>
                         {c.returned_reason && (
                           <>
                             <span>•</span>
                             <span className="text-rose-600 font-semibold">
-                              Returned: {c.returned_reason}
+                              {t("coordinator.returned", "Returned:")} {c.returned_reason}
                             </span>
                           </>
                         )}
@@ -702,7 +698,7 @@ export default function CoordinatorDashboard() {
                         className="font-bold text-xs flex items-center gap-1.5 shadow-sm py-2 px-4"
                       >
                         <User className="h-4 w-4" />
-                        Assign to...
+                        {t("coordinator.assign_to", "Assign to...")}
                       </Button>
                       <Button
                         size="sm"
@@ -710,7 +706,7 @@ export default function CoordinatorDashboard() {
                         onClick={() => navigate(`/complaints/${c.complaint_id}`)}
                         className="text-xs"
                       >
-                        Details
+                        {t("coordinator.details", "Details")}
                       </Button>
                     </div>
                   </div>
@@ -725,17 +721,17 @@ export default function CoordinatorDashboard() {
           <div className="p-5 space-y-4">
             <div className="flex items-center justify-between pb-2">
               <span className="text-xs text-slate-500 font-medium">
-                Active jobs across the team with assigned worker and status.
+                {t("coordinator.team_board_subtitle", "Active jobs across the team with assigned worker and status.")}
               </span>
               <Button size="sm" variant="ghost" onClick={reload} className="text-xs">
-                Refresh Board
+                {t("coordinator.refresh_board", "Refresh Board")}
               </Button>
             </div>
 
             {teamBoardComplaints.length === 0 ? (
               <EmptyState
-                title="No Active Jobs on Board"
-                description="No open jobs currently assigned across the team."
+                title={t("coordinator.no_active_jobs_title", "No Active Jobs on Board")}
+                description={t("coordinator.no_active_jobs_desc", "No open jobs currently assigned across the team.")}
               />
             ) : (
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -753,19 +749,19 @@ export default function CoordinatorDashboard() {
                           {c.title || c.category}
                         </Link>
                         <Badge tone={getPriorityTone(c.priority)}>
-                          {c.priority || "Medium"}
+                          {getPriorityLabel(c.priority, t)}
                         </Badge>
                         <Badge tone={getStatusTone(c.status)}>
-                          {c.status}
+                          {getStatusLabel(c.status, t)}
                         </Badge>
                         {c.assignee_on_leave_flag && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300">
-                            Assignee on leave
+                            {t("coordinator.assignee_on_leave", "Assignee on leave")}
                           </span>
                         )}
                         {c.assignee_removed_flag && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-300">
-                            Assignee removed — reassign
+                            {t("coordinator.assignee_removed", "Assignee removed — reassign")}
                           </span>
                         )}
                       </div>
@@ -773,7 +769,7 @@ export default function CoordinatorDashboard() {
                       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
                         <span className="flex items-center gap-1 font-semibold text-slate-800 dark:text-slate-200">
                           <User className="h-3.5 w-3.5 text-blue-500" />
-                          Worker: {c.assigned_to}
+                          {t("coordinator.worker", "Worker:")} {c.assigned_to}
                         </span>
                         <span>•</span>
                         <span className="flex items-center gap-1">
@@ -785,7 +781,7 @@ export default function CoordinatorDashboard() {
                             <span>•</span>
                             <span className="flex items-center gap-1">
                               <Clock className="h-3.5 w-3.5 text-slate-400" />
-                              SLA: {formatDate(c.sla_deadline)}
+                              {t("employee.sla", "SLA:")} {formatDate(c.sla_deadline)}
                             </span>
                           </>
                         )}
@@ -799,7 +795,7 @@ export default function CoordinatorDashboard() {
                         onClick={() => setAssignModalComplaint(c)}
                         className="text-xs font-semibold"
                       >
-                        Reassign
+                        {t("coordinator.reassign", "Reassign")}
                       </Button>
                       <Button
                         size="sm"
@@ -807,7 +803,7 @@ export default function CoordinatorDashboard() {
                         onClick={() => handleOpenResolveModal(c)}
                         className="text-xs"
                       >
-                        Mark Done on Behalf
+                        {t("coordinator.mark_done_behalf", "Mark Done on Behalf")}
                       </Button>
                       <Button
                         size="sm"
@@ -815,7 +811,7 @@ export default function CoordinatorDashboard() {
                         onClick={() => navigate(`/complaints/${c.complaint_id}`)}
                         className="text-xs"
                       >
-                        Details
+                        {t("coordinator.details", "Details")}
                       </Button>
                     </div>
                   </div>
@@ -830,17 +826,17 @@ export default function CoordinatorDashboard() {
           <div className="p-5 space-y-4">
             <div className="flex items-center justify-between pb-2">
               <span className="text-xs text-slate-500 font-medium">
-                Jobs assigned to you directly. Fast execution with big Mark Done button.
+                {t("coordinator.my_jobs_subtitle", "Jobs assigned to you directly. Fast execution with big Mark Done button.")}
               </span>
               <Button size="sm" variant="ghost" onClick={reload} className="text-xs">
-                Refresh My Jobs
+                {t("coordinator.refresh_my_jobs", "Refresh My Jobs")}
               </Button>
             </div>
 
             {myJobs.length === 0 ? (
               <EmptyState
-                title="No Personal Assignments"
-                description="You currently have no jobs assigned to yourself. You can assign complaints to yourself from the 'To assign' queue."
+                title={t("coordinator.no_personal_jobs_title", "No Personal Assignments")}
+                description={t("coordinator.no_personal_jobs_desc", "You currently have no jobs assigned to yourself. You can assign complaints to yourself from the 'To assign' queue.")}
               />
             ) : (
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -860,10 +856,10 @@ export default function CoordinatorDashboard() {
                             {c.title || c.category}
                           </Link>
                           <Badge tone={getPriorityTone(c.priority)}>
-                            {c.priority || "Medium"}
+                            {getPriorityLabel(c.priority, t)}
                           </Badge>
                           <Badge tone={getStatusTone(c.status)}>
-                            {c.status}
+                            {getStatusLabel(c.status, t)}
                           </Badge>
                         </div>
 
@@ -877,7 +873,7 @@ export default function CoordinatorDashboard() {
                             {getLocationName(c.location_id, locations)}
                           </span>
                           <span>•</span>
-                          <span>Assigned {c.assigned_at ? formatDate(c.assigned_at) : "Recently"}</span>
+                          <span>{t("coordinator.assigned_date", "Assigned")} {c.assigned_at ? formatDate(c.assigned_at) : "Recently"}</span>
                         </div>
                       </div>
 
@@ -891,7 +887,7 @@ export default function CoordinatorDashboard() {
                             className="font-bold text-xs flex items-center gap-1.5 shadow-sm py-2 px-4"
                           >
                             <Play className="h-4 w-4" />
-                            Start Work
+                            {t("coordinator.start_work", "Start Work")}
                           </Button>
                         )}
 
@@ -902,7 +898,7 @@ export default function CoordinatorDashboard() {
                           className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm py-2 px-5 rounded-xl"
                         >
                           <Check className="h-4 w-4" />
-                          Mark Done
+                          {t("coordinator.mark_done", "Mark Done")}
                         </Button>
 
                         {/* More Menu Toggle */}
@@ -918,9 +914,9 @@ export default function CoordinatorDashboard() {
                           {isMenuOpen && (
                             <div className="absolute right-0 mt-1 w-52 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl z-20 py-1 text-xs">
                               <div className="px-3 py-1 text-[10px] font-semibold text-slate-400 uppercase">
-                                Preset Notes
+                                {t("employee.preset_notes", "Preset Notes")}
                               </div>
-                              {PRESET_WORKER_NOTES.map((preset) => (
+                              {presetNotes.map((preset) => (
                                 <button
                                   key={preset.code}
                                   type="button"
@@ -944,7 +940,7 @@ export default function CoordinatorDashboard() {
                                 className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200"
                               >
                                 <Pause className="h-3.5 w-3.5 text-amber-500" />
-                                Waiting for parts
+                                {t("employee.waiting_parts", "Waiting for parts")}
                               </button>
 
                               <button
@@ -957,7 +953,7 @@ export default function CoordinatorDashboard() {
                                 className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200"
                               >
                                 <Navigation className="h-3.5 w-3.5 text-indigo-500" />
-                                Wrong location
+                                {t("employee.wrong_location", "Wrong location")}
                               </button>
 
                               <button
@@ -970,7 +966,7 @@ export default function CoordinatorDashboard() {
                                 className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-rose-600 dark:text-rose-400"
                               >
                                 <RotateCcw className="h-3.5 w-3.5" />
-                                Return to queue
+                                {t("coordinator.return_to_queue", "Return to queue")}
                               </button>
                             </div>
                           )}
@@ -989,29 +985,29 @@ export default function CoordinatorDashboard() {
           <div className="p-5 space-y-6">
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-3">
-                Team Stats (This Month)
+                {t("coordinator.team_stats_title", "Team Stats (This Month)")}
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                  <div className="text-xs text-slate-500">Total Assigned</div>
+                  <div className="text-xs text-slate-500">{t("coordinator.stat_total_assigned", "Total Assigned")}</div>
                   <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">
                     {stats?.team_stats?.total_assigned_this_month ?? 0}
                   </div>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                  <div className="text-xs text-slate-500">Avg Time to Assign</div>
+                  <div className="text-xs text-slate-500">{t("coordinator.stat_avg_assign_time", "Avg Time to Assign")}</div>
                   <div className="text-2xl font-black text-blue-600 mt-1">
                     {stats?.team_stats?.avg_time_to_assign ? `${stats.team_stats.avg_time_to_assign}h` : "N/A"}
                   </div>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                  <div className="text-xs text-slate-500">Overdue Now</div>
+                  <div className="text-xs text-slate-500">{t("coordinator.stat_overdue_now", "Overdue Now")}</div>
                   <div className="text-2xl font-black text-rose-600 mt-1">
                     {stats?.team_stats?.overdue_now ?? 0}
                   </div>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                  <div className="text-xs text-slate-500">Escalated to Backup / Warden</div>
+                  <div className="text-xs text-slate-500">{t("coordinator.stat_escalated", "Escalated to Backup / Warden")}</div>
                   <div className="text-2xl font-black text-amber-600 mt-1">
                     {(stats?.team_stats?.escalations_to_backup_count ?? 0) + (stats?.team_stats?.escalations_to_warden_count ?? 0)}
                   </div>
@@ -1021,29 +1017,29 @@ export default function CoordinatorDashboard() {
 
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-3">
-                My Worker Stats (Personal)
+                {t("coordinator.my_worker_stats", "My Worker Stats (Personal)")}
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                  <div className="text-xs text-slate-500">Open Jobs</div>
+                  <div className="text-xs text-slate-500">{t("employee.stats_open_jobs", "Open Jobs")}</div>
                   <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">
                     {stats?.worker_stats?.open_jobs ?? myJobs.length}
                   </div>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                  <div className="text-xs text-slate-500">Completed This Month</div>
+                  <div className="text-xs text-slate-500">{t("employee.stats_completed_month", "Completed This Month")}</div>
                   <div className="text-2xl font-black text-emerald-600 mt-1">
                     {stats?.worker_stats?.completed_this_month ?? 0}
                   </div>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                  <div className="text-xs text-slate-500">Avg Time to Fix</div>
+                  <div className="text-xs text-slate-500">{t("coordinator.stat_avg_fix_time", "Avg Time to Fix")}</div>
                   <div className="text-2xl font-black text-blue-600 mt-1">
                     {stats?.worker_stats?.avg_time_to_fix ? `${stats.worker_stats.avg_time_to_fix}h` : "N/A"}
                   </div>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                  <div className="text-xs text-slate-500">On-time Rate</div>
+                  <div className="text-xs text-slate-500">{t("coordinator.stat_on_time_rate", "On-time Rate")}</div>
                   <div className="text-2xl font-black text-indigo-600 mt-1">
                     {stats?.worker_stats?.on_time_rate ?? 100}%
                   </div>
@@ -1059,35 +1055,35 @@ export default function CoordinatorDashboard() {
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  Team Members & Workforce
+                  {t("coordinator.workforce_title", "Team Members & Workforce")}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Manage worker accounts, coverage, and reset temporary passwords for in-person handoff.
+                  {t("coordinator.workforce_subtitle", "Manage worker accounts, coverage, and reset temporary passwords for in-person handoff.")}
                 </p>
               </div>
               <Button size="sm" variant="ghost" onClick={loadAllTeamMembers} className="text-xs">
-                Refresh Workforce
+                {t("coordinator.refresh_workforce", "Refresh Workforce")}
               </Button>
             </div>
 
             {loadingMembers ? (
-              <div className="p-8 text-center text-xs text-slate-500">Loading team workforce...</div>
+              <div className="p-8 text-center text-xs text-slate-500">{t("coordinator.loading_workforce", "Loading team workforce...")}</div>
             ) : teamMembersList.length === 0 ? (
               <EmptyState
-                title="No Workers in Team"
-                description="Your team does not have any workers assigned yet. Please contact your App Manager or Admin to assign workers to your team."
+                title={t("coordinator.no_workers_title", "No Workers Assigned")}
+                description={t("coordinator.no_workers_desc", "No employees currently assigned to this department.")}
               />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 font-bold border-y border-slate-200 dark:border-slate-700">
                     <tr>
-                      <th className="py-2.5 px-3">Name</th>
-                      <th className="py-2.5 px-3">Role</th>
-                      <th className="py-2.5 px-3">Phone</th>
-                      <th className="py-2.5 px-3">Team</th>
-                      <th className="py-2.5 px-3">Status</th>
-                      <th className="py-2.5 px-3 text-right">Actions</th>
+                      <th className="py-2.5 px-3">{t("coordinator.col_member", "Name")}</th>
+                      <th className="py-2.5 px-3">{t("coordinator.col_role", "Role")}</th>
+                      <th className="py-2.5 px-3">{t("coordinator.col_phone", "Phone")}</th>
+                      <th className="py-2.5 px-3">Department / Assigned Scope</th>
+                      <th className="py-2.5 px-3">{t("coordinator.col_status", "Status")}</th>
+                      <th className="py-2.5 px-3 text-right">{t("coordinator.col_actions", "Actions")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1097,13 +1093,13 @@ export default function CoordinatorDashboard() {
                           {m.name}
                         </td>
                         <td className="py-3 px-3 text-slate-600 dark:text-slate-300">
-                          Employee
+                          {t("roles.employee", "Employee")}
                         </td>
                         <td className="py-3 px-3 text-slate-700 dark:text-slate-300 font-mono">
                           {m.phone || "—"}
                         </td>
                         <td className="py-3 px-3 text-slate-500">
-                          {m.team_name}
+                          {(m.memberships || []).map(x => `${x.department_name} @ ${x.location_name}`).join(", ") || m.department_id || "Campus Maintenance"}
                         </td>
                         <td className="py-3 px-3">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -1111,7 +1107,7 @@ export default function CoordinatorDashboard() {
                               ? "bg-amber-100 text-amber-800"
                               : "bg-emerald-100 text-emerald-800"
                           }`}>
-                            {m.on_leave ? "On Leave" : "Available"}
+                            {m.on_leave ? t("coordinator.status_on_leave", "On Leave") : t("coordinator.status_available", "Available")}
                           </span>
                         </td>
                         <td className="py-3 px-3 text-right">
@@ -1120,10 +1116,10 @@ export default function CoordinatorDashboard() {
                             variant="outline"
                             onClick={() => handleResetWorkerPassword(m)}
                             className="text-xs font-bold border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40"
-                            title="Generate and print login slip with CP-XXXX temporary password"
+                            title={t("coordinator.title_reset_slip", "Generate and print login slip with CP-XXXX temporary password")}
                           >
                             <Key className="h-3.5 w-3.5 mr-1 text-amber-600" />
-                            Reset Password Slip
+                            {t("coordinator.btn_reset_pwd_slip", "Reset Password Slip")}
                           </Button>
                         </td>
                       </tr>
@@ -1144,7 +1140,7 @@ export default function CoordinatorDashboard() {
         onAssigned={() => {
           reload();
           setToastTone("success");
-          setToastMessage("Complaint assigned successfully.");
+          setToastMessage(t("coordinator.toast_assigned", "Complaint assigned successfully."));
         }}
       />
 
@@ -1166,7 +1162,7 @@ export default function CoordinatorDashboard() {
       <Modal
         isOpen={showResolveModal}
         onClose={() => setShowResolveModal(false)}
-        title="Mark Job as Resolved"
+        title={t("employee.modal_resolve_title", "Mark Job as Resolved")}
       >
         <form onSubmit={handleConfirmResolve} className="space-y-4">
           {resolveError && (
@@ -1179,18 +1175,18 @@ export default function CoordinatorDashboard() {
             <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl text-sm">
               <div className="font-semibold">{selectedComplaint.title || selectedComplaint.category}</div>
               <div className="text-xs text-slate-500 mt-0.5">
-                Worker: <span className="font-medium text-slate-700 dark:text-slate-300">{selectedComplaint.assigned_to}</span>
+                {t("coordinator.worker", "Worker:")} <span className="font-medium text-slate-700 dark:text-slate-300">{selectedComplaint.assigned_to}</span>
               </div>
             </div>
           )}
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">
-              After-repair Photo URL
+              {t("employee.photo_url_label", "After-repair Photo URL")}
             </label>
             <input
               type="text"
-              placeholder="https://... or uploaded image URL"
+              placeholder={t("employee.photo_url_placeholder", "https://... or uploaded image URL")}
               value={proofUrl}
               onChange={(e) => setProofUrl(e.target.value)}
               disabled={isPhotoSkipped}
@@ -1207,12 +1203,12 @@ export default function CoordinatorDashboard() {
                   onChange={(e) => setIsPhotoSkipped(e.target.checked)}
                   className="rounded text-blue-600"
                 />
-                Skip after-repair photo
+                {t("employee.skip_photo", "Skip after-repair photo")}
               </label>
               {isPhotoSkipped && (
                 <input
                   type="text"
-                  placeholder="Reason for skipping photo..."
+                  placeholder={t("employee.skip_photo_placeholder", "Reason for skipping photo...")}
                   value={photoSkipReason}
                   onChange={(e) => setPhotoSkipReason(e.target.value)}
                   className="w-full text-xs rounded border border-amber-300 bg-white dark:bg-slate-900 p-1.5 text-slate-900 dark:text-slate-100 outline-none"
@@ -1224,11 +1220,11 @@ export default function CoordinatorDashboard() {
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">
-              Resolution Notes
+              {t("employee.resolution_notes_label", "Resolution Notes")}
             </label>
             <textarea
               rows={2}
-              placeholder="What was fixed..."
+              placeholder={t("employee.resolution_notes_placeholder", "What was fixed...")}
               value={resolveNotesText}
               onChange={(e) => setResolveNotesText(e.target.value)}
               className="w-full text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500"
@@ -1237,10 +1233,10 @@ export default function CoordinatorDashboard() {
 
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
             <Button variant="secondary" onClick={() => setShowResolveModal(false)} disabled={submittingResolve}>
-              Cancel
+              {t("common.cancel", "Cancel")}
             </Button>
             <Button variant="primary" type="submit" disabled={submittingResolve} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              {submittingResolve ? "Resolving..." : "Confirm Done"}
+              {submittingResolve ? t("employee.submitting", "Resolving...") : t("employee.confirm_mark_done", "Confirm Done")}
             </Button>
           </div>
         </form>
@@ -1250,12 +1246,12 @@ export default function CoordinatorDashboard() {
       <Modal
         isOpen={showPartsModal}
         onClose={() => setShowPartsModal(false)}
-        title="Waiting for Parts"
+        title={t("employee.waiting_parts", "Waiting for Parts")}
       >
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">
-              Parts Details / Reason <span className="text-rose-500">*</span>
+              {t("employee.parts_needed_label", "Parts Details / Reason")} <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
@@ -1267,7 +1263,7 @@ export default function CoordinatorDashboard() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">
-              Expected Arrival Date (Optional)
+              {t("employee.expected_date_label", "Expected Arrival Date (Optional)")}
             </label>
             <input
               type="date"
@@ -1278,14 +1274,14 @@ export default function CoordinatorDashboard() {
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setShowPartsModal(false)} disabled={pausingParts}>
-              Cancel
+              {t("common.cancel", "Cancel")}
             </Button>
             <Button
               variant="primary"
               disabled={!partsReason.trim() || pausingParts}
               onClick={handleConfirmParts}
             >
-              {pausingParts ? "Pausing..." : "Pause for Parts"}
+              {pausingParts ? t("employee.pausing", "Pausing...") : t("employee.confirm_pause", "Pause for Parts")}
             </Button>
           </div>
         </div>
@@ -1295,19 +1291,19 @@ export default function CoordinatorDashboard() {
       <Modal
         isOpen={showWrongLocModal}
         onClose={() => setShowWrongLocModal(false)}
-        title="Report Wrong Location"
+        title={t("employee.modal_wrong_loc_title", "Report Wrong Location")}
       >
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">
-              Correct Location <span className="text-rose-500">*</span>
+              {t("employee.actual_location_label", "Correct Location")} <span className="text-rose-500">*</span>
             </label>
             <select
               value={newLocationId}
               onChange={(e) => setNewLocationId(e.target.value)}
               className="w-full text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Select location...</option>
+              <option value="">{t("employee.select_location", "Select location...")}</option>
               {locations.map((loc) => (
                 <option key={loc.location_id} value={loc.location_id}>
                   {loc.name}
@@ -1317,7 +1313,7 @@ export default function CoordinatorDashboard() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">
-              Note (Optional)
+              {t("employee.additional_details_label", "Note (Optional)")}
             </label>
             <input
               type="text"
@@ -1329,14 +1325,14 @@ export default function CoordinatorDashboard() {
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setShowWrongLocModal(false)} disabled={reportingWrongLoc}>
-              Cancel
+              {t("common.cancel", "Cancel")}
             </Button>
             <Button
               variant="primary"
               disabled={!newLocationId || reportingWrongLoc}
               onClick={handleConfirmWrongLocation}
             >
-              {reportingWrongLoc ? "Updating..." : "Submit New Location"}
+              {reportingWrongLoc ? t("employee.updating", "Updating...") : t("employee.reroute_btn", "Submit New Location")}
             </Button>
           </div>
         </div>
@@ -1346,19 +1342,19 @@ export default function CoordinatorDashboard() {
       <Modal
         isOpen={showReturnModal}
         onClose={() => setShowReturnModal(false)}
-        title="Return Complaint to Queue"
+        title={t("coordinator.modal_return_queue_title", "Return Complaint to Queue")}
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-500">
-            This complaint will return to the "To assign" queue, and the assign timer will reset.
+            {t("coordinator.modal_return_queue_desc", "This complaint will return to the 'To assign' queue, and the assign timer will reset.")}
           </p>
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase mb-1">
-              Reason for Return <span className="text-rose-500">*</span>
+              {t("employee.return_reason_label", "Reason for Return")} <span className="text-rose-500">*</span>
             </label>
             <textarea
               rows={3}
-              placeholder="Reason for returning this job..."
+              placeholder={t("coordinator.reassign_reason_placeholder", "Reason for returning this job...")}
               value={returnReason}
               onChange={(e) => setReturnReason(e.target.value)}
               className="w-full text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-blue-500"
@@ -1367,14 +1363,14 @@ export default function CoordinatorDashboard() {
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setShowReturnModal(false)} disabled={returning}>
-              Cancel
+              {t("common.cancel", "Cancel")}
             </Button>
             <Button
               variant="danger"
               disabled={!returnReason.trim() || returning}
               onClick={handleConfirmReturn}
             >
-              {returning ? "Returning..." : "Return Job"}
+              {returning ? t("employee.returning", "Returning...") : t("employee.return_queue_btn", "Return Job")}
             </Button>
           </div>
         </div>

@@ -30,12 +30,41 @@ def pytest_configure(config):
     _cleanup_isolated_db()
     try:
         if os.path.exists(BASE_DB_PATH):
-            shutil.copy2(BASE_DB_PATH, TEST_DB_PATH)
+            import sqlite3
+            src = sqlite3.connect(f"file:{BASE_DB_PATH}?mode=ro", uri=True)
+            dst = sqlite3.connect(TEST_DB_PATH)
+            with dst:
+                src.backup(dst)
+            dst.close()
+            src.close()
         os.environ["DATABASE_PATH"] = TEST_DB_PATH
         from api.dependencies import _service_cache
         _service_cache.clear()
     except Exception:
         pass
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiters_and_lockouts():
+    """Ensure test cases do not suffer from cross-test rate-limiter or login-lockout cascades."""
+    try:
+        from middleware.rate_limiter import auth_limiter
+        auth_limiter._requests.clear()
+        auth_limiter._lockouts.clear()
+    except Exception:
+        pass
+
+    try:
+        import sqlite3
+        db_path = os.environ.get("DATABASE_PATH", TEST_DB_PATH)
+        if os.path.exists(db_path):
+            with sqlite3.connect(db_path) as conn:
+                conn.execute("DELETE FROM login_attempts")
+                conn.execute("DELETE FROM login_rate_limits")
+                conn.commit()
+    except Exception:
+        pass
+    yield
 
 
 def pytest_unconfigure(config):

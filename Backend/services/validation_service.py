@@ -11,16 +11,17 @@ class ValidationService:
         self.auth_service = auth_service
 
     def validate_unique_department_name(self, name: str, exclude_id: str = None, location_id: str = None):
-        """Checks if a department with the given name already exists in the same location (case-insensitive)."""
-        normalized_name = name.strip().lower()
+        """Checks if a department with the given name already exists across campus (case and whitespace insensitive)."""
+        normalized_name = " ".join(name.strip().split()).lower()
         for dept in self.auth_service.list_departments():
-            if dept.name.strip().lower() == normalized_name and dept.location_id == location_id:
+            dept_normalized = " ".join(dept.name.strip().split()).lower()
+            if dept_normalized == normalized_name:
                 if exclude_id and dept.department_id == exclude_id:
                     continue
-                logger.warning(f"Duplicate department name detected under location {location_id}: {name}")
+                logger.warning(f"Duplicate department name detected across campus: {name}")
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=f'Department "{name.strip()}" already exists under this location. Please choose another name.',
+                    detail=f'Department "{name.strip()}" already exists. Department names must be unique across campus.',
                 )
 
     def validate_unique_location_name(self, name: str, exclude_id: str = None):

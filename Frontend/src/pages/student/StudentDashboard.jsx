@@ -25,7 +25,6 @@ import Badge from "../../components/Badge.jsx";
 import Card from "../../components/Card.jsx";
 import Modal from "../../components/Modal.jsx";
 import Toast from "../../components/Toast.jsx";
-import FixerOfTheMonthWidget from "../../components/FixerOfTheMonthWidget.jsx";
 import EmergencyButton from "../../components/EmergencyButton.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useLanguage } from "../../context/LanguageContext.jsx";
@@ -73,7 +72,8 @@ export const getStudentStageText = (complaint) => {
   return status;
 };
 
-const getLocationName = (locId, locations = []) => {
+const getLocationName = (locId, locations = [], fallbackName = "") => {
+  if (fallbackName) return fallbackName;
   if (!locId) return "";
   const match = (locations || []).find((l) => l.location_id === locId || l.name === locId);
   if (match && match.name) return match.name;
@@ -111,72 +111,82 @@ export default function StudentDashboard() {
   const [actionSubmitting, setActionSubmitting] = useState(false);
 
   const {
-    data: dashboardData,
-    loading,
-    error,
-    reload,
-  } = useAsyncData(
-    async () => {
-      const [compRes, ancRes, notifRes, locRes] = await Promise.all([
-        complaintService.list().catch(() => ({ data: [] })),
-        announcementService.list().catch(() => ({ data: [] })),
-        notificationService
-          .listPaginated({ limit: 5 })
-          .then((res) => ({ data: res.data.items }))
-          .catch(() => ({ data: [] })),
-        locationService.list().catch(() => ({ data: [] })),
-      ]);
-      return {
-        complaints: compRes.data || [],
-        announcements: ancRes.data || [],
-        notifications: notifRes.data || [],
-        locations: locRes.data || [],
-      };
-    },
-    { complaints: [], announcements: [], notifications: [], locations: [] },
-  );
+    data: complaintsData,
+    loading: complaintsLoading,
+    error: complaintsError,
+    reload: reloadComplaints,
+  } = useAsyncData(async () => {
+    const res = await complaintService.list().catch(() => ({ data: [] }));
+    return res.data || [];
+  }, []);
 
-  const complaints = dashboardData?.complaints || [];
-  const announcements = dashboardData?.announcements || [];
-  const notifications = dashboardData?.notifications || [];
-  const locations = dashboardData?.locations || [];
+  const {
+    data: announcementsData,
+    loading: announcementsLoading,
+  } = useAsyncData(async () => {
+    const res = await announcementService.list().catch(() => ({ data: [] }));
+    return res.data || [];
+  }, []);
 
-  const myComplaints = useMemo(
-    () =>
-      complaints.filter(
-        (c) => c.created_by === user?.user_id || c.student_id === user?.user_id,
-      ),
-    [complaints, user],
-  );
+  const {
+    data: notificationsData,
+    loading: notificationsLoading,
+    reload: reloadNotifications,
+  } = useAsyncData(async () => {
+    const res = await notificationService
+      .listPaginated({ limit: 5 })
+      .catch(() => ({ data: { items: [] } }));
+    return res.data?.items || [];
+  }, []);
 
-  const needAttentionComplaints = useMemo(() => {
-    return myComplaints.filter(
-      (c) =>
-        c.status === "Waiting for Verification" ||
-        c.status === COMPLAINT_STATUS.WAITING_VERIFICATION ||
-        c.status === "Admin Review" ||
-        c.status === "Reopened",
-    );
-  }, [myComplaints]);
+  const { data: locationsData } = useAsyncData(async () => {
+    const res = await locationService.list().catch(() => ({ data: [] }));
+    return res.data || [];
+  }, []);
+
+  const complaints = complaintsData || [];
+  const announcements = announcementsData || [];
+  const notifications = notificationsData || [];
+  const locations = locationsData || [];
+
+  const unreadAnnouncements = useMemo(() => {
+    return announcements.filter((a) => !a.is_read);
+  }, [announcements]);
+
+  const unreadAnnouncementsCount = unreadAnnouncements.length;
+
+  const isClosedStatus = (statusStr) => {
+    if (!statusStr) return false;
+    const s = String(statusStr).toLowerCase();
+    return s.startsWith("closed") || s === "rejected";
+  };
 
   const activeComplaints = useMemo(() => {
-    return myComplaints.filter(
-      (c) => !["Closed", "Closed (Auto Closed)", "Rejected"].includes(c.status),
-    );
-  }, [myComplaints]);
+    return complaints.filter((c) => !isClosedStatus(c.status));
+  }, [complaints]);
 
   const closedCount = useMemo(() => {
-    return myComplaints.filter((c) =>
-      ["Closed", "Closed (Auto Closed)"].includes(c.status),
-    ).length;
-  }, [myComplaints]);
+    return complaints.filter((c) => isClosedStatus(c.status)).length;
+  }, [complaints]);
+
+  const needAttentionComplaints = useMemo(() => {
+    return complaints.filter(
+      (c) =>
+        (c.created_by === user?.user_id || c.student_id === user?.user_id) &&
+        (c.status === "Waiting for Verification" ||
+          c.status === COMPLAINT_STATUS.WAITING_VERIFICATION ||
+          c.status === "Admin Review" ||
+          c.status === "Reopened"),
+    );
+  }, [complaints, user]);
 
   const handleConfirmClose = async (complaintId) => {
     setActionSubmitting(true);
     try {
       await complaintService.verify(complaintId);
       setToast({ type: "success", message: "Complaint confirmed and marked closed." });
-      reload();
+      reloadComplaints();
+      reloadNotifications();
     } catch (err) {
       setToast({
         type: "danger",
@@ -200,7 +210,8 @@ export default function StudentDashboard() {
       setToast({ type: "success", message: "Complaint reopened. Coordinator has been notified." });
       setReopenTarget(null);
       setReopenReason("");
-      reload();
+      reloadComplaints();
+      reloadNotifications();
     } catch (err) {
       setToast({
         type: "danger",
@@ -210,11 +221,6 @@ export default function StudentDashboard() {
       setActionSubmitting(false);
     }
   };
-
-  if (loading)
-    return <Loader label="Loading student dashboard..." variant="skeleton" />;
-  if (error)
-    return <EmptyState title="Dashboard Unavailable" description={error} />;
 
   return (
     <div className="space-y-6">
@@ -258,14 +264,14 @@ export default function StudentDashboard() {
         <ActionPill
           icon={FileText}
           label={t("pills.my_complaints", "My complaints")}
-          count={activeComplaints.length}
+          count={complaintsLoading ? undefined : activeComplaints.length}
           to="/complaints"
           tone="indigo"
         />
         <ActionPill
           icon={Megaphone}
           label={t("pills.notices", "Notices")}
-          count={announcements.length}
+          count={announcementsLoading ? undefined : unreadAnnouncementsCount}
           to="/announcements"
           tone="emerald"
         />
@@ -273,35 +279,44 @@ export default function StudentDashboard() {
 
       {/* 3 Key Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-        <StatCard
-          label="Need Attention"
-          value={needAttentionComplaints.length}
-          accent={needAttentionComplaints.length > 0}
-          subtext={
-            needAttentionComplaints.length > 0
-              ? "Requires verification to close"
-              : "All verifications complete"
-          }
-          onClick={() => setActiveTab("need_attention")}
-        />
-        <StatCard
-          label="Active Problems"
-          value={activeComplaints.length}
-          subtext="Currently open or in progress"
-          onClick={() => setActiveTab("active")}
-        />
-        <StatCard
-          label="Resolved & Closed"
-          value={closedCount}
-          subtext="Completed tickets archive"
-          onClick={() =>
-            navigate("/complaints", { state: { status: "Closed" } })
-          }
-        />
+        {complaintsLoading ? (
+          <>
+            <div className="h-24 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-800" />
+            <div className="h-24 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-800" />
+            <div className="h-24 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-800" />
+          </>
+        ) : (
+          <>
+            <StatCard
+              label="Need Attention"
+              value={needAttentionComplaints.length}
+              accent={needAttentionComplaints.length > 0}
+              subtext={
+                needAttentionComplaints.length > 0
+                  ? "Requires verification to close"
+                  : "All verifications complete"
+              }
+              onClick={() => setActiveTab("need_attention")}
+            />
+            <StatCard
+              label="Active Problems"
+              value={activeComplaints.length}
+              subtext="Currently open or in progress"
+              onClick={() =>
+                navigate("/complaints", { state: { status: "active" } })
+              }
+            />
+            <StatCard
+              label="Resolved & Closed"
+              value={closedCount}
+              subtext="Completed tickets archive"
+              onClick={() =>
+                navigate("/complaints", { state: { status: "Closed" } })
+              }
+            />
+          </>
+        )}
       </div>
-
-      {/* Fixer of the Month Recognition Banner */}
-      <FixerOfTheMonthWidget />
 
       {/* Urgent Attention / Action Cards */}
       {needAttentionComplaints.length > 0 && (
@@ -350,7 +365,7 @@ export default function StudentDashboard() {
                       <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
                         <span className="flex items-center gap-1">
                           <MapPin className="h-3.5 w-3.5 text-primary" />
-                          {getLocationName(c.location_id, locations)}
+                          {getLocationName(c.location_id, locations, c.location_name)}
                         </span>
                         <span>•</span>
                         <span>{c.department_id || "General"}</span>
@@ -458,13 +473,26 @@ export default function StudentDashboard() {
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
               }`}
             >
-              All ({myComplaints.length})
+              All ({complaints.length})
             </button>
           </div>
         </div>
 
-        {(() => {
-          let listToDisplay = myComplaints;
+        {complaintsLoading ? (
+          <div className="space-y-3 py-2">
+            <div className="h-20 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800/60" />
+            <div className="h-20 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800/60" />
+            <div className="h-20 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800/60" />
+          </div>
+        ) : complaintsError ? (
+          <div className="py-6 text-center space-y-3">
+            <p className="text-xs text-rose-500 font-medium">{complaintsError}</p>
+            <Button size="sm" variant="outline" onClick={() => reloadComplaints()}>
+              Retry
+            </Button>
+          </div>
+        ) : (() => {
+          let listToDisplay = complaints;
           if (activeTab === "need_attention") listToDisplay = needAttentionComplaints;
           if (activeTab === "active") listToDisplay = activeComplaints;
 
@@ -504,12 +532,15 @@ export default function StudentDashboard() {
                       <Badge tone={getStatusTone(c.status)}>
                         {c.status}
                       </Badge>
+                      {c.visibility_type === "Community" && (
+                        <Badge tone="info">Community</Badge>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
                       <span className="flex items-center gap-1">
                         <MapPin className="h-3 w-3 text-primary" />
-                        {getLocationName(c.location_id, locations)}
+                        {getLocationName(c.location_id, locations, c.location_name)}
                       </span>
                       <span>•</span>
                       <span>{c.department_id || "General"}</span>
@@ -546,103 +577,60 @@ export default function StudentDashboard() {
         })()}
       </Card>
 
-      {/* Main Operations Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Campus Notices */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-200/80 dark:border-slate-800/80">
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-              <Megaphone className="h-3.5 w-3.5 text-amber-500" />
-              Campus Notices
-            </h2>
-            <Link
-              to="/announcements"
-              className="text-xs font-medium text-primary hover:underline"
-            >
-              View All
-            </Link>
-          </div>
-
-          {announcements.length === 0 ? (
-            <p className="text-xs text-slate-400 dark:text-slate-500 py-4 text-center">
-              No active announcements today.
-            </p>
-          ) : (
-            <div className="space-y-2.5">
-              {announcements.slice(0, 3).map((a) => (
-                <div
-                  key={a.announcement_id || a.id}
-                  className="p-3 rounded-xl bg-white dark:bg-[#101726] border border-slate-200/80 dark:border-slate-800/80 text-xs shadow-2xs space-y-1"
-                >
-                  <div className="flex items-center justify-between gap-2 font-medium text-slate-900 dark:text-slate-100">
-                    <span className="truncate">{a.title}</span>
-                    <Badge tone={a.priority === "Critical" ? "danger" : "warning"}>
-                      {a.priority || "Normal"}
-                    </Badge>
-                  </div>
-                  <p className="text-slate-500 dark:text-slate-400 line-clamp-2 text-[11px] leading-relaxed">
-                    {a.content || a.description}
-                  </p>
-                  <div className="text-[10px] text-slate-400 dark:text-slate-500 pt-1 flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {formatDate(a.created_at)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+      {/* Recent Activity */}
+      <Card className="!p-4 sm:!p-5 border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 shadow-2xs space-y-3">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+            <Bell className="h-3.5 w-3.5 text-primary" />
+            Recent Activity
+          </h2>
+          <Link
+            to="/notifications"
+            className="text-xs font-medium text-primary hover:underline"
+          >
+            View All
+          </Link>
         </div>
 
-        {/* Recent Activity */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-200/80 dark:border-slate-800/80">
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-              <Bell className="h-3.5 w-3.5 text-primary" />
-              Recent Activity
-            </h2>
-            <Link
-              to="/notifications"
-              className="text-xs font-medium text-primary hover:underline"
-            >
-              View All
-            </Link>
+        {notificationsLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 py-1">
+            <div className="h-14 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800/60" />
+            <div className="h-14 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800/60" />
           </div>
-
-          {notifications.length === 0 ? (
-            <p className="text-xs text-slate-400 dark:text-slate-500 py-4 text-center">
-              No recent activity.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {notifications.slice(0, 4).map((n) => (
-                <div
-                  key={n.notification_id || n.id}
-                  onClick={() => {
-                    if (n.reference_id && n.reference_type === "Complaint") {
-                      navigate(`/complaints/${n.reference_id}`);
-                    } else {
-                      navigate("/notifications");
-                    }
-                  }}
-                  className="flex items-start justify-between gap-2 p-2.5 rounded-xl bg-white dark:bg-[#101726] border border-slate-200/70 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 cursor-pointer transition-colors text-xs"
-                >
-                  <div className="space-y-0.5 min-w-0 pr-1">
-                    <div className="font-medium text-slate-800 dark:text-slate-200 truncate">
-                      {n.title || n.message}
-                    </div>
-                    <div className="text-[11px] text-slate-400 dark:text-slate-500 line-clamp-1">
-                      {n.message}
-                    </div>
+        ) : notifications.length === 0 ? (
+          <p className="text-xs text-slate-400 dark:text-slate-500 py-3 text-center">
+            No recent activity.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {notifications.slice(0, 4).map((n) => (
+              <div
+                key={n.notification_id || n.id}
+                onClick={() => {
+                  if (n.reference_id && n.reference_type === "Complaint") {
+                    navigate(`/complaints/${n.reference_id}`);
+                  } else {
+                    navigate("/notifications");
+                  }
+                }}
+                className="flex items-start justify-between gap-2 p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 cursor-pointer transition-colors text-xs"
+              >
+                <div className="space-y-0.5 min-w-0 pr-1">
+                  <div className="font-medium text-slate-800 dark:text-slate-200 truncate">
+                    {n.title || n.message}
                   </div>
-                  <span className="text-[10px] text-slate-400 shrink-0">
-                    {formatDate(n.created_at)}
-                  </span>
+                  <div className="text-[11px] text-slate-400 dark:text-slate-500 line-clamp-1">
+                    {n.message}
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+                <span className="text-[10px] text-slate-400 shrink-0">
+                  {formatDate(n.created_at)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {/* Student Reopen Modal */}
       {reopenTarget && (

@@ -1,23 +1,56 @@
-# Matches the two-process local dev stack documented in CLAUDE.md
-# ("Running Locally"): uvicorn on :8000, vite on :5173. No other services —
-# storage is the same file-based SQLite database the app already uses,
-# just persisted via a volume instead of living inside the container.
+# Campus Pulse — Production Docker Compose Stack
+# Multi-container orchestration for FastAPI Backend, React Frontend, and PostgreSQL 16.
+
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: campuspulse_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-campuspulse_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-campuspulse_secure_password}
+      POSTGRES_DB: ${POSTGRES_DB:-campuspulse}
+    ports:
+      - "5432:5432"
+    volumes:
+      - campus_pulse_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-campuspulse_user} -d ${POSTGRES_DB:-campuspulse}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./Backend
+    container_name: campuspulse_backend
     ports:
       - "8000:8000"
+    environment:
+      - DB_ENGINE=postgres
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-campuspulse_user}:${POSTGRES_PASSWORD:-campuspulse_secure_password}@db:5432/${POSTGRES_DB:-campuspulse}
+      - DB_POOL_MIN=2
+      - DB_POOL_MAX=20
+      - ENVIRONMENT=production
+      - CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
     volumes:
       - ./Backend/storage:/app/storage
       - ./Backend/logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
     build:
       context: ./Frontend
+    container_name: campuspulse_frontend
     ports:
       - "5173:5173"
     depends_on:
       - backend
     restart: unless-stopped
+
+volumes:
+  campus_pulse_pgdata:
+    name: campus_pulse_pgdata

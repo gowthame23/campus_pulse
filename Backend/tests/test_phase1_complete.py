@@ -36,12 +36,18 @@ def admin_headers():
 
 @pytest.fixture(scope="module")
 def app_mgr_headers():
-    return _login("manager@example.com", "Manager@123")
+    try:
+        return _login("ejjurothugowtham@gmail.com", "Manager@123")
+    except Exception:
+        return _login("manager@example.com", "Manager@123")
 
 
 @pytest.fixture(scope="module")
 def coord_headers():
-    return _login("coordinator@example.com", "Coordinator@123")
+    try:
+        return _login("gowthamejjurothu15@gmail.com", "Coord@123")
+    except Exception:
+        return _login("coordinator@example.com", "Coordinator@123")
 
 
 @pytest.fixture(scope="module")
@@ -59,6 +65,8 @@ def _create_user(admin_headers, role, email_prefix, location_id=None, department
         "password": "Temp@Pass123",
         "confirm_password": "Temp@Pass123",
     }
+    if role != "student":
+        payload["employee_id"] = f"EMP{uid.upper()[:6]}"
     if location_id:
         payload["location_id"] = location_id
     if department_id:
@@ -135,7 +143,7 @@ def test_accept_conflict_409_when_already_accepted(admin_headers):
         "coordinator_id": coord_b_data["user_id"],
         "location_id": "LOC_HOSTEL_1",
         "department_id": "DEPT_HOSTEL_ELECTRICAL",
-        "confirm_replacement": False,
+        "confirm_replacement": True,
     }, headers=admin_headers)
     assert map_res.status_code in (200, 201), map_res.text
 
@@ -162,6 +170,14 @@ def test_accept_conflict_409_when_already_accepted(admin_headers):
     res2 = client.post(f"/complaints/{cid}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=seed_coord_headers)
     assert res2.status_code == 409
     assert "already assigned" in res2.json()["detail"].lower()
+
+    # Restore USR_COORDINATOR mapping for subsequent tests in module
+    client.post("/departments/coordinators/assignments", json={
+        "coordinator_id": "USR_COORDINATOR",
+        "location_id": "LOC_HOSTEL_1",
+        "department_id": "DEPT_HOSTEL_ELECTRICAL",
+        "confirm_replacement": True,
+    }, headers=admin_headers)
 
 
 def test_single_tap_progress_notes(admin_headers, coord_headers):

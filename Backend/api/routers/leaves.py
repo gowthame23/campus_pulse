@@ -46,6 +46,7 @@ def set_leave(
             reason=payload.reason,
             set_by=current_user.user_id,
             caller_user=current_user,
+            department_id=payload.department_id,
         )
     except PermissionError as pe:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(pe))

@@ -15,11 +15,18 @@ def _ensure_attachment_access(complaint, current_user, complaint_service):
     if role in ("administrator", "app_manager"):
         return
     if role == "student":
-        if complaint.created_by == current_user.user_id:
+        user_ids = {str(current_user.user_id).lower()}
+        if getattr(current_user, "email", None):
+            user_ids.add(str(current_user.email).lower())
+        if str(complaint.created_by).lower() in user_ids:
             return
-        if complaint.visibility_type == "Community" and complaint.location_id == current_user.location_id:
+        # Allow access to Community or Public complaints
+        vis = (getattr(complaint, "visibility_type", "") or "").lower()
+        if vis in ("public", "community"):
             return
-    elif role == "coordinator":
+    elif role in ("coordinator", "employee"):
+        if complaint.assigned_to == current_user.user_id:
+            return
         coord_assignments = complaint_service.auth_service.list_coordinator_assignments(coordinator_id=current_user.user_id) or []
         for asgn in coord_assignments:
             a_loc = asgn.get("location_id")
@@ -28,8 +35,6 @@ def _ensure_attachment_access(complaint, current_user, complaint_service):
             dept_match = a_dept in ("ALL", None, complaint.department_id)
             if loc_match and dept_match:
                 return
-        if complaint.assigned_to == current_user.user_id:
-            return
     elif role == "location_in_charge":
         locs = complaint_service.auth_service.list_locations()
         assigned_locs = {l.location_id for l in locs if l.in_charge_id == current_user.user_id}
@@ -103,24 +108,24 @@ def upload_attachments(
                 detail="Students can only upload under the 'Additional' category.",
             )
 
-    elif u_role == "coordinator":
+    elif u_role in ("coordinator", "employee"):
         if complaint.assigned_to != current_user.user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Coordinators can only upload to complaints assigned to them.",
+                detail="Staff can only upload to complaints assigned to them.",
             )
 
         if category not in ("Before Repair", "After Repair"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Coordinators must upload under 'Before Repair' or 'After Repair' categories.",
+                detail="Staff must upload under 'Before Repair' or 'After Repair' categories.",
             )
 
         if complaint.status == Complaint.RESOLVED:
             if category != "After Repair":
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Coordinators can only upload 'After Repair' images for resolved complaints.",
+                    detail="Staff can only upload 'After Repair' images for resolved complaints.",
                 )
     else:
         raise HTTPException(

@@ -9,22 +9,26 @@ class Department:
         department_id=None,
         complaint_types=None,
         coordinator_id=None,
+        coordinator_2_id=None,
         active=True,
         archived=False,
         location_id=None,
         archived_by_role=None,
         archived_by=None,
+        description=None,
     ):
         self.department_id = department_id or generate_id("DEPT")
         self.name = name
         self.sla_days = int(sla_days)
         self.complaint_types = complaint_types or []
         self.coordinator_id = coordinator_id
+        self.coordinator_2_id = coordinator_2_id
         self.active = active
         self.archived = archived
         self.location_id = location_id
         self.archived_by_role = archived_by_role
         self.archived_by = archived_by
+        self.description = description
 
     def to_dict(self):
         return {
@@ -33,11 +37,13 @@ class Department:
             "sla_days": self.sla_days,
             "complaint_types": self.complaint_types,
             "coordinator_id": self.coordinator_id,
+            "coordinator_2_id": self.coordinator_2_id,
             "active": self.active,
             "archived": self.archived,
             "location_id": self.location_id,
             "archived_by_role": self.archived_by_role,
             "archived_by": self.archived_by,
+            "description": self.description,
         }
 
     @classmethod
@@ -48,9 +54,12 @@ class Department:
             data.get("department_id"),
             data.get("complaint_types", []),
             data.get("coordinator_id"),
+            data.get("coordinator_2_id"),
             data.get("active", True),
             data.get("archived", False),
             data.get("location_id"),
             data.get("archived_by_role"),
             data.get("archived_by"),
+            data.get("description"),
         )
+

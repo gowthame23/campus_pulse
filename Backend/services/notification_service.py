@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 
-from utils.helper import generate_id, now_string
+from utils.helper import generate_id, now_string, now
 from utils.logger import get_logger
 from utils.websocket_manager import manager
 
@@ -179,7 +179,7 @@ class NotificationService:
             return None
 
         nid = generate_id("NTF")
-        created_at = now_string()
+        created_at = now().strftime("%Y-%m-%d %H:%M:%S.%f")
 
         # Determine initial delivery status
         is_online = manager.is_online(receiver_id)
@@ -196,6 +196,21 @@ class NotificationService:
             "priority": priority,
         }
         payload_json = json.dumps(payload_dict)
+
+        # Deduplication check: do not flood duplicate unread alerts/reminders for the same reference item
+        if reference_id and notification_type in ("alert", "info"):
+            with self._connect() as conn:
+                existing = conn.execute(
+                    """SELECT notification_id FROM notifications 
+                       WHERE receiver_id = ? AND reference_id = ? AND title = ? AND is_read = 0 AND is_deleted = 0
+                       ORDER BY created_at DESC LIMIT 1""",
+                    (receiver_id, reference_id, title),
+                ).fetchone()
+                if existing:
+                    logger.info(
+                        f"[Notification Deduplicated] Notification for {receiver_id} ref {reference_id} title '{title}' already pending unread."
+                    )
+                    return existing["notification_id"]
 
         with self._connect() as conn:
             conn.execute(
@@ -274,6 +289,8 @@ class NotificationService:
             )
 
         return notification_payload
+
+    create_notification = publish
 
     # Backward compatible helper methods
     def notify(

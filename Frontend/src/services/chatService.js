@@ -3,7 +3,7 @@ import axios from "../api/axios";
 export const chatService = {
   // 1:1 Personal Chat methods
   getContacts: () => axios.get("/chat/users"),
-  getConversations: () => axios.get("/chat/conversations"),
+  getConversations: (params) => axios.get("/chat/conversations", { params }),
   getUnreadCount: () => axios.get("/chat/unread-count"),
   startPersonalChat: (recipientId) =>
     axios.post("/chat/personal/start", { recipient_id: recipientId }),

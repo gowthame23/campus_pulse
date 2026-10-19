@@ -2,7 +2,12 @@ import apiClient from "../api/axios";
 
 export const authService = {
   login: (payload) => apiClient.post("/auth/login", payload),
-  logout: () => apiClient.post("/auth/logout"),
+  logout: (token) =>
+    apiClient.post(
+      "/auth/logout",
+      {},
+      token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
+    ),
   me: () => apiClient.get("/auth/me"),
   changePassword: (payload) => apiClient.post("/auth/change-password", payload),
   resetPassword: (payload) => apiClient.post("/auth/reset-password", payload),

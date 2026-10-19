@@ -34,13 +34,13 @@ graph TD
    - **Restrictions:** Cannot access or modify other institutions in multi-tenant mode.
 3. **App Manager (`app_manager`):**
    - **Scope:** Multi-location operational supervisor (Hostel, Mess, Academic Block, SAC, Sports).
-   - **Permissions:** Operational dashboard, user management (Coordinators/Students), location management, complaint reassignment across assigned locations, notice broadcasts, reports, analytics, audit log inspection.
-   - **Restrictions:** Cannot alter system-wide root configurations or perform destructive database resets.
+   - **Permissions:** Operational dashboard, user management (Coordinators/Students/Staff), location management, complaint reassignment across assigned locations, notice broadcasts, reports, analytics, audit log inspection.
+   - **Restrictions (Remediation F-05):** Strictly prohibited from modifying, deactivating, or restoring `administrator` or `super_admin` accounts (`PermissionError`); prohibited from assigning the `administrator` role during user imports; cannot alter root system settings or restore full database backups.
 4. **Warden / Location In-Charge (`location_in_charge`):**
    - **Scope:** Assigned physical facility (Hostel, Mess, or Complex).
    - **Permissions:** Supervises facility complaints; in-person verification of High/Critical resolutions and 10% random spot checks; publishes location-scoped announcements (hostel circulars); can submit complaints on behalf of residents.
    - **Restrictions:** **Never assigned complaints to fix; cannot mark complaints resolved; cannot verify complaints they filed themselves**; cannot modify departmental definitions or create administrator accounts.
-5. **Coordinator (`coordinator`):**
+5. **Coordinator (`coordinator` / `employee`):**
    - **Scope:** Multi-department and multi-location service delivery (e.g. Carpentry + Electrical across Block A and Block B).
    - **Permissions:** Accept tickets from pooled queues; update complaint progress; mark resolved and upload photo proof; add internal/public comments; direct chat with complainants.
    - **Restrictions:** **Cannot verify complaints; cannot publish campus announcements** (strictly rejected with 403 Forbidden); cannot manage user accounts or modify campus infrastructure.
@@ -63,9 +63,10 @@ graph TD
 | **Reopen Resolved Complaints** | No | Yes | No | No | No | **Yes** (Author)| `POST /complaints/:id/reopen` |
 | **Compose & Publish Notices** | No | **Yes** | **Yes** | **Yes** | **NO (403)** | **NO (403)**| `POST /announcements` (`require_roles(...)`) |
 | **View Announcements** | Yes | Yes | Yes | Yes | Yes | **Yes** | `GET /announcements` |
-| **Manage Users (Create/Deactivate)**| No | **Yes** | **Yes** | No | No | No | `POST /users`, `PUT /users/:id/deactivate` |
+| **Manage Users (Create/Deactivate)**| No | **Yes** | **Yes (Staff/Student)** | No | No | No | `POST /users`, `PUT /users/:id/deactivate` (F-05 Protected) |
 | **Manage Locations & Depts** | No | **Yes** | **Yes** | No | No | No | `POST /locations`, `POST /departments` |
-| **Create & Restore Backups** | No | **Yes** | **Yes** | No | No | No | `POST /backups`, `POST /backups/:id/restore`|
+| **Create Backups** | No | **Yes** | **Yes** | No | No | No | `POST /backups` |
+| **Restore Backups** | No | **Yes** | **NO (Admin Only)** | No | No | No | `POST /backups/:id/restore` |
 | **View Audit Logs** | Yes | **Yes** | **Yes** | No | No | No | `GET /audit` (`require_roles("admin", "manager")`)|
 | **Institution Registry Management**| **Yes** | No | No | No | No | No | `POST /superadmin/institutions` |
 
@@ -87,18 +88,22 @@ graph TD
 ### 2.2 Sessions and Password Hashing Mechanics
 - **Why Opaque Session Tokens?** Unlike stateless JWTs, database-backed opaque tokens can be revoked instantaneously. When an administrator deactivates an account or a user changes their password, `revoke_user_sessions(user_id)` deletes all matching hashes from `user_sessions`. Stale tokens fail immediately on the next HTTP request.
 - **Why Store SHA-256 Hashes of Tokens?** Storing only the SHA-256 hash in `user_sessions` ensures that even a catastrophic database leak does not expose active bearer tokens to attackers.
-- **Sliding Expiration:** Authenticated requests update `last_seen` in `user_sessions`. Schedulers purge sessions idle beyond `SESSION_LIFETIME` (24 hours).
+- **Absolute vs Sliding Expiration (Remediation F-01):**
+  - **Absolute Expiry:** Hard cap enforced at exactly 24 hours (`MAX_SESSION_LIFETIME = 86400s`) measured strictly from the immutable original `created_at` timestamp. Sessions cannot be extended indefinitely.
+  - **Idle Expiry:** Sessions time out if idle for more than 4 hours (`SESSION_LIFETIME = 14400s`) based on `last_seen`. Sliding window updates preserve the original `created_at` in storage.
+- **Cookie Security (Remediation F-04):** Dynamic `secure=is_secure` flag sets `Secure; HttpOnly; SameSite=Lax` based on request protocol (`https://` or `X-Forwarded-Proto`).
+- **WebSocket First-Login Enforcement (Remediation F-04):** WebSockets check `first_login` status; users requiring initial password setup cannot bypass first-login workflows via real-time sockets.
 
 ---
 
-### 2.3 Account Activation & Verification Tokens (OTP Investigation)
-- **Codebase Findings:** A rigorous inspection of the entire codebase confirms that **Campus Pulse does NOT use SMS/numeric One-Time Passwords (OTP)**.
-- **Actual Mechanism:** The application utilizes **High-Entropy Cryptographic URL Activation Tokens**.
-  - Generated via `secrets.token_urlsafe(32)` (256 bits of cryptographic entropy).
-  - Stored in the `activation_tokens` table alongside `user_id`, `created_at`, and `expires_at` (default 7-day validity).
-  - Delivered via email links pointing to `${FRONTEND_URL}/activate?token=<token>`.
-  - Consumed upon successful password establishment, preventing replay attacks.
-  - Rate limiting applies to submission attempts on `POST /auth/activate`.
+### 2.3 Account Activation & Password Reset OTP Mechanics (Remediation F-02 & F-03)
+- **Account Activation:** Utilizes high-entropy cryptographic URL activation tokens (`secrets.token_urlsafe(32)`), stored in `activation_tokens` table, expiring in 7 days.
+- **Password Reset Flow (OTP):**
+  - Triggered via `POST /auth/password-reset/request`. If the email exists, generates a 6-digit cryptographic OTP tied to a unique `reset_id` and dispatches via email/mock transport with a 15-minute expiry.
+  - Returns a generic status response to prevent user enumeration attacks.
+  - Client submits OTP via `POST /auth/password-reset/verify` along with `reset_id` and the new password.
+  - **Brute-Force & Flooding Protection:** Max 3 incorrect OTP verification attempts per `reset_id`. Exceeding 3 attempts permanently invalidates the reset token. IP-based rate limiting (5 requests per 15 minutes) prevents request flooding.
+  - **Lockout Synchronization (Remediation F-03):** Successful password reset/change atomically clears both `login_attempts` and `login_rate_limits`, ensuring accounts are cleanly unblocked upon credential reset.
 
 ---
 
@@ -198,6 +203,19 @@ stateDiagram-v2
 ---
 
 ### 2.11 Audit Logs & Governance
-- **Monitored Actions:** User account creation, deactivation, password reset, role assignment, location reassignment, complaint escalation, settings modification.
+- **Monitored Actions:** User account creation, deactivation, password reset, role assignment, location reassignment, complaint escalation, settings modification, safety report identity disclosure.
 - **Logged Attributes:** `actor_id`, `action`, `entity_type`, `entity_id`, `details` (JSON diff), `ip_address`, `created_at`.
 - **Immutability:** No API endpoint exists to update or delete rows in `audit_logs`. Logs are append-only.
+
+---
+
+### 2.12 Anonymous Safety Reports Identity Protection (Remediation F-06)
+- **Normal Display:** All anonymous safety reports are displayed strictly as **"Anonymous"** across all standard views, lists, details, exports, and WebSockets.
+- **Controlled Disclosure Requirement:** Under product governance, identity revelation is strictly reserved for investigating suspected abuse.
+- **Step-Up Authentication & RBAC Guard:**
+  - Endpoint: `POST /safety-reports/{id}/reveal-identity`.
+  - Accessible **strictly by Administrators** (`administrator` or `super_admin`).
+  - Requires **step-up re-authentication**: The administrator must provide their current password (`admin_password`). Verified via `admin_user.check_password()`.
+  - Returns minimal PII (`name`, `email`, `phone_number`).
+  - Emits an immutable audit log record recording the admin's identity, timestamp, and justification reason.
+- **Database Architecture:** Underlying user mappings are stored in `safety_report_identity` table, decoupled from standard complaint queries to guarantee zero accidental leakage.

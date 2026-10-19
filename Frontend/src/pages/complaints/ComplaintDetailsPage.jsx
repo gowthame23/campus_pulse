@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
   Calendar,
@@ -23,6 +23,11 @@ import {
   Eye,
   MessageSquare,
   AlertTriangle,
+  Phone,
+  PhoneCall,
+  Globe,
+  Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import Badge from "../../components/Badge.jsx";
 import Button from "../../components/Button.jsx";
@@ -37,6 +42,7 @@ import Toast from "../../components/Toast.jsx";
 import AssignModal from "../../components/AssignModal.jsx";
 import { getApiError } from "../../api/axios.js";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useLanguage } from "../../context/LanguageContext.jsx";
 
 import { complaintService } from "../../services/complaintService.js";
 import { attachmentService } from "../../services/attachmentService.js";
@@ -72,12 +78,22 @@ const getLifecycleStepIndex = (status) => {
 export default function ComplaintDetailsPage() {
   const { complaintId } = useParams();
   const { user } = useAuth();
+  const { language, t } = useLanguage();
   const [complaint, setComplaint] = useState(null);
+  const [showTranslation, setShowTranslation] = useState(false);
+  const [translatedData, setTranslatedData] = useState(null);
+  const [translating, setTranslating] = useState(false);
+  const [translationError, setTranslationError] = useState("");
   const [departments, setDepartments] = useState([]);
   const [locations, setLocations] = useState([]);
   const [coordinators, setCoordinators] = useState([]);
+  const locState = useLocation();
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(
+    locState?.state?.isOther
+      ? "Thank you for your information. Your submission has been received and routed to Administration for review."
+      : ""
+  );
   const [error, setError] = useState("");
   const [confirmAction, setConfirmAction] = useState(null);
   const {
@@ -153,10 +169,19 @@ export default function ComplaintDetailsPage() {
     (user.user_id === complaint.created_by ||
       user.id === complaint.created_by ||
       user.email === complaint.created_by);
+  const isAssigned = Boolean(complaint?.assigned_to) || !["Submitted", "Pending"].includes(complaint?.status);
   const canStudentEditOrDelete =
     isOwner &&
     (user?.role === ROLES.STUDENT || (user?.role || "").toLowerCase() === "student") &&
-    complaint?.status === "Submitted";
+    complaint?.status === "Submitted" &&
+    !isAssigned;
+  const canStudentRequestCancellation =
+    isOwner &&
+    (user?.role === ROLES.STUDENT || (user?.role || "").toLowerCase() === "student") &&
+    isAssigned &&
+    complaint?.status !== "Cancelled" &&
+    !complaint?.status?.startsWith("Closed") &&
+    complaint?.status !== "Cancellation Requested";
 
   const availableEditDepartments = useMemo(() => {
     if (!editLocation) return [];
@@ -326,6 +351,72 @@ export default function ComplaintDetailsPage() {
     }
   };
 
+  const [showCancellationModal, setShowCancellationModal] = useState(false);
+  const [cancellationReasonInput, setCancellationReasonInput] = useState("");
+  const [submittingCancellationRequest, setSubmittingCancellationRequest] = useState(false);
+
+  const [showRejectCancellationModal, setShowRejectCancellationModal] = useState(false);
+  const [rejectCancellationReason, setRejectCancellationReason] = useState("");
+  const [submittingRejectCancellation, setSubmittingRejectCancellation] = useState(false);
+
+  const handleCancellationRequestSubmit = async (e) => {
+    e.preventDefault();
+    if (!cancellationReasonInput.trim()) {
+      setError("A cancellation reason is required.");
+      return;
+    }
+    setSubmittingCancellationRequest(true);
+    setError("");
+    try {
+      await complaintService.requestCancellation(complaintId, cancellationReasonInput.trim());
+      setMessage("Cancellation request submitted for coordinator review.");
+      setShowCancellationModal(false);
+      load();
+    } catch (err) {
+      setError(getApiError(err, "Failed to submit cancellation request."));
+    } finally {
+      setSubmittingCancellationRequest(false);
+    }
+  };
+
+  const handleApproveCancellation = async () => {
+    askConfirm({
+      title: "Approve Complaint Cancellation",
+      message: `Are you sure you want to approve cancellation of complaint ${complaintId}? The complaint will be marked Cancelled and work stopped.`,
+      confirmLabel: "Approve Cancellation",
+      tone: "danger",
+      action: async () => {
+        try {
+          await complaintService.approveCancellation(complaintId, "Approved by coordinator");
+          setMessage("Complaint cancelled successfully.");
+          load();
+        } catch (err) {
+          setError(getApiError(err, "Failed to approve cancellation."));
+        }
+      },
+    });
+  };
+
+  const handleRejectCancellationSubmit = async (e) => {
+    e.preventDefault();
+    if (!rejectCancellationReason.trim()) {
+      setError("A rejection reason is required.");
+      return;
+    }
+    setSubmittingRejectCancellation(true);
+    setError("");
+    try {
+      await complaintService.rejectCancellation(complaintId, rejectCancellationReason.trim());
+      setMessage("Cancellation request rejected. Complaint restored to active workflow.");
+      setShowRejectCancellationModal(false);
+      load();
+    } catch (err) {
+      setError(getApiError(err, "Failed to reject cancellation."));
+    } finally {
+      setSubmittingRejectCancellation(false);
+    }
+  };
+
   const canCoordinate = [
     ROLES.COORDINATOR,
     ROLES.APP_MANAGER,
@@ -416,22 +507,24 @@ export default function ComplaintDetailsPage() {
         feedbackResponse,
       ] = await Promise.all([
         complaintService.getById(complaintId),
-        departmentService.list().catch(() => ({ data: [] })),
-        locationService.list().catch(() => ({ data: [] })),
+        departments.length > 0 ? Promise.resolve({ data: departments }) : departmentService.list().catch(() => ({ data: [] })),
+        locations.length > 0 ? Promise.resolve({ data: locations }) : locationService.list().catch(() => ({ data: [] })),
         complaintService.getComments(complaintId).catch(() => ({ data: [] })),
         attachmentService.list(complaintId).catch(() => ({ data: [] })),
-        userService.list().catch(() => ({ data: [] })),
+        allUsers.length > 0 ? Promise.resolve({ data: allUsers }) : userService.list().catch(() => ({ data: [] })),
         complaintService.getFeedback(complaintId).catch(() => ({ data: [] })),
       ]);
       setComplaint(complaintResponse.data);
-      setDepartments(departmentResponse.data || []);
-      setLocations(locationResponse.data || []);
+      if (departments.length === 0) setDepartments(departmentResponse.data || []);
+      if (locations.length === 0) setLocations(locationResponse.data || []);
       setComments(commentsResponse.data || []);
       setAttachments(attachmentsResponse.data || []);
       setFeedbacks(feedbackResponse.data || []);
-      const userList = usersResponse.data || [];
-      setAllUsers(userList);
-      setCoordinators(userList.filter((u) => (u.role || "").toLowerCase() === "coordinator"));
+      if (allUsers.length === 0) {
+        const userList = usersResponse.data || [];
+        setAllUsers(userList);
+        setCoordinators(userList.filter((u) => (u.role || "").toLowerCase() === "coordinator"));
+      }
       setSelectedPriority(complaintResponse.data.priority || "Medium");
     } catch (err) {
       if (!silent) setError(getApiError(err, "Unable to load complaint."));
@@ -909,6 +1002,33 @@ export default function ComplaintDetailsPage() {
     }
   };
 
+  const handleTranslateComplaint = async (targetLang = null) => {
+    const target = targetLang || language || "en";
+    setTranslating(true);
+    setTranslationError("");
+    try {
+      const res = await complaintService.translate(complaintId, target);
+      setTranslatedData(res.data);
+      setShowTranslation(true);
+    } catch (err) {
+      setTranslationError(getApiError(err, "Failed to translate complaint."));
+    } finally {
+      setTranslating(false);
+    }
+  };
+
+  const toggleTranslation = () => {
+    if (showTranslation) {
+      setShowTranslation(false);
+    } else {
+      if (translatedData && translatedData.target_language === language) {
+        setShowTranslation(true);
+      } else {
+        handleTranslateComplaint(language);
+      }
+    }
+  };
+
   const askConfirm = (config) => setConfirmAction(config);
   const resolveComplaint = (values) => {
     const afterRepair = attachments.filter(
@@ -1009,6 +1129,19 @@ export default function ComplaintDetailsPage() {
               Edit
             </button>
           )}
+          {canStudentRequestCancellation && (
+            <button
+              type="button"
+              onClick={() => {
+                setCancellationReasonInput("");
+                setShowCancellationModal(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition-all shadow-2xs cursor-pointer active:scale-95"
+            >
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Request Cancellation
+            </button>
+          )}
           {canDeleteTicket && (
             <button
               type="button"
@@ -1037,6 +1170,51 @@ export default function ComplaintDetailsPage() {
         wardenUser={wardenUser}
         attachments={attachments}
       />
+
+      {/* Cancellation Review Alert Banner for Coordinator / Admin */}
+      {(complaint?.status === "Cancellation Requested" || complaint?.cancellation_requested) && (
+        <div className="bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 dark:border-amber-700 rounded-xl p-4 text-amber-900 dark:text-amber-100 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-bold text-amber-950 dark:text-amber-100">
+                Cancellation Requested by {complaint.cancellation_requested_by_name || complaint.cancellation_requested_by || "Student"}
+              </h3>
+              <p className="text-xs text-amber-800 dark:text-amber-200 mt-1 font-medium">
+                <strong>Reason:</strong> "{complaint.cancellation_reason || "No reason specified"}"
+              </p>
+              {complaint.cancellation_requested_at && (
+                <span className="text-[11px] text-amber-700 dark:text-amber-300 font-semibold block mt-1">
+                  Requested on {formatDate(complaint.cancellation_requested_at)}
+                </span>
+              )}
+            </div>
+          </div>
+          {(isCoordinator || isAdmin || isAppManager) && (
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="danger"
+                onClick={handleApproveCancellation}
+                className="text-xs font-bold py-1.5 px-3 bg-rose-600 hover:bg-rose-700 text-white"
+              >
+                Approve Cancellation
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setRejectCancellationReason("");
+                  setShowRejectCancellationModal(true);
+                }}
+                className="text-xs font-bold py-1.5 px-3 text-amber-950 dark:text-amber-100 border-amber-400 dark:border-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/60"
+              >
+                Reject Cancellation
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Deletion Request Alert Banner for App Manager / Admin */}
       {complaint?.deletion_requested && canDirectDelete && (
@@ -1155,14 +1333,81 @@ export default function ComplaintDetailsPage() {
               </div>
             </dl>
 
-            {/* Description Text Box */}
+            {/* Description Text Box with AI Translation */}
             <div className="mt-5 border-t border-slate-100 dark:border-slate-800/80 pt-4">
-              <dt className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
-                Problem Description
-              </dt>
-              <dd className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 p-4 text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-normal">
-                {complaint.description}
-              </dd>
+              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                <dt className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                  {t("description") || "Problem Description"}
+                </dt>
+                <div className="flex items-center gap-2">
+                  {showTranslation && (
+                    <button
+                      type="button"
+                      onClick={() => setShowTranslation(false)}
+                      className="text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+                    >
+                      {t("translation.original") || "Original"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={toggleTranslation}
+                    disabled={translating}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 px-2.5 py-1 rounded-lg border border-indigo-200/60 dark:border-indigo-800/50 transition disabled:opacity-50"
+                  >
+                    {translating ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>{t("translation.translating") || "Translating..."}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        <span>
+                          {showTranslation
+                            ? (t("translation.original") || "Original")
+                            : (t("translation.view_translation") || `Translate (${(language || "en").toUpperCase()})`)}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {translationError && (
+                <div className="mb-2 text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 p-2.5 rounded-lg border border-rose-200 dark:border-rose-900/40 flex items-center justify-between">
+                  <span>{translationError}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleTranslateComplaint(language)}
+                    className="underline font-semibold ml-2 hover:text-rose-700"
+                  >
+                    {t("translation.retry") || "Retry"}
+                  </button>
+                </div>
+              )}
+
+              {showTranslation && translatedData ? (
+                <div className="relative rounded-xl border border-indigo-200/80 dark:border-indigo-800/80 bg-indigo-50/40 dark:bg-indigo-950/20 p-4 transition-all">
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-indigo-100 dark:border-indigo-900/40 text-[11px] text-indigo-700 dark:text-indigo-300 font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5" />
+                      {t("translation.translated_badge", { lang: (translatedData.target_language || language).toUpperCase() }) || `Translated via AI to ${(translatedData.target_language || language).toUpperCase()}`}
+                    </span>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal">
+                      {translatedData.source_language ? `${t("translation.source_detected", { lang: translatedData.source_language.toUpperCase() }) || `Detected: ${translatedData.source_language.toUpperCase()}`}` : ""}
+                      {translatedData.cached ? " • Cached" : ""}
+                    </span>
+                  </div>
+                  <dd className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-normal whitespace-pre-wrap">
+                    {translatedData.translated_text}
+                  </dd>
+                </div>
+              ) : (
+                <dd className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 p-4 text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-normal whitespace-pre-wrap">
+                  {complaint.description}
+                </dd>
+              )}
             </div>
 
             {/* Categorized Complaint Attachments Section */}
@@ -1782,6 +2027,64 @@ export default function ComplaintDetailsPage() {
             </div>
           </Card>
 
+          {/* Critical Complaint Emergency Direct Contacts */}
+          {(complaint.priority || "").toLowerCase() === "critical" && (
+            <Card className="border-rose-200 dark:border-rose-900/60 bg-rose-50/50 dark:bg-rose-950/20 shadow-xs">
+              <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-rose-100 dark:border-rose-900/40">
+                <ShieldAlert className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                <div>
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-rose-800 dark:text-rose-200">
+                    Emergency Direct Contacts
+                  </h2>
+                  <p className="text-[11px] text-rose-700/80 dark:text-rose-300/80 font-medium mt-0.5">
+                    Critical Priority — Designated escalation authorities for immediate response
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                {(complaint.emergency_contacts && complaint.emergency_contacts.length > 0) ? (
+                  complaint.emergency_contacts.map((contact, idx) => (
+                    <div
+                      key={idx}
+                      className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-rose-200/80 dark:border-rose-900/50 flex items-center justify-between gap-3 shadow-2xs"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                          {contact.role}
+                        </div>
+                        <div className="font-semibold text-slate-900 dark:text-slate-100 truncate text-xs mt-0.5">
+                          {contact.name}
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                          {contact.phone_available ? contact.phone : "No phone registered"}
+                        </div>
+                      </div>
+
+                      {contact.phone_available ? (
+                        <a
+                          href={`tel:${contact.phone}`}
+                          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-colors"
+                        >
+                          <PhoneCall className="h-3.5 w-3.5" />
+                          Call
+                        </a>
+                      ) : (
+                        <span className="shrink-0 text-[10px] font-semibold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">
+                          Phone unavailable
+                        </span>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-2.5 rounded-lg bg-white/60 dark:bg-slate-900/60 text-center text-rose-700 dark:text-rose-300 text-xs">
+                    Authorities notified via priority broadcast
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+
           {/* Responsible Personnel Card */}
           <ResponsiblePersonnelCard
             complaint={complaint}
@@ -1821,6 +2124,14 @@ export default function ComplaintDetailsPage() {
                   <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                     {formatDate(complaint.resolved_at)}
                   </span>
+                </div>
+              )}
+              {(!complaint.due_date || complaint.location_id === "LOC_OTHER" || complaint.department_id === "DEPT_OTHER_GENERAL") && (
+                <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-300">
+                  <p className="font-semibold">Informational Submission / Under Review</p>
+                  <p className="mt-0.5 text-amber-700 dark:text-amber-400">
+                    This complaint was submitted under an unlisted location or category. Standard SLA countdown timers and technician assignment do not apply until an Administrator reviews the information and assigns a department.
+                  </p>
                 </div>
               )}
             </div>
@@ -2016,6 +2327,84 @@ export default function ComplaintDetailsPage() {
                 disabled={submittingDeletionRequest}
               >
                 {submittingDeletionRequest ? "Submitting..." : "Send Deletion Request"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Cancellation Reason Modal for Student */}
+      {showCancellationModal && (
+        <Modal
+          isOpen={showCancellationModal}
+          onClose={() => setShowCancellationModal(false)}
+          title="⚠️ Request Complaint Cancellation"
+        >
+          <form onSubmit={handleCancellationRequestSubmit} className="space-y-4">
+            <p className="text-xs text-slate-500">
+              This complaint is currently assigned or in progress. Please explain why you want to cancel it. The assigned coordinator will review and process your request.
+            </p>
+            <Textarea
+              label="Cancellation Reason"
+              value={cancellationReasonInput}
+              onChange={(e) => setCancellationReasonInput(e.target.value)}
+              placeholder="Explain why you wish to cancel this complaint (e.g., issue resolved itself, entered in error, duplicate)..."
+              rows={4}
+              required
+            />
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowCancellationModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="danger"
+                disabled={submittingCancellationRequest}
+              >
+                {submittingCancellationRequest ? "Submitting..." : "Submit Cancellation Request"}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Reject Cancellation Reason Modal for Coordinator */}
+      {showRejectCancellationModal && (
+        <Modal
+          isOpen={showRejectCancellationModal}
+          onClose={() => setShowRejectCancellationModal(false)}
+          title="❌ Reject Cancellation Request"
+        >
+          <form onSubmit={handleRejectCancellationSubmit} className="space-y-4">
+            <p className="text-xs text-slate-500">
+              Please specify the reason for rejecting the student's cancellation request. The complaint will remain active in the workflow.
+            </p>
+            <Textarea
+              label="Rejection Reason"
+              value={rejectCancellationReason}
+              onChange={(e) => setRejectCancellationReason(e.target.value)}
+              placeholder="State why the cancellation request is rejected (e.g. technician is already on site, critical safety hazard cannot be cancelled)..."
+              rows={4}
+              required
+            />
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowRejectCancellationModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="danger"
+                disabled={submittingRejectCancellation}
+              >
+                {submittingRejectCancellation ? "Rejecting..." : "Confirm Rejection"}
               </Button>
             </div>
           </form>
@@ -2352,7 +2741,14 @@ export default function ComplaintDetailsPage() {
         isOpen={showAssignModal}
         onClose={() => setShowAssignModal(false)}
         complaint={complaint}
-        onAssigned={load}
+        onAssigned={(updated) => {
+          if (updated && updated.complaint_id) {
+            setComplaint(updated);
+            setMessage("Complaint assigned successfully!");
+          } else {
+            load(true);
+          }
+        }}
       />
     </div>
   );

@@ -16,13 +16,56 @@ from core.constants import (
     STATUS_SUBMITTED,
     normalize_priority,
 )
+from utils.db import is_postgres_configured, get_db_connection
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
+def run_postgres_migrations():
+    """Run all idempotent migrations on PostgreSQL."""
+    conn = get_db_connection()
+    try:
+        # Create schema_migrations tracking table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                version VARCHAR(255) PRIMARY KEY,
+                applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.commit()
+
+        # Check if 001_baseline_schema is applied
+        row = conn.execute("SELECT version FROM schema_migrations WHERE version = '001_baseline_schema';").fetchone()
+        if not row:
+            schema_file = Path(__file__).resolve().parent / "postgres_schema.sql"
+            if schema_file.exists():
+                sql_content = schema_file.read_text(encoding="utf-8")
+                raw_conn = getattr(conn, "_conn", conn)
+                with raw_conn.cursor() as cur:
+                    cur.execute(sql_content)
+                conn.execute("INSERT INTO schema_migrations (version) VALUES ('001_baseline_schema') ON CONFLICT DO NOTHING;")
+                conn.commit()
+                logger.info("Applied 001_baseline_schema (215 tables) to PostgreSQL.")
+
+        _normalize_priorities_and_deadlines(conn)
+        _reroute_warden_assigned_open_complaints(conn)
+        _migrate_translation_tables(conn)
+        conn.commit()
+        logger.info("PostgreSQL database migrations completed successfully.")
+    except Exception as err:
+        conn.rollback()
+        logger.error(f"PostgreSQL migration error: {err}")
+        raise err
+    finally:
+        conn.close()
+
+
 def run_migrations(db_path: str = "storage/campus_pulse.db"):
-    """Run all idempotent migrations on the specified database path."""
+    """Run all idempotent migrations on the specified database path or PostgreSQL."""
+    if is_postgres_configured():
+        return run_postgres_migrations()
+
     db_file = Path(db_path)
     if not db_file.exists():
         # Will be created on first connection
@@ -47,8 +90,12 @@ def run_migrations(db_path: str = "storage/campus_pulse.db"):
         _migrate_phase5_tables(conn)
         _migrate_teams_and_leaves(conn)
         _migrate_emergency_tables(conn)
+        _migrate_sla_configs_table(conn)
+        _migrate_translation_tables(conn)
+        _migrate_location_departments_table(conn)
         _normalize_priorities_and_deadlines(conn)
         _reroute_warden_assigned_open_complaints(conn)
+        _migrate_multi_department_coordinators(conn)
 
         conn.commit()
         logger.info("Database migrations completed successfully.")
@@ -60,8 +107,18 @@ def run_migrations(db_path: str = "storage/campus_pulse.db"):
         conn.close()
 
 
-def _get_existing_columns(conn: sqlite3.Connection, table_name: str) -> set:
+def _get_existing_columns(conn, table_name: str) -> set:
     """Return a set of column names currently present in table_name."""
+    try:
+        if is_postgres_configured():
+            cursor = conn.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_name = %s;",
+                (table_name.lower(),)
+            )
+            rows = cursor.fetchall()
+            return {r["column_name"] if isinstance(r, dict) or hasattr(r, "__getitem__") else r[0] for r in rows}
+    except Exception:
+        pass
     cursor = conn.execute(f"PRAGMA table_info({table_name});")
     return {row["name"] for row in cursor.fetchall()}
 
@@ -157,6 +214,9 @@ def _migrate_complaints_table(conn: sqlite3.Connection):
         "acknowledged_at": "TEXT",
         "emergency_outcome": "TEXT",
         "emergency_realert_sent": "INTEGER DEFAULT 0",
+        "is_deleted": "INTEGER DEFAULT 0",
+        "deleted_at": "TEXT",
+        "deleted_by": "TEXT",
     }
 
     for col_name, col_type in new_columns.items():
@@ -240,17 +300,94 @@ def _migrate_locations_table(conn: sqlite3.Connection):
             WHERE (in_charge_id IS NULL OR in_charge_id = '') AND warden_id IS NOT NULL;
         """)
 
+    if "public_complaint_access" not in existing_cols:
+        conn.execute("ALTER TABLE locations ADD COLUMN public_complaint_access TEXT DEFAULT 'everyone';")
+        conn.execute("""
+            UPDATE locations
+            SET public_complaint_access = 'location_only'
+            WHERE location_type = 'Hostel' OR name LIKE '%Hostel%';
+        """)
+        logger.info("Added public_complaint_access column to locations table.")
+
+    if "complaint_submission_policy" not in existing_cols:
+        conn.execute("ALTER TABLE locations ADD COLUMN complaint_submission_policy TEXT DEFAULT 'everyone';")
+        conn.execute("""
+            UPDATE locations
+            SET complaint_submission_policy = CASE
+                WHEN public_complaint_access IS NOT NULL THEN public_complaint_access
+                WHEN location_type = 'Hostel' OR name LIKE '%Hostel%' THEN 'location_only'
+                ELSE 'everyone'
+            END;
+        """)
+        logger.info("Added complaint_submission_policy column to locations table.")
+
+
+def _migrate_sla_configs_table(conn: sqlite3.Connection):
+    """Ensure department_sla_configs and sla_config_audit_logs tables exist."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS department_sla_configs (
+            config_id TEXT PRIMARY KEY,
+            department_id TEXT NOT NULL UNIQUE,
+            normal_start_time TEXT DEFAULT '10:00',
+            normal_end_time TEXT DEFAULT '16:00',
+            normal_duration_hours INTEGER DEFAULT 72,
+            medium_start_time TEXT DEFAULT '10:00',
+            medium_end_time TEXT DEFAULT '16:00',
+            medium_duration_hours INTEGER DEFAULT 48,
+            high_start_time TEXT DEFAULT '10:00',
+            high_end_time TEXT DEFAULT '18:00',
+            high_duration_hours INTEGER DEFAULT 24,
+            critical_start_time TEXT DEFAULT '00:00',
+            critical_end_time TEXT DEFAULT '23:59',
+            critical_duration_hours INTEGER DEFAULT 4,
+            app_manager_escalation_hours INTEGER DEFAULT 24,
+            admin_escalation_hours INTEGER DEFAULT 48,
+            updated_at TEXT NOT NULL,
+            updated_by TEXT NOT NULL
+        );
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS sla_config_audit_logs (
+            audit_id TEXT PRIMARY KEY,
+            department_id TEXT NOT NULL,
+            changed_by TEXT NOT NULL,
+            changed_at TEXT NOT NULL,
+            old_value TEXT,
+            new_value TEXT,
+            remarks TEXT,
+            changes_json TEXT
+        );
+    """)
+    audit_cols = _get_existing_columns(conn, "sla_config_audit_logs")
+    if "changes_json" not in audit_cols:
+        conn.execute("ALTER TABLE sla_config_audit_logs ADD COLUMN changes_json TEXT;")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_sla_config_dept ON department_sla_configs(department_id);")
+    logger.info("Department SLA configs and audit tables verified.")
+
 
 def _migrate_operational_tables(conn: sqlite3.Connection):
     """Create distributed scheduler lock, login attempts, ws tickets, and push subscriptions."""
     # 1. Distributed scheduler lock for multi-worker safety
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS scheduler_lock (
-            name TEXT PRIMARY KEY,
-            owner TEXT,
-            expires_at REAL
-        );
-    """)
+    existing_cols = _get_existing_columns(conn, "scheduler_lock")
+    if "lock_name" not in existing_cols:
+        conn.execute("DROP TABLE IF EXISTS scheduler_lock;")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS scheduler_lock (
+                lock_name TEXT PRIMARY KEY,
+                locked_by TEXT,
+                locked_at TEXT,
+                expires_at TEXT
+            );
+        """)
+    else:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS scheduler_lock (
+                lock_name TEXT PRIMARY KEY,
+                locked_by TEXT,
+                locked_at TEXT,
+                expires_at TEXT
+            );
+        """)
 
     # 2. SQLite-backed rate limiter for login brute force protection across workers
     conn.execute("""
@@ -569,6 +706,46 @@ def _migrate_teams_and_leaves(conn: sqlite3.Connection):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_team_mem_user ON team_members(user_id);")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_user_leaves_user ON user_leaves(user_id, from_date, to_date);")
 
+    # Multi-Department Coordinator Support: Allow an employee to coordinate multiple departments/teams
+    conn.execute("DROP INDEX IF EXISTS uq_team_coord1;")
+    conn.execute("DROP INDEX IF EXISTS uq_team_coord2;")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_team_coord1 ON teams(coordinator_id);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_team_coord2 ON teams(backup_coordinator_id);")
+
+    # Employee Department-Location Work Memberships
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS employee_work_memberships (
+            membership_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            department_id TEXT NOT NULL,
+            location_id TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            created_by TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+            FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE CASCADE,
+            FOREIGN KEY (location_id) REFERENCES locations(location_id) ON DELETE CASCADE,
+            UNIQUE (user_id, department_id, location_id)
+        );
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_ewm_user ON employee_work_memberships(user_id);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_ewm_dept_loc ON employee_work_memberships(department_id, location_id);")
+
+    # Migrate initial work memberships from active teams, members, and locations
+    conn.execute("""
+        INSERT OR IGNORE INTO employee_work_memberships (membership_id, user_id, department_id, location_id, created_at, created_by)
+        SELECT 
+            'EWM_' || lower(hex(randomblob(6))),
+            tm.user_id,
+            t.department_id,
+            tl.location_id,
+            datetime('now'),
+            'migration'
+        FROM team_members tm
+        JOIN teams t ON tm.team_id = t.team_id
+        JOIN team_locations tl ON t.team_id = tl.team_id
+        WHERE t.active = 1;
+    """)
+
     # Complaints new columns for team model
     existing_cols = _get_existing_columns(conn, "complaints")
     team_model_cols = {
@@ -580,6 +757,14 @@ def _migrate_teams_and_leaves(conn: sqlite3.Connection):
         "returned_reason": "TEXT",
         "assignee_on_leave_flag": "INTEGER DEFAULT 0",
         "assignee_removed_flag": "INTEGER DEFAULT 0",
+        "cancellation_requested": "INTEGER DEFAULT 0",
+        "cancellation_requested_by": "TEXT",
+        "cancellation_reason": "TEXT",
+        "cancellation_requested_at": "TEXT",
+        "cancellation_decided_by": "TEXT",
+        "cancellation_decided_at": "TEXT",
+        "cancellation_decision_note": "TEXT",
+        "previous_status": "TEXT",
     }
     for col, ctype in team_model_cols.items():
         if col not in existing_cols:
@@ -744,10 +929,208 @@ def _migrate_emergency_tables(conn: sqlite3.Connection):
     logger.info("Emergency tables and schema migration verified.")
 
     # Location hierarchy: parent_id column
-    loc_cols = [c["name"] for c in conn.execute("PRAGMA table_info(locations)").fetchall()]
+    loc_cols = _get_existing_columns(conn, "locations")
     if "parent_id" not in loc_cols:
         conn.execute("ALTER TABLE locations ADD COLUMN parent_id TEXT NULL;")
         logger.info("Added parent_id column to locations table.")
+
+
+def _migrate_translation_tables(conn):
+    """Ensure complaint_translations table exists with compound caching index."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS complaint_translations (
+            translation_id TEXT PRIMARY KEY,
+            complaint_id TEXT NOT NULL,
+            source_hash TEXT NOT NULL,
+            source_language TEXT NOT NULL,
+            target_language TEXT NOT NULL,
+            translated_text TEXT NOT NULL,
+            provider TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (complaint_id) REFERENCES complaints(complaint_id) ON DELETE CASCADE
+        );
+    """)
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_translations_cache 
+        ON complaint_translations (complaint_id, source_hash, target_language);
+    """)
+    logger.info("Complaint translations schema migration verified.")
+
+
+def _migrate_location_departments_table(conn):
+    """Ensure location_departments table exists, consolidate duplicate location-specific
+    departments into central campus-wide departments, and populate location-department
+    mappings.
+    """
+    import uuid
+    from datetime import datetime
+
+    # 1. Create table and indexes
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS location_departments (
+            id TEXT PRIMARY KEY,
+            location_id TEXT NOT NULL,
+            department_id TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            created_by TEXT DEFAULT 'system',
+            is_active INTEGER NOT NULL DEFAULT 1,
+            FOREIGN KEY (location_id) REFERENCES locations(location_id) ON DELETE CASCADE,
+            FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE CASCADE,
+            UNIQUE(location_id, department_id)
+        );
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_loc_dept_loc ON location_departments(location_id);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_loc_dept_dept ON location_departments(department_id);")
+
+    # 2. Consolidation of duplicate location-scoped departments into central canonical entities
+    consolidation_map = {
+        'DEPT_ACADEMIC_ELECTRICAL': 'DEPT_HOSTEL_ELECTRICAL',
+        'DEPT_SAC_ELECTRICAL': 'DEPT_HOSTEL_ELECTRICAL',
+        'DEPT_SPORTS_LIGHTING': 'DEPT_HOSTEL_ELECTRICAL',
+        
+        'DEPT_ACADEMIC_PLUMBING': 'DEPT_HOSTEL_PLUMBING',
+        'DEPT_MESS_PLUMBING': 'DEPT_HOSTEL_PLUMBING',
+        'DEPT_SAC_PLUMBING': 'DEPT_HOSTEL_PLUMBING',
+        'DEPT_SPORTS_PLUMBING': 'DEPT_HOSTEL_PLUMBING',
+        
+        'DEPT_ACADEMIC_HOUSEKEEPING': 'DEPT_HOSTEL_HOUSEKEEPING',
+        'DEPT_SAC_HOUSEKEEPING': 'DEPT_HOSTEL_HOUSEKEEPING',
+        'DEPT_SPORTS_HOUSEKEEPING': 'DEPT_HOSTEL_HOUSEKEEPING',
+        'DEPT_MESS_HYGIENE': 'DEPT_HOSTEL_HOUSEKEEPING',
+        
+        'DEPT_ACADEMIC_FURNITURE': 'DEPT_HOSTEL_FURNITURE',
+        'DEPT_MESS_FURNITURE': 'DEPT_HOSTEL_FURNITURE',
+        
+        'DEPT_ACADEMIC_NETWORK': 'DEPT_HOSTEL_NETWORK',
+        
+        'DEPT_HOSTEL_OTHER': 'DEPT_OTHER_GENERAL',
+        'DEPT_ACADEMIC_OTHER': 'DEPT_OTHER_GENERAL',
+        'DEPT_MESS_OTHER': 'DEPT_OTHER_GENERAL',
+        'DEPT_SAC_OTHER': 'DEPT_OTHER_GENERAL',
+        'DEPT_SPORTS_OTHER': 'DEPT_OTHER_GENERAL',
+    }
+
+    # Re-parent child references if table exists
+    tables_to_reparent = [
+        ("department_issues", "department_id"),
+        ("complaints", "department_id"),
+        ("users", "department_id"),
+        ("employee_work_memberships", "department_id"),
+        ("coordinator_assignments", "department_id"),
+    ]
+    for tbl, col in tables_to_reparent:
+        try:
+            for old_id, canonical_id in consolidation_map.items():
+                conn.execute(f"UPDATE {tbl} SET {col} = ? WHERE {col} = ?", (canonical_id, old_id))
+        except Exception:
+            pass
+
+    # Clean legacy duplicate department rows from departments
+    try:
+        # Update canonical departments to clean central names and detach location_id
+        conn.execute("UPDATE departments SET name = 'Electrical', location_id = NULL WHERE department_id = 'DEPT_HOSTEL_ELECTRICAL'")
+        conn.execute("UPDATE departments SET name = 'Plumbing', location_id = NULL WHERE department_id = 'DEPT_HOSTEL_PLUMBING'")
+        conn.execute("UPDATE departments SET name = 'Housekeeping', location_id = NULL WHERE department_id = 'DEPT_HOSTEL_HOUSEKEEPING'")
+        conn.execute("UPDATE departments SET name = 'Furniture & Fixtures', location_id = NULL WHERE department_id = 'DEPT_HOSTEL_FURNITURE'")
+        conn.execute("UPDATE departments SET name = 'Network & IT', location_id = NULL WHERE department_id = 'DEPT_HOSTEL_NETWORK'")
+        conn.execute("UPDATE departments SET name = 'Other / Not Sure', location_id = NULL WHERE department_id = 'DEPT_OTHER_GENERAL'")
+        conn.execute("UPDATE departments SET location_id = NULL WHERE department_id IN ('DEPT_MESS_FOOD', 'DEPT_MESS_MAINTENANCE', 'DEPT_ACADEMIC_LIBRARY', 'DEPT_SPORTS_GROUNDS', 'DEPT_SPORTS_EQUIPMENT', 'DEPT_SAC_EQUIPMENT', 'DEPT_SAC_AV')")
+
+        for old_id in consolidation_map.keys():
+            conn.execute("DELETE FROM departments WHERE department_id = ?", (old_id,))
+    except Exception as e:
+        logger.warning(f"Note during department consolidation: {e}")
+
+    # Clean orphan ownership claims
+    try:
+        conn.execute("DELETE FROM ownership_claims WHERE item_id NOT IN (SELECT item_id FROM lost_found_items)")
+    except Exception:
+        pass
+
+    # 3. Seed baseline location_departments associations
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # Ensure Health & Medical and Fire & Safety departments exist
+    try:
+        import json
+        med_complaint_types = json.dumps([
+            'Medical Emergency', 'First Aid Assistance', 'Ambulance Request',
+            'Clinic Consultation', 'Health & Hygiene Concern', 'Other / Not Sure'
+        ])
+        conn.execute('''
+            INSERT OR IGNORE INTO departments (department_id, name, sla_days, complaint_types, active, archived, description, status)
+            VALUES ('DEPT_CAMPUS_MEDICAL', 'Health & Medical', 1, ?, 1, 0, 'Campus Health Center, medical clinic, first aid, ambulance, and student healthcare services.', 'Active')
+        ''', (med_complaint_types,))
+
+        fire_complaint_types = json.dumps([
+            'Fire Outbreak', 'Smoke Detected', 'Gas Leakage Hazard',
+            'Fire Extinguisher Inspection', 'Emergency Exit Blocked', 'Other / Not Sure'
+        ])
+        conn.execute('''
+            INSERT OR IGNORE INTO departments (department_id, name, sla_days, complaint_types, active, archived, description, status)
+            VALUES ('DEPT_CAMPUS_FIRE', 'Fire & Safety', 1, ?, 1, 0, 'Campus fire protection, smoke detection, fire extinguishers, emergency evacuation, and safety hazard control.', 'Active')
+        ''', (fire_complaint_types,))
+
+        # Update emergency category mappings
+        conn.execute("UPDATE emergency_categories SET department_id = 'DEPT_CAMPUS_MEDICAL' WHERE category_id = 'EM_CAT_05' AND (department_id IS NULL OR department_id = '')")
+        conn.execute("UPDATE emergency_categories SET department_id = 'DEPT_CAMPUS_FIRE' WHERE category_id = 'EM_CAT_04' AND (department_id IS NULL OR department_id = '')")
+        conn.execute("UPDATE emergency_categories SET department_id = 'DEPT_HOSTEL_PLUMBING' WHERE category_id = 'EM_CAT_02'")
+    except Exception as e:
+        logger.warning(f"Note during medical and fire department verification: {e}")
+
+    common_hostel_depts = ['DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_HOSTEL_FURNITURE', 'DEPT_HOSTEL_NETWORK', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
+    academic_depts = ['DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_HOSTEL_FURNITURE', 'DEPT_HOSTEL_NETWORK', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
+    mess_depts = ['DEPT_MESS_FOOD', 'DEPT_MESS_MAINTENANCE', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_FURNITURE', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
+    sac_depts = ['DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
+    sports_depts = ['DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
+    other_depts = ['DEPT_OTHER_GENERAL', 'DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE']
+
+    loc_mappings = {
+        'LOC_HOSTEL_1': common_hostel_depts,
+        'LOC_HOSTEL_2': common_hostel_depts,
+        'LOC_ACADEMIC_1': academic_depts,
+        'LOC_ACADEMIC_2': academic_depts,
+        'LOC_MESS_1': mess_depts,
+        'LOC_MESS_2': mess_depts,
+        'LOC_SAC_1': sac_depts,
+        'LOC_SAC_2': sac_depts,
+        'LOC_SPORTS_1': sports_depts,
+        'LOC_SPORTS_2': sports_depts,
+        'LOC_OTHER': other_depts,
+    }
+
+    for loc_id, dept_ids in loc_mappings.items():
+        for dept_id in dept_ids:
+            try:
+                conn.execute('''
+                    INSERT OR IGNORE INTO location_departments (id, location_id, department_id, created_at, created_by, is_active)
+                    VALUES (?, ?, ?, ?, 'migration', 1)
+                ''', (f'LD_{uuid.uuid4().hex[:12]}', loc_id, dept_id, now_str))
+            except Exception:
+                pass
+
+    logger.info("location_departments schema migration and baseline associations verified.")
+    _migrate_multi_department_coordinators(conn)
+
+
+def _migrate_multi_department_coordinators(conn: sqlite3.Connection):
+    """Enable multi-department coordinators:
+    1. Drop obsolete global unique indexes on teams(coordinator_id) and teams(backup_coordinator_id).
+    2. Add department_id column to user_leaves table if missing.
+    3. Ensure index support for department-scoped leaves.
+    """
+    conn.execute("DROP INDEX IF EXISTS uq_team_coord1;")
+    conn.execute("DROP INDEX IF EXISTS uq_team_coord2;")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_team_coord1 ON teams(coordinator_id);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_team_coord2 ON teams(backup_coordinator_id);")
+
+    # Add department_id to user_leaves if missing
+    cursor = conn.execute("PRAGMA table_info(user_leaves)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if "department_id" not in columns:
+        conn.execute("ALTER TABLE user_leaves ADD COLUMN department_id TEXT")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_user_leaves_dept ON user_leaves(user_id, department_id)")
+    logger.info("Multi-department coordinator migrations verified.")
 
 
 

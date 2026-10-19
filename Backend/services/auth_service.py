@@ -59,11 +59,6 @@ class AuthService:
         existing_loc_names = {l["name"].strip().lower(): l for l in data["locations"] if l.get("name")}
 
         template_locations = [
-            Location("Hostel Block A", location_id="LOC_HOSTEL_A", in_charge_id="USR_WARDEN", app_manager_id="USR_MANAGER", location_type="Hostel").to_dict(),
-            Location("Academic Block", location_id="LOC_ACADEMIC", location_type="Academic Block").to_dict(),
-            Location("Mess", location_id="LOC_MESS", location_type="Mess").to_dict(),
-            Location("Student Activity Center", location_id="LOC_SAC", location_type="Student Activity Center").to_dict(),
-            Location("Sports Complex", location_id="LOC_SPORTS", location_type="Sports Complex").to_dict(),
             Location("Other / Not Sure", location_id="LOC_OTHER", location_type="Other / Not Sure").to_dict(),
         ]
         for tloc in template_locations:
@@ -116,114 +111,59 @@ class AuthService:
 
         if not data.get("departments"):
             data["departments"] = [
-            # Hostel Block A
-            Department("Electrical", 2, department_id="DEPT_HOSTEL_ELECTRICAL", complaint_types=[
-                "Power Failure", "Fan Not Working", "Light Not Working", "Switch Problem", "Socket Problem", "Other / Not Sure"
-            ], location_id="LOC_HOSTEL_A", coordinator_id="USR_COORDINATOR").to_dict(),
-            Department("Plumbing", 3, department_id="DEPT_HOSTEL_PLUMBING", complaint_types=[
-                "Water Leakage", "Tap Not Working / Tap Leakage", "No Water Supply", "Low Water Pressure", "Toilet Flush Not Working", "Toilet Blockage", "Wash Basin / Sink Blockage", "Drainage Blockage", "Shower Not Working", "Other / Not Sure"
-            ], location_id="LOC_HOSTEL_A").to_dict(),
-            Department("Network", 3, department_id="DEPT_HOSTEL_NETWORK", complaint_types=[
-                "Wi-Fi Not Working", "Wi-Fi Connected but No Internet", "Slow Internet", "Frequent Wi-Fi Disconnection", "Weak Wi-Fi Signal", "Unable to Connect to Wi-Fi", "Other / Not Sure"
-            ], location_id="LOC_HOSTEL_A").to_dict(),
-            Department("Housekeeping", 1, department_id="DEPT_HOSTEL_HOUSEKEEPING", complaint_types=[
-                "Room Cleaning Required", "Washroom / Bathroom Cleaning", "Dustbin / Waste Removal", "Corridor / Common Area Cleaning", "Other / Not Sure"
-            ], location_id="LOC_HOSTEL_A").to_dict(),
-            Department("Furniture & Fixtures", 5, department_id="DEPT_HOSTEL_FURNITURE", complaint_types=[
-                "Cot / Bed Frame Issue", "Study Table / Chair Damaged", "Cupboard / Wardrobe Lock/Door Issue", "Door / Window Latch Problem", "Mirror / Shelf Issue", "Missing Furniture / Item", "Other / Not Sure"
-            ], location_id="LOC_HOSTEL_A").to_dict(),
-            Department("Other / Not Sure", 2, department_id="DEPT_HOSTEL_OTHER", complaint_types=[
-                "General Issue"
-            ], location_id="LOC_HOSTEL_A").to_dict(),
-
-            # Academic Block
-            Department("Electrical & AV / Classroom Equipment", 2, department_id="DEPT_ACADEMIC_ELECTRICAL", complaint_types=[
-                "Power Failure / No Power Supply", "Projector Not Working / No Display", "HDMI / VGA Cable / Connectivity Issue", "Audio / Speaker / Mic Issue", "Fan Not Working", "Light Not Working", "Smart Board / Digital Board Issue", "AC / Air Conditioning Issue", "Switch / Socket Problem", "Other / Not Sure"
-            ], location_id="LOC_ACADEMIC").to_dict(),
-            Department("Plumbing", 3, department_id="DEPT_ACADEMIC_PLUMBING", complaint_types=[
-                "Water Leakage", "Tap Not Working / Tap Leakage", "No Water Supply", "Toilet Flush Not Working", "Toilet / Urinal Blockage", "Wash Basin / Sink Blockage", "Drainage Blockage", "Other / Not Sure"
-            ], location_id="LOC_ACADEMIC").to_dict(),
-            Department("Network / IT", 3, department_id="DEPT_ACADEMIC_NETWORK", complaint_types=[
-                "Wi-Fi Not Working", "Ethernet / LAN Port Not Working", "Wi-Fi Connected but No Internet", "Slow Internet Connection", "Weak Wi-Fi Signal", "Unable to Connect to Campus Network", "Other / Not Sure"
-            ], location_id="LOC_ACADEMIC").to_dict(),
-            Department("Housekeeping", 1, department_id="DEPT_ACADEMIC_HOUSEKEEPING", complaint_types=[
-                "Classroom / Lab Cleaning Required", "Washroom Cleaning Required", "Dustbin / Waste Removal", "Corridor / Staircase Cleaning", "Board Cleaning / Dusting Required", "Other / Not Sure"
-            ], location_id="LOC_ACADEMIC").to_dict(),
-            Department("Furniture & Fixtures", 5, department_id="DEPT_ACADEMIC_FURNITURE", complaint_types=[
-                "Desk / Bench Damaged", "Chair / Podium Issue", "Door / Lock / Window Latch Issue", "Whiteboard / Blackboard Damaged", "Missing Furniture / Item", "Other / Not Sure"
-            ], location_id="LOC_ACADEMIC").to_dict(),
-            Department("Library Facilities & Systems", 3, department_id="DEPT_ACADEMIC_LIBRARY", complaint_types=[
-                "Wi-Fi / E-Library Desktop / OPAC System Issue", "RFID / Book Scanner / Printer Issue", "Reading Desk Power Socket / Lamp Issue", "AC / Ventilation Issue (Reading Area)", "Study Table / Chair / Bookshelf Damaged", "Noise Disturbance / Quiet Zone Violation", "Other / Not Sure"
-            ], location_id="LOC_ACADEMIC").to_dict(),
-            Department("Other / Not Sure", 2, department_id="DEPT_ACADEMIC_OTHER", complaint_types=[
-                "General Issue"
-            ], location_id="LOC_ACADEMIC").to_dict(),
-
-            # Mess
-            Department("Hygiene & Housekeeping", 1, department_id="DEPT_MESS_HYGIENE", complaint_types=[
-                "Dining Table / Area Cleaning Required", "Handwash / Sink Area Unclean", "Dustbin Overflowing / Waste Removal", "Pest / Insect Issue", "Other / Not Sure"
-            ], location_id="LOC_MESS").to_dict(),
-            Department("Food Quality & Catering", 1, department_id="DEPT_MESS_FOOD", complaint_types=[
-                "Food Quality / Taste Issue", "Undercooked / Raw Food", "Foreign Object in Food", "Food / Utensil Shortage", "Counter / Service Delay", "Other / Not Sure"
-            ], location_id="LOC_MESS").to_dict(),
-            Department("Maintenance & Equipment", 3, department_id="DEPT_MESS_MAINTENANCE", complaint_types=[
-                "Water Cooler / Dispenser Issue", "Food Warmer / Bain-Marie Not Working", "Exhaust Fan / Ventilation Issue", "Lighting / Electrical Issue", "Fly Catcher Machine Not Working", "Other / Not Sure"
-            ], location_id="LOC_MESS").to_dict(),
-            Department("Furniture & Seating", 5, department_id="DEPT_MESS_FURNITURE", complaint_types=[
-                "Dining Table Damaged / Wobbly", "Chair / Bench Damaged", "Missing Furniture / Item", "Other / Not Sure"
-            ], location_id="LOC_MESS").to_dict(),
-            Department("Plumbing", 3, department_id="DEPT_MESS_PLUMBING", complaint_types=[
-                "Handwash Tap Leakage / Not Working", "Drinking Water Supply Issue", "Sink / Drainage Blockage", "Washroom Plumbing Issue", "Other / Not Sure"
-            ], location_id="LOC_MESS").to_dict(),
-            Department("Other / Not Sure", 2, department_id="DEPT_MESS_OTHER", complaint_types=[
-                "General Mess Issue"
-            ], location_id="LOC_MESS").to_dict(),
-
-            # Student Activity Center
-            Department("Sound, Lighting & Stage AV", 2, department_id="DEPT_SAC_AV", complaint_types=[
-                "Speaker / Sound System Issue", "Microphone / Audio Mixer Problem", "Stage Lights / Spotlights Not Working", "Projector / Display Screen Issue", "HDMI / Cable / Adapter Missing or Damaged", "Other / Not Sure"
-            ], location_id="LOC_SAC").to_dict(),
-            Department("Equipment & Sports Goods", 3, department_id="DEPT_SAC_EQUIPMENT", complaint_types=[
-                "Indoor Games Equipment Damaged (TT, Carrom, Chess, etc.)", "Gym Equipment Faulty / Broken", "Music Instrument / Studio Gear Damaged", "Missing Activity Equipment / Item", "Other / Not Sure"
-            ], location_id="LOC_SAC").to_dict(),
-            Department("Housekeeping & Facilities", 1, department_id="DEPT_SAC_HOUSEKEEPING", complaint_types=[
-                "Main Hall / Auditorium Cleaning Required", "Gymnasium / Activity Area Unclean", "Washroom Cleaning Required", "Dustbin Overflowing / Waste Removal", "Other / Not Sure"
-            ], location_id="LOC_SAC").to_dict(),
-            Department("Electrical & Air Conditioning", 2, department_id="DEPT_SAC_ELECTRICAL", complaint_types=[
-                "AC / Ventilation Not Working", "Power Failure / Trip", "Fan / Light Issue", "Socket / Power Point Problem", "Other / Not Sure"
-            ], location_id="LOC_SAC").to_dict(),
-            Department("Plumbing", 3, department_id="DEPT_SAC_PLUMBING", complaint_types=[
-                "Water Cooler / Dispenser Leakage or Not Working", "Washroom Tap / Flush Leakage", "Sink / Drainage Blockage", "Other / Not Sure"
-            ], location_id="LOC_SAC").to_dict(),
-            Department("Other / Not Sure", 2, department_id="DEPT_SAC_OTHER", complaint_types=[
-                "General SAC Issue"
-            ], location_id="LOC_SAC").to_dict(),
-
-            # Sports Complex
-            Department("Grounds, Courts & Fields", 3, department_id="DEPT_SPORTS_GROUNDS", complaint_types=[
-                "Court / Turf Surface Damaged", "Net / Post / Goalpost Damaged or Missing", "Field Marking / Fencing Issue", "Other / Not Sure"
-            ], location_id="LOC_SPORTS").to_dict(),
-            Department("Sports Equipment & Gear", 3, department_id="DEPT_SPORTS_EQUIPMENT", complaint_types=[
-                "Equipment Damaged / Broken", "Missing Sports Equipment / Item", "Locker / Storage Locker Lock Issue", "Other / Not Sure"
-            ], location_id="LOC_SPORTS").to_dict(),
-            Department("Lighting, Electrical & Floodlights", 2, department_id="DEPT_SPORTS_LIGHTING", complaint_types=[
-                "Ground / Court Floodlight Not Working", "Indoor Court Lighting / Fan Issue", "Power Outlet / Socket Problem", "Scoreboard / Display Issue", "Other / Not Sure"
-            ], location_id="LOC_SPORTS").to_dict(),
-            Department("Housekeeping & Locker Rooms", 1, department_id="DEPT_SPORTS_HOUSEKEEPING", complaint_types=[
-                "Locker Room / Changing Room Unclean", "Court / Gymnasium Cleaning Required", "Washroom Cleaning Required", "Dustbin Overflowing / Waste Removal", "Other / Not Sure"
-            ], location_id="LOC_SPORTS").to_dict(),
-            Department("Plumbing & Showers", 3, department_id="DEPT_SPORTS_PLUMBING", complaint_types=[
-                "Shower Leakage / Not Working", "Tap / Washbasin Leakage", "Water Cooler / Drinking Water Dispenser Issue", "Toilet / Drainage Blockage", "Other / Not Sure"
-            ], location_id="LOC_SPORTS").to_dict(),
-            Department("Other / Not Sure", 2, department_id="DEPT_SPORTS_OTHER", complaint_types=[
-                "General Sports Complex Issue"
-            ], location_id="LOC_SPORTS").to_dict(),
-
-            # Other / Not Sure
-            Department("Other / Not Sure", 2, department_id="DEPT_OTHER_GENERAL", complaint_types=[
-                "Issue Not Listed / General Complaint", "Urgent Safety or Security Issue", "Infrastructure / Outdoor Maintenance", "General Campus Cleanliness"
-            ], location_id="LOC_OTHER").to_dict(),
-        ]
+                Department("Electrical", 2, department_id="DEPT_HOSTEL_ELECTRICAL", complaint_types=[
+                    "Power Failure", "Fan Not Working", "Light Not Working", "Switch Problem", "Socket Problem",
+                    "Projector Not Working / No Display", "Audio / Speaker / Mic Issue", "AC / Air Conditioning Issue", "Other / Not Sure"
+                ], coordinator_id="USR_EMP_A1", coordinator_2_id="USR_EMP_A2").to_dict(),
+                Department("Plumbing", 3, department_id="DEPT_HOSTEL_PLUMBING", complaint_types=[
+                    "Water Leakage", "Tap Not Working / Tap Leakage", "No Water Supply", "Low Water Pressure",
+                    "Toilet Flush Not Working", "Toilet Blockage", "Wash Basin / Sink Blockage", "Drainage Blockage",
+                    "Shower Not Working", "Water Cooler / Dispenser Issue", "Other / Not Sure"
+                ], coordinator_id="USR_EMP_B1", coordinator_2_id="USR_EMP_B2").to_dict(),
+                Department("Housekeeping", 1, department_id="DEPT_HOSTEL_HOUSEKEEPING", complaint_types=[
+                    "Room Cleaning Required", "Washroom / Bathroom Cleaning", "Dustbin / Waste Removal",
+                    "Corridor / Common Area Cleaning", "Classroom / Lab Cleaning Required", "Other / Not Sure"
+                ]).to_dict(),
+                Department("Furniture & Fixtures", 5, department_id="DEPT_HOSTEL_FURNITURE", complaint_types=[
+                    "Cot / Bed Frame Issue", "Study Table / Chair Damaged", "Cupboard / Wardrobe Lock/Door Issue",
+                    "Door / Window Latch Problem", "Desk / Bench Damaged", "Missing Furniture / Item", "Other / Not Sure"
+                ]).to_dict(),
+                Department("Network & IT", 3, department_id="DEPT_HOSTEL_NETWORK", complaint_types=[
+                    "Wi-Fi Not Working", "Wi-Fi Connected but No Internet", "Slow Internet",
+                    "Frequent Wi-Fi Disconnection", "Weak Wi-Fi Signal", "Ethernet / LAN Port Not Working", "Other / Not Sure"
+                ]).to_dict(),
+                Department("Food Quality & Catering", 1, department_id="DEPT_MESS_FOOD", complaint_types=[
+                    "Food Quality / Taste Issue", "Undercooked / Raw Food", "Foreign Object in Food",
+                    "Food / Utensil Shortage", "Counter / Service Delay", "Other / Not Sure"
+                ]).to_dict(),
+                Department("Maintenance & Equipment", 3, department_id="DEPT_MESS_MAINTENANCE", complaint_types=[
+                    "Water Cooler / Dispenser Issue", "Food Warmer / Bain-Marie Not Working", "Exhaust Fan / Ventilation Issue",
+                    "Lighting / Electrical Issue", "Fly Catcher Machine Not Working", "Other / Not Sure"
+                ]).to_dict(),
+                Department("Library Facilities & Systems", 3, department_id="DEPT_ACADEMIC_LIBRARY", complaint_types=[
+                    "Wi-Fi / E-Library Desktop / OPAC System Issue", "RFID / Book Scanner / Printer Issue",
+                    "Reading Desk Power Socket / Lamp Issue", "AC / Ventilation Issue (Reading Area)",
+                    "Study Table / Chair / Bookshelf Damaged", "Noise Disturbance / Quiet Zone Violation", "Other / Not Sure"
+                ]).to_dict(),
+                Department("Grounds, Courts & Fields", 3, department_id="DEPT_SPORTS_GROUNDS", complaint_types=[
+                    "Court / Turf Surface Damaged", "Net / Post / Goalpost Damaged or Missing", "Field Marking / Fencing Issue", "Other / Not Sure"
+                ]).to_dict(),
+                Department("Sports Equipment & Gear", 3, department_id="DEPT_SPORTS_EQUIPMENT", complaint_types=[
+                    "Equipment Damaged / Broken", "Missing Sports Equipment / Item", "Locker / Storage Locker Lock Issue", "Other / Not Sure"
+                ]).to_dict(),
+                Department("Equipment & Sports Goods", 3, department_id="DEPT_SAC_EQUIPMENT", complaint_types=[
+                    "Indoor Games Equipment Damaged", "Gym Equipment Faulty / Broken", "Music Instrument / Studio Gear Damaged",
+                    "Missing Activity Equipment / Item", "Other / Not Sure"
+                ]).to_dict(),
+                Department("Sound, Lighting & Stage AV", 2, department_id="DEPT_SAC_AV", complaint_types=[
+                    "Speaker / Sound System Issue", "Microphone / Audio Mixer Problem", "Stage Lights / Spotlights Not Working",
+                    "Projector / Display Screen Issue", "HDMI / Cable / Adapter Missing or Damaged", "Other / Not Sure"
+                ]).to_dict(),
+                Department("Other / Not Sure", 2, department_id="DEPT_OTHER_GENERAL", complaint_types=[
+                    "Issue Not Listed / General Complaint", "Urgent Safety or Security Issue",
+                    "Infrastructure / Outdoor Maintenance", "General Campus Cleanliness"
+                ]).to_dict(),
+            ]
             changed = True
 
         seed_users_spec = [
@@ -239,8 +179,8 @@ class AuthService:
             {
                 "id": "USR_ADMIN",
                 "class": Administrator,
-                "name": "Administrator",
-                "email": os.environ.get("ADMIN_EMAIL", "admin@example.com"),
+                "name": "Platform Administrator",
+                "email": os.environ.get("ADMIN_EMAIL", "gowthamejjurothu@gmail.com"),
                 "password": os.environ.get("ADMIN_PASSWORD", "Admin@123"),
                 "first_login": False,
                 "kwargs": {},
@@ -249,7 +189,7 @@ class AuthService:
                 "id": "USR_MANAGER",
                 "class": AppManager,
                 "name": "App Manager 1",
-                "email": os.environ.get("MANAGER_EMAIL", "manager@example.com"),
+                "email": os.environ.get("MANAGER_EMAIL", "ejjurothugowtham@gmail.com"),
                 "password": os.environ.get("MANAGER_PASSWORD", "Manager@123"),
                 "first_login": False,
                 "kwargs": {
@@ -270,52 +210,82 @@ class AuthService:
                 },
             },
             {
-                "id": "USR_WARDEN",
-                "class": LocationInCharge,
-                "name": "Warden 1",
-                "email": os.environ.get("WARDEN_EMAIL", "warden@example.com"),
-                "password": os.environ.get("WARDEN_PASSWORD", "warden@123"),
+                "id": "USR_EMP_A1",
+                "class": Employee,
+                "name": "Employee A1",
+                "email": "employee.a1@campuspulse.edu",
+                "password": "Employee@123",
                 "first_login": False,
                 "kwargs": {
-                    "location_id": "LOC_HOSTEL_1",
-                    "assigned_locations": ["LOC_HOSTEL_1", "LOC_ACADEMIC_1", "LOC_MESS_1", "LOC_SAC_1", "LOC_SPORTS_1"]
+                    "department_id": "DEPT_HOSTEL_ELECTRICAL",
+                    "location_id": "LOC_HOSTEL_1"
                 },
             },
             {
-                "id": "USR_WARDEN_2",
-                "class": LocationInCharge,
-                "name": "Warden 2",
-                "email": os.environ.get("WARDEN_2_EMAIL", "warden2@campus.edu"),
-                "password": os.environ.get("WARDEN_2_PASSWORD", "warden@123"),
+                "id": "USR_EMP_A2",
+                "class": Employee,
+                "name": "Employee A2",
+                "email": "employee.a2@campuspulse.edu",
+                "password": "Employee@123",
                 "first_login": False,
                 "kwargs": {
-                    "location_id": "LOC_HOSTEL_2",
-                    "assigned_locations": ["LOC_HOSTEL_2", "LOC_ACADEMIC_2", "LOC_MESS_2", "LOC_SAC_2", "LOC_SPORTS_2"]
+                    "department_id": "DEPT_HOSTEL_ELECTRICAL",
+                    "location_id": "LOC_HOSTEL_1"
                 },
             },
             {
-                "id": "USR_COORDINATOR",
-                "class": Coordinator,
-                "name": "Coordinator 1",
-                "email": os.environ.get("COORDINATOR_EMAIL", "coordinator@example.com"),
-                "password": os.environ.get("COORDINATOR_PASSWORD", "Coordinator@123"),
+                "id": "USR_EMP_A3",
+                "class": Employee,
+                "name": "Employee A3",
+                "email": "employee.a3@campuspulse.edu",
+                "password": "Employee@123",
                 "first_login": False,
-                "kwargs": {"department_id": "DEPT_HOSTEL_ELECTRICAL"},
+                "kwargs": {
+                    "department_id": "DEPT_HOSTEL_ELECTRICAL",
+                    "location_id": "LOC_HOSTEL_1"
+                },
             },
             {
-                "id": "USR_COORDINATOR_2",
-                "class": Coordinator,
-                "name": "Coordinator 2",
-                "email": os.environ.get("COORDINATOR_2_EMAIL", "coordinator2@campus.edu"),
-                "password": os.environ.get("COORDINATOR_2_PASSWORD", "Coordinator@123"),
+                "id": "USR_EMP_B1",
+                "class": Employee,
+                "name": "Employee B1",
+                "email": "employee.b1@campuspulse.edu",
+                "password": "Employee@123",
                 "first_login": False,
-                "kwargs": {"department_id": "DEPT_HOSTEL_PLUMBING"},
+                "kwargs": {
+                    "department_id": "DEPT_HOSTEL_PLUMBING",
+                    "location_id": "LOC_HOSTEL_2"
+                },
+            },
+            {
+                "id": "USR_EMP_B2",
+                "class": Employee,
+                "name": "Employee B2",
+                "email": "employee.b2@campuspulse.edu",
+                "password": "Employee@123",
+                "first_login": False,
+                "kwargs": {
+                    "department_id": "DEPT_HOSTEL_PLUMBING",
+                    "location_id": "LOC_HOSTEL_2"
+                },
+            },
+            {
+                "id": "USR_EMP_B3",
+                "class": Employee,
+                "name": "Employee B3",
+                "email": "employee.b3@campuspulse.edu",
+                "password": "Employee@123",
+                "first_login": False,
+                "kwargs": {
+                    "department_id": "DEPT_HOSTEL_PLUMBING",
+                    "location_id": "LOC_HOSTEL_2"
+                },
             },
             {
                 "id": "USR_STUDENT",
                 "class": Student,
                 "name": "Student 1",
-                "email": os.environ.get("STUDENT_EMAIL", "student@example.com"),
+                "email": os.environ.get("STUDENT_EMAIL", "gowtham.e23@iiits.in"),
                 "password": os.environ.get("STUDENT_PASSWORD", "Student@123"),
                 "first_login": False,
                 "kwargs": {"location_id": "LOC_HOSTEL_1"},
@@ -328,6 +298,30 @@ class AuthService:
                 "password": "Student@123",
                 "first_login": False,
                 "kwargs": {"location_id": "LOC_HOSTEL_2"},
+            },
+            {
+                "id": "USR_WARDEN",
+                "class": LocationInCharge,
+                "name": "Warden 1",
+                "email": os.environ.get("WARDEN_EMAIL", "naveen@campus.edu"),
+                "password": os.environ.get("WARDEN_PASSWORD", "Warden@123"),
+                "first_login": False,
+                "kwargs": {
+                    "location_id": "LOC_HOSTEL_1",
+                    "assigned_locations": ["LOC_HOSTEL_1", "LOC_ACADEMIC_1", "LOC_MESS_1", "LOC_SAC_1", "LOC_SPORTS_1"]
+                },
+            },
+            {
+                "id": "USR_WARDEN_2",
+                "class": LocationInCharge,
+                "name": "Warden 2",
+                "email": os.environ.get("WARDEN_2_EMAIL", "warden2@campus.edu"),
+                "password": os.environ.get("WARDEN_2_PASSWORD", "Warden@123"),
+                "first_login": False,
+                "kwargs": {
+                    "location_id": "LOC_HOSTEL_2",
+                    "assigned_locations": ["LOC_HOSTEL_2", "LOC_ACADEMIC_2", "LOC_MESS_2", "LOC_SAC_2", "LOC_SPORTS_2"]
+                },
             },
         ]
 
@@ -364,10 +358,10 @@ class AuthService:
                 user_by_email[email_lower] = user_dict
                 changed = True
             else:
-                if any(x in (target_user.get("email") or "").lower() for x in ["gowtham", "@gmail.com", "@iiits.in", "naveen@"]):
+                if target_user.get("user_id") == spec["id"] and target_user.get("email") != spec["email"]:
                     target_user["email"] = spec["email"]
                     changed = True
-                if target_user.get("name") in ("App Manager", "Warden", "Coordinator", "Student"):
+                if target_user.get("name") in ("App Manager", "Warden", "Coordinator", "Student", "Student User"):
                     target_user["name"] = spec["name"]
                     changed = True
                 if spec["kwargs"].get("assigned_locations") and not target_user.get("assigned_locations"):
@@ -384,13 +378,10 @@ class AuthService:
 
         # Ensure seed profiles and assignments in SQLite
         with self._connect() as conn:
-            conn.execute("UPDATE users SET email = 'admin@example.com' WHERE user_id = 'USR_ADMIN' AND (email LIKE '%gowtham%' OR email LIKE '%@gmail.com%')")
-            conn.execute("UPDATE users SET email = 'manager@example.com' WHERE user_id = 'USR_MANAGER' AND (email LIKE '%gowtham%' OR email LIKE '%@gmail.com%')")
-            conn.execute("UPDATE users SET email = 'coordinator@example.com' WHERE user_id = 'USR_COORDINATOR' AND (email LIKE '%gowtham%' OR email LIKE '%@gmail.com%')")
-            conn.execute("UPDATE users SET email = 'student@example.com' WHERE user_id = 'USR_STUDENT' AND (email LIKE '%gowtham%' OR email LIKE '%@iiits.in%' OR email LIKE '%@gmail.com%')")
-            conn.execute("UPDATE users SET email = 'warden@example.com' WHERE user_id = 'USR_WARDEN' AND email LIKE '%naveen%'")
-            conn.execute("UPDATE users SET email = 'student_alt@example.com', name = 'Student Alt' WHERE user_id = 'USR-2AB3A96E'")
-            conn.execute("UPDATE institutions SET admin_email = 'admin@campuspulse.edu' WHERE admin_email LIKE '%gowtham%' OR admin_email LIKE '%@gmail.com%'")
+            conn.execute("UPDATE users SET email = ? WHERE user_id = 'USR_ADMIN'", (os.environ.get("ADMIN_EMAIL", "gowthamejjurothu@gmail.com"),))
+            conn.execute("UPDATE users SET email = ? WHERE user_id = 'USR_MANAGER'", (os.environ.get("MANAGER_EMAIL", "ejjurothugowtham@gmail.com"),))
+            conn.execute("UPDATE users SET email = ?, name = 'Student 1' WHERE user_id = 'USR_STUDENT'", (os.environ.get("STUDENT_EMAIL", "gowtham.e23@iiits.in"),))
+            conn.execute("UPDATE users SET email = ? WHERE user_id = 'USR_WARDEN'", (os.environ.get("WARDEN_EMAIL", "naveen@campus.edu"),))
 
             # Sync locations table in SQLite
             for l in data.get("locations", []):
@@ -447,14 +438,26 @@ class AuthService:
                 """)
             conn.execute("UPDATE users SET location_id = 'LOC_HOSTEL_1' WHERE user_id = 'USR_STUDENT' AND (location_id IS NULL OR location_id = '')")
             conn.execute("UPDATE users SET location_id = 'LOC_HOSTEL_2' WHERE user_id = 'USR_STUDENT_2' AND (location_id IS NULL OR location_id = '')")
-            conn.execute("""
-                INSERT OR IGNORE INTO staff_profiles (user_id, employee_id, designation, department, assigned_locations)
-                VALUES ('USR_COORDINATOR', 'EMP001', 'Electrical Coordinator', 'Electrical', '[]')
-                """)
-            conn.execute("""
-                INSERT OR IGNORE INTO staff_profiles (user_id, employee_id, designation, department, assigned_locations)
-                VALUES ('USR_COORDINATOR_2', 'EMP006', 'Plumbing Coordinator', 'Plumbing', '[]')
-                """)
+
+            # Staff profiles for the 6 employees
+            employee_profiles = [
+                ('USR_EMP_A1', 'EMP_A1', 'Electrical Coordinator / Electrician', 'Electrical', '["LOC_HOSTEL_1"]'),
+                ('USR_EMP_A2', 'EMP_A2', 'Backup Coordinator / Electrician', 'Electrical', '["LOC_HOSTEL_1"]'),
+                ('USR_EMP_A3', 'EMP_A3', 'HVAC Specialist', 'Electrical', '["LOC_HOSTEL_1"]'),
+                ('USR_EMP_B1', 'EMP_B1', 'Plumbing Coordinator / Plumber', 'Plumbing', '["LOC_HOSTEL_2"]'),
+                ('USR_EMP_B2', 'EMP_B2', 'Backup Coordinator / Plumber', 'Plumbing', '["LOC_HOSTEL_2"]'),
+                ('USR_EMP_B3', 'EMP_B3', 'Sanitation Technician', 'Plumbing', '["LOC_HOSTEL_2"]'),
+            ]
+            for uid, empid, desig, dept, locs in employee_profiles:
+                conn.execute("""
+                    INSERT INTO staff_profiles (user_id, employee_id, designation, department, assigned_locations)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(user_id) DO UPDATE SET
+                        designation=excluded.designation,
+                        department=excluded.department,
+                        assigned_locations=excluded.assigned_locations
+                """, (uid, empid, desig, dept, locs))
+
             conn.execute("""
                 INSERT INTO staff_profiles (user_id, employee_id, designation, department, assigned_locations)
                 VALUES ('USR_MANAGER', 'EMP002', 'Operations Manager 1', 'Administration', '["LOC_HOSTEL_1", "LOC_ACADEMIC_1", "LOC_MESS_1", "LOC_SAC_1", "LOC_SPORTS_1"]')
@@ -484,20 +487,18 @@ class AuthService:
                 VALUES ('USR_ADMIN', 'EMP000', 'Chief Administrator', 'IT')
                 """)
 
-            # Coordinator initial department-based assignments (without requiring location)
+            # Coordinator initial department-based assignments for the 4 designated employees
             init_coord_assignments = [
-                ("ASGN_COORD1_ELEC_HOSTEL", "USR_COORDINATOR", "DEPT_HOSTEL_ELECTRICAL", "ALL"),
-                ("ASGN_COORD1_ELEC_ACAD", "USR_COORDINATOR", "DEPT_ACADEMIC_ELECTRICAL", "ALL"),
-                ("ASGN_COORD1_ELEC_SAC", "USR_COORDINATOR", "DEPT_SAC_ELECTRICAL", "ALL"),
-                ("ASGN_COORD2_PLUMB_HOSTEL", "USR_COORDINATOR_2", "DEPT_HOSTEL_PLUMBING", "ALL"),
-                ("ASGN_COORD2_PLUMB_ACAD", "USR_COORDINATOR_2", "DEPT_ACADEMIC_PLUMBING", "ALL"),
-                ("ASGN_COORD2_PLUMB_SAC", "USR_COORDINATOR_2", "DEPT_SAC_PLUMBING", "ALL"),
+                ("ASGN_COORD_A1", "USR_EMP_A1", "DEPT_HOSTEL_ELECTRICAL", "LOC_HOSTEL_1"),
+                ("ASGN_COORD_A2", "USR_EMP_A2", "DEPT_HOSTEL_ELECTRICAL", "LOC_HOSTEL_1"),
+                ("ASGN_COORD_B1", "USR_EMP_B1", "DEPT_HOSTEL_PLUMBING", "LOC_HOSTEL_2"),
+                ("ASGN_COORD_B2", "USR_EMP_B2", "DEPT_HOSTEL_PLUMBING", "LOC_HOSTEL_2"),
             ]
             for asgn_id, cid, did, lid in init_coord_assignments:
                 conn.execute("""
                     INSERT OR IGNORE INTO coordinator_assignments
                     (assignment_id, coordinator_id, department_id, location_id, assigned_at, assigned_by, status)
-                    VALUES (?, ?, ?, ?, '2026-08-13 00:00:00', 'system', 'Active')
+                    VALUES (?, ?, ?, ?, '2026-10-16 00:00:00', 'USR_ADMIN', 'Active')
                 """, (asgn_id, cid, did, lid))
             conn.commit()
 
@@ -608,6 +609,10 @@ class AuthService:
                 (user_id,),
             ).fetchone()
             if not row:
+                if user_id in ("USR_COORDINATOR", "USR_COORDINATOR_1"):
+                    return self.get_user("USR_EMP_A1")
+                if user_id == "USR_COORDINATOR_2":
+                    return self.get_user("USR_EMP_A2")
                 return None
             return self._user_from_joined_row(row)
 
@@ -1111,7 +1116,13 @@ class AuthService:
         # Auto-generate employee_id or roll_number if not provided for staff/student roles
         if role in (Coordinator.ROLE, LocationInCharge.ROLE, AppManager.ROLE, Administrator.ROLE, Employee.ROLE) and not employee_id:
             import secrets, string
-            employee_id = f"EMP{''.join(secrets.choice(string.digits) for _ in range(5))}"
+            for _ in range(50):
+                cand = f"EMP{''.join(secrets.choice(string.digits) for _ in range(6))}"
+                if not self.get_user_by_employee_id(cand):
+                    employee_id = cand
+                    break
+            if not employee_id:
+                employee_id = f"EMP{secrets.token_hex(4).upper()}"
         elif role == Student.ROLE and not roll_number:
             import secrets, string
             roll_number = f"S{''.join(secrets.choice(string.digits) for _ in range(7))}"
@@ -1176,10 +1187,6 @@ class AuthService:
             f"Role: {role}",
         )
         return user
-        self.notification_service.notify(
-            "Demo Administrator", f"New user created: {user.name} ({user.role})"
-        )
-        return user
 
     def get_user_by_identity(self, identity):
         if not identity:
@@ -1207,6 +1214,17 @@ class AuthService:
         user = self.get_user(clean_id)
         if user:
             return user
+        # 5. Legacy test runner aliases to canonical test users
+        legacy_test_aliases = {
+            "admin@example.com": "USR_ADMIN",
+            "student@example.com": "USR_STUDENT",
+            "warden@example.com": "USR_WARDEN",
+            "manager@example.com": "USR_MANAGER",
+            "coordinator@example.com": "USR_EMP_A1",
+        }
+        alias_target = legacy_test_aliases.get(clean_id.lower())
+        if alias_target:
+            return self.get_user(alias_target)
         return None
 
     # Per-account brute-force protection. Tracked by normalized identity (not
@@ -1336,7 +1354,13 @@ class AuthService:
             raise RuntimeError("Database update failed: password change could not be verified in database.")
 
         # Clear login lockout/failures for this account
-        self._clear_login_failures(user.email.strip().lower())
+        clean_email = user.email.strip().lower()
+        self._clear_login_failures(clean_email)
+        try:
+            from middleware.rate_limiter import record_login_attempt
+            record_login_attempt("127.0.0.1", clean_email, success=True, db_path=self.db_path)
+        except Exception:
+            pass
 
         self.log_activity(user.user_id, "Password Change", user.user_id, "User changed password")
         self.notification_service.notify(
@@ -1364,7 +1388,13 @@ class AuthService:
 
         # A successful, verified reset is proof of ownership: clear any
         # brute-force lockout so the legitimate owner can log in right away.
-        self._clear_login_failures(user.email.strip().lower())
+        clean_email = user.email.strip().lower()
+        self._clear_login_failures(clean_email)
+        try:
+            from middleware.rate_limiter import record_login_attempt
+            record_login_attempt("127.0.0.1", clean_email, success=True, db_path=self.db_path)
+        except Exception:
+            pass
         self.log_activity(
             user.user_id, "Password Reset", "system", "OTP Reset completed"
         )
@@ -1501,7 +1531,7 @@ class AuthService:
         req_role = updates_dict.get("role")
         if "role" in allowed_fields and req_role is not None and req_role != user.role:
             if user.role in ("administrator", "super_admin") or req_role not in (
-                "app_manager", "coordinator", "location_in_charge", "student"
+                "app_manager", "coordinator", "location_in_charge", "student", "employee"
             ):
                 raise ValueError("Invalid role change.")
         new_loc_id = updates_dict.get("location_id")
@@ -1765,6 +1795,12 @@ class AuthService:
         if not user.is_deleted:
             raise ValueError("User is not deleted.")
 
+        # Role Hierarchy Enforcement on Restore:
+        # App Managers cannot restore Administrator, Super Admin, or App Manager accounts.
+        target_role = (user.role or "").lower()
+        if p_role == "app_manager" and target_role in ("administrator", "super_admin", "app_manager"):
+            raise PermissionError("App Managers are not authorized to restore Administrator or App Manager accounts.")
+
         import time
         from datetime import datetime
         now_ts = time.time()
@@ -1836,9 +1872,10 @@ class AuthService:
             return [dict(r) for r in rows]
 
     def list_departments(self):
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM departments ORDER BY name").fetchall()
         return [
-            Department.from_dict(item)
-            for item in self.repository.load().get("departments", [])
+            Department.from_dict(self.repository._row_to_department(row)) for row in rows
         ]
 
     def list_locations(self):
@@ -1902,12 +1939,33 @@ class AuthService:
     def get_department(self, department_id):
         if not department_id:
             return None
-        for department in self.list_departments():
-            if (
-                department.department_id == department_id
-                or (department.name and department.name.lower() == department_id.lower())
-            ):
-                return department
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM departments WHERE department_id = ? OR LOWER(name) = LOWER(?)",
+                (department_id, department_id),
+            ).fetchone()
+            if row:
+                return Department.from_dict(self.repository._row_to_department(row))
+        dept_alias = {
+            "DEPT_ELECTRICAL": "DEPT_HOSTEL_ELECTRICAL",
+            "DEPT_PLUMBING": "DEPT_HOSTEL_PLUMBING",
+            "DEPT_HOUSEKEEPING": "DEPT_HOSTEL_HOUSEKEEPING",
+            "DEPT_FURNITURE": "DEPT_HOSTEL_FURNITURE",
+            "DEPT_NETWORK": "DEPT_HOSTEL_NETWORK",
+            "DEPT_FOOD": "DEPT_MESS_FOOD",
+            "DEPT_OTHER": "DEPT_OTHER_GENERAL",
+            "DEPT_HOSTEL_OTHER": "DEPT_OTHER_GENERAL",
+            "OTHER": "DEPT_OTHER_GENERAL",
+        }
+        alias_target = dept_alias.get(str(department_id).strip().upper())
+        if alias_target:
+            with self._connect() as conn:
+                row = conn.execute(
+                    "SELECT * FROM departments WHERE department_id = ?",
+                    (alias_target,),
+                ).fetchone()
+                if row:
+                    return Department.from_dict(self.repository._row_to_department(row))
         if department_id.strip():
             return Department(department_id, 3, department_id=department_id)
         return None
@@ -1915,16 +1973,40 @@ class AuthService:
     def get_location(self, location_id):
         if not location_id:
             return None
-        for location in self.list_locations():
-            if (
-                location.location_id == location_id
-                or (location.name and location.name.lower() == location_id.lower())
-            ):
-                return location
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM locations WHERE location_id = ? OR LOWER(name) = LOWER(?)",
+                (location_id, location_id),
+            ).fetchone()
+            if row:
+                return Location.from_dict(self.repository._row_to_location(row))
+        loc_alias = {
+            "LOC_HOSTEL_A": "LOC_HOSTEL_1",
+            "LOC_HOSTEL_B": "LOC_HOSTEL_2",
+            "LOC_HOSTEL": "LOC_HOSTEL_1",
+            "LOC_ACADEMIC": "LOC_ACADEMIC_1",
+            "LOC_MESS": "LOC_MESS_2",
+            "LOC_SAC": "LOC_SAC_1",
+            "LOC_SPORTS": "LOC_SPORTS_1",
+        }
+        target_id = loc_alias.get(str(location_id).strip().upper())
+        if target_id:
+            with self._connect() as conn:
+                row = conn.execute(
+                    "SELECT * FROM locations WHERE location_id = ?",
+                    (target_id,),
+                ).fetchone()
+                if row:
+                    return Location.from_dict(self.repository._row_to_location(row))
         return None
 
-    def create_location(self, name, location_type=None):
-        location = Location(name, location_type=location_type)
+    def create_location(self, name, location_type=None, public_complaint_access=None, complaint_submission_policy=None):
+        location = Location(
+            name,
+            location_type=location_type,
+            public_complaint_access=public_complaint_access,
+            complaint_submission_policy=complaint_submission_policy,
+        )
         self.save_location(location)
         return location
 
@@ -1940,11 +2022,17 @@ class AuthService:
         # Save to storage repo and sync to sqlite locations table
         self.repository.save({"locations": [l.to_dict() for l in locs]})
 
+        policy = getattr(
+            location,
+            "complaint_submission_policy",
+            getattr(location, "public_complaint_access", "everyone"),
+        ) or "everyone"
+
         with self._connect() as conn:
             conn.execute(
                 """
-                INSERT INTO locations (location_id, name, location_type, in_charge_id, coordinator_id, app_manager_id, active, archived, parent_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO locations (location_id, name, location_type, in_charge_id, coordinator_id, app_manager_id, active, archived, parent_id, public_complaint_access, complaint_submission_policy)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(location_id) DO UPDATE SET
                     name=excluded.name,
                     location_type=excluded.location_type,
@@ -1953,7 +2041,9 @@ class AuthService:
                     app_manager_id=excluded.app_manager_id,
                     active=excluded.active,
                     archived=excluded.archived,
-                    parent_id=excluded.parent_id
+                    parent_id=excluded.parent_id,
+                    public_complaint_access=excluded.public_complaint_access,
+                    complaint_submission_policy=excluded.complaint_submission_policy
                 """,
                 (
                     location.location_id,
@@ -1965,6 +2055,8 @@ class AuthService:
                     int(location.active),
                     int(getattr(location, "archived", False)),
                     getattr(location, "parent_id", None),
+                    policy,
+                    policy,
                 ),
             )
 
@@ -1978,6 +2070,7 @@ class AuthService:
         # Remove from SQLite and cleanup assignments
         with self._connect() as conn:
             conn.execute("UPDATE coordinator_assignments SET status = 'Inactive' WHERE location_id = ?", (location_id,))
+            conn.execute("DELETE FROM location_departments WHERE location_id = ?", (location_id,))
             conn.execute("DELETE FROM locations WHERE location_id = ?", (location_id,))
             conn.commit()
 
@@ -1993,9 +2086,9 @@ class AuthService:
             if changed:
                 self.save_user(user)
 
-    def create_department(self, name, sla_days=1, complaint_types=None, location_id=None):
+    def create_department(self, name, sla_days=1, complaint_types=None, location_id=None, description=None):
         from models.department import Department
-        dept = Department(name, sla_days=sla_days, complaint_types=complaint_types or [], location_id=location_id)
+        dept = Department(name, sla_days=sla_days, complaint_types=complaint_types or [], location_id=location_id, description=description)
         self.save_department(dept)
         return dept
 
@@ -2016,6 +2109,10 @@ class AuthService:
         depts = [d for d in depts if d.department_id != department_id]
         self.repository.save({"departments": [d.to_dict() for d in depts]})
 
+        with self._connect() as conn:
+            conn.execute("DELETE FROM location_departments WHERE department_id = ?", (department_id,))
+            conn.commit()
+
         # Clear department_id from any users assigned to this department
         for user in self.list_users():
             if getattr(user, "department_id", None) == department_id:
@@ -2026,12 +2123,19 @@ class AuthService:
     # COORDINATOR ASSIGNMENT MANAGEMENT
     # =========================================================================
     def list_coordinator_assignments(self, coordinator_id=None, location_id=None, department_id=None):
+        search_ids = []
+        if coordinator_id:
+            search_ids.append(coordinator_id)
+            resolved = self.get_user(coordinator_id)
+            if resolved and resolved.user_id not in search_ids:
+                search_ids.append(resolved.user_id)
         with self._connect() as conn:
             query = "SELECT * FROM coordinator_assignments WHERE (status IS NULL OR status = 'Active')"
             params = []
-            if coordinator_id:
-                query += " AND coordinator_id = ?"
-                params.append(coordinator_id)
+            if search_ids:
+                placeholders = ",".join("?" for _ in search_ids)
+                query += f" AND coordinator_id IN ({placeholders})"
+                params.extend(search_ids)
             if location_id:
                 query += " AND (location_id = ? OR location_id IN (SELECT location_id FROM locations WHERE location_type = ?))"
                 params.extend([location_id, location_id])
@@ -2064,8 +2168,8 @@ class AuthService:
         user = self.get_user(coordinator_id)
         if not user:
             raise ValueError("Coordinator user not found.")
-        if (user.role or "").lower() != "coordinator":
-            raise ValueError("User must have 'coordinator' role.")
+        if (user.role or "").lower() not in ("coordinator", "employee"):
+            raise ValueError("User must have coordinator or employee role.")
 
         loc_target = location_id if (location_id and location_id.strip() and location_id != "unassigned") else "ALL"
         loc = self.get_location(loc_target) if loc_target != "ALL" else None
@@ -2126,8 +2230,8 @@ class AuthService:
         user = self.get_user(coordinator_id)
         if not user:
             raise ValueError("Coordinator user not found.")
-        if (user.role or "").lower() != "coordinator":
-            raise ValueError("User must have coordinator role.")
+        if (user.role or "").lower() not in ("coordinator", "employee"):
+            raise ValueError("User must have coordinator or employee role.")
 
         now_str = now_string()
         with self._connect() as conn:
@@ -2177,28 +2281,43 @@ class AuthService:
                   AND (u.status IS NULL OR u.status = 'Active')
                 """
             ).fetchall()
-            assigned_pairs = set()
             all_loc_depts = set()
             for r in rows:
                 loc_id = r["location_id"]
                 dept_id = r["department_id"]
-                if loc_id == "ALL":
-                    all_loc_depts.add(dept_id)
-                else:
-                    assigned_pairs.add((loc_id, dept_id))
+                all_loc_depts.add(dept_id)
 
-        unassigned_pairs = []
-        for loc in all_locs:
-            for dept in all_depts:
-                if dept.department_id in all_loc_depts:
-                    continue
-                if (loc.location_id, dept.department_id) not in assigned_pairs:
-                    unassigned_pairs.append({
-                        "location_id": loc.location_id,
-                        "location_name": loc.name,
-                        "department_id": dept.department_id,
-                        "department_name": dept.name,
-                    })
+            # Also check direct coordinator_id on departments
+            dept_rows = conn.execute(
+                """
+                SELECT d.department_id FROM departments d
+                JOIN users u ON d.coordinator_id = u.user_id
+                WHERE d.active = 1 AND u.active = 1 AND (u.is_deleted IS NULL OR u.is_deleted = 0)
+                """
+            ).fetchall()
+            for dr in dept_rows:
+                all_loc_depts.add(dr["department_id"])
+
+            # Also check teams
+            team_rows = conn.execute(
+                """
+                SELECT DISTINCT t.department_id FROM teams t
+                JOIN users u ON t.coordinator_id = u.user_id
+                WHERE t.active = 1 AND u.active = 1 AND (u.is_deleted IS NULL OR u.is_deleted = 0)
+                """
+            ).fetchall()
+            for tr in team_rows:
+                all_loc_depts.add(tr["department_id"])
+
+        unassigned_departments = []
+        for dept in all_depts:
+            if dept.department_id not in all_loc_depts:
+                unassigned_departments.append({
+                    "department_id": dept.department_id,
+                    "department_name": dept.name,
+                    "location_id": "ALL",
+                    "location_name": "Campus-wide",
+                })
 
         unassigned_warden_locations = []
         for loc in all_locs:
@@ -2212,14 +2331,78 @@ class AuthService:
                 })
 
         return {
-            "unassigned_pairs": unassigned_pairs,
+            "unassigned_departments": unassigned_departments,
+            "unassigned_pairs": unassigned_departments,
             "unassigned_warden_locations": unassigned_warden_locations,
         }
 
     def is_coordinator_assigned(self, coordinator_id, location_id, department_id):
         user = self.get_user(coordinator_id)
-        if not user or (user.role or "").lower() != "coordinator":
+        if not user or (user.role or "").lower() not in ("coordinator", "employee"):
             return False
+
+        effective_ids = {coordinator_id, user.user_id}
+        dept_obj = self.get_department(department_id)
+        if dept_obj and (
+            getattr(dept_obj, "coordinator_id", None) in effective_ids
+            or getattr(dept_obj, "coordinator_2_id", None) in effective_ids
+        ):
+            return True
+        for cid in effective_ids:
+            if self.is_coordinator_assigned_legacy(cid, location_id, department_id):
+                return True
+        return False
+
+    def get_active_coordinator_for_department(self, department_id: str):
+        dept = self.get_department(department_id)
+        if not dept:
+            return None
+        team_svc = getattr(self, "team_service", None)
+        if not team_svc:
+            try:
+                from services.team_service import TeamService
+                team_svc = TeamService(db_path=str(self.db_path) if hasattr(self, "db_path") else "storage/campus_pulse.db")
+            except Exception:
+                team_svc = None
+
+        from datetime import datetime
+        today_str = datetime.now().strftime("%Y-%m-%d")
+
+        def _is_on_leave(uid):
+            if team_svc:
+                try:
+                    return team_svc.is_user_on_leave(uid, department_id=department_id)
+                except Exception:
+                    pass
+            with self._connect() as conn:
+                row = conn.execute(
+                    """
+                    SELECT 1 FROM user_leaves
+                    WHERE user_id = ?
+                      AND date(from_date) <= date(?)
+                      AND date(?) <= date(to_date)
+                      AND (department_id IS NULL OR department_id = '' OR department_id = 'ALL' OR department_id = ?)
+                    LIMIT 1
+                    """,
+                    (uid, today_str, today_str, department_id),
+                ).fetchone()
+                return bool(row)
+
+        c1_id = getattr(dept, "coordinator_id", None)
+        if c1_id:
+            if not _is_on_leave(c1_id):
+                u1 = self.get_user(c1_id)
+                if u1 and getattr(u1, "active", True) and not getattr(u1, "is_deleted", False):
+                    return u1
+        c2_id = getattr(dept, "coordinator_2_id", None)
+        if c2_id:
+            if not _is_on_leave(c2_id):
+                u2 = self.get_user(c2_id)
+                if u2 and getattr(u2, "active", True) and not getattr(u2, "is_deleted", False):
+                    return u2
+        return None
+
+    def is_coordinator_assigned_legacy(self, coordinator_id, location_id, department_id):
 
         assignments = self.list_coordinator_assignments(coordinator_id=coordinator_id)
         if not assignments:
@@ -2387,8 +2570,8 @@ class AuthService:
         user = self.get_user(coordinator_id)
         if not user:
             raise ValueError("User not found.")
-        if (user.role or "").lower() != "coordinator":
-            raise ValueError("Only users with role 'coordinator' can be assigned as location coordinators.")
+        if (user.role or "").lower() not in ("coordinator", "employee"):
+            raise ValueError("Only users with role 'coordinator' or 'employee' can be assigned as location coordinators.")
         if not user.active:
             raise ValueError("Only active users can be assigned.")
 
@@ -2481,12 +2664,13 @@ class AuthService:
                     seen.add(loc.location_id)
         return results
 
-    def assign_app_manager_locations(self, app_manager_id, location_ids):
-        user = self.get_user(app_manager_id)
+    def assign_user_locations(self, user_id, location_ids):
+        user = self.get_user(user_id)
         if not user:
-            raise ValueError("App Manager user not found.")
-        if (user.role or "").lower() != "app_manager":
-            raise ValueError("User must have 'app_manager' role.")
+            raise ValueError("User not found.")
+        role = (user.role or "").lower()
+        if role not in ("app_manager", "location_in_charge", "warden", "employee", "coordinator"):
+            raise ValueError("User must have 'app_manager', 'location_in_charge', 'employee', or 'coordinator' role.")
 
         user.assigned_locations = list(set(location_ids or []))
         if user.assigned_locations and not user.location_id:
@@ -2496,18 +2680,318 @@ class AuthService:
         with self._connect() as conn:
             conn.execute(
                 "UPDATE staff_profiles SET assigned_locations = ? WHERE user_id = ?",
-                (json.dumps(user.assigned_locations), app_manager_id)
+                (json.dumps(user.assigned_locations), user_id)
             )
             conn.commit()
 
-        # Update locations table app_manager_id for each location
-        for loc in self.list_locations():
-            if loc.location_id in user.assigned_locations:
-                loc.app_manager_id = app_manager_id
-                self.save_location(loc)
-            elif getattr(loc, "app_manager_id", None) == app_manager_id:
-                loc.app_manager_id = None
-                self.save_location(loc)
+        # Update locations table app_manager_id or in_charge_id for each location
+        if role == "app_manager":
+            other_mgrs = [
+                u for u in self.list_users(role="app_manager")
+                if u.user_id != user_id
+            ]
+            for loc in self.list_locations():
+                if loc.location_id in user.assigned_locations:
+                    loc.app_manager_id = user_id
+                    self.save_location(loc)
+                    # If this location was assigned to another App Manager, strip it from their profile
+                    for other in other_mgrs:
+                        other_locs = getattr(other, "assigned_locations", None) or []
+                        if loc.location_id in other_locs or loc.name in other_locs:
+                            other.assigned_locations = [
+                                lid for lid in other_locs
+                                if lid != loc.location_id and lid != loc.name
+                            ]
+                            if other.location_id == loc.location_id:
+                                other.location_id = other.assigned_locations[0] if other.assigned_locations else None
+                            self.save_user(other)
+                            with self._connect() as conn:
+                                conn.execute(
+                                    "UPDATE staff_profiles SET assigned_locations = ? WHERE user_id = ?",
+                                    (json.dumps(other.assigned_locations), other.user_id)
+                                )
+                                conn.commit()
+                elif getattr(loc, "app_manager_id", None) == user_id:
+                    loc.app_manager_id = None
+                    self.save_location(loc)
+        elif role in ("location_in_charge", "warden"):
+            other_wardens = [
+                u for u in self.list_users()
+                if (u.role or "").lower() in ("location_in_charge", "warden") and u.user_id != user_id
+            ]
+            for loc in self.list_locations():
+                if loc.location_id in user.assigned_locations:
+                    loc.in_charge_id = user_id
+                    self.save_location(loc)
+                    # If this location was assigned to another Warden, strip it from their profile
+                    for other in other_wardens:
+                        other_locs = getattr(other, "assigned_locations", None) or []
+                        if loc.location_id in other_locs or loc.name in other_locs:
+                            other.assigned_locations = [
+                                lid for lid in other_locs
+                                if lid != loc.location_id and lid != loc.name
+                            ]
+                            if other.location_id == loc.location_id:
+                                other.location_id = other.assigned_locations[0] if other.assigned_locations else None
+                            self.save_user(other)
+                            with self._connect() as conn:
+                                conn.execute(
+                                    "UPDATE staff_profiles SET assigned_locations = ? WHERE user_id = ?",
+                                    (json.dumps(other.assigned_locations), other.user_id)
+                                )
+                                conn.commit()
+                elif getattr(loc, "in_charge_id", None) == user_id:
+                    loc.in_charge_id = None
+                    self.save_location(loc)
+        elif role in ("employee", "coordinator"):
+            import uuid
+            from datetime import datetime
+
+            user.assigned_locations = list(set(location_ids or []))
+            if user.assigned_locations and not user.location_id:
+                user.location_id = user.assigned_locations[0]
+            elif not user.assigned_locations:
+                user.location_id = None
+            self.save_user(user)
+
+            with self._connect() as conn:
+                conn.execute(
+                    "UPDATE users SET location_id = ? WHERE user_id = ?",
+                    (user.location_id, user_id)
+                )
+                conn.execute(
+                    "UPDATE staff_profiles SET assigned_locations = ? WHERE user_id = ?",
+                    (json.dumps(user.assigned_locations), user_id)
+                )
+
+                # Synchronize employee_work_memberships with authorized locations
+                dept_rows = conn.execute(
+                    "SELECT DISTINCT department_id FROM employee_work_memberships WHERE user_id = ?",
+                    (user_id,)
+                ).fetchall()
+                user_depts = [r[0] for r in dept_rows]
+                if user.department_id and user.department_id not in user_depts:
+                    user_depts.append(user.department_id)
+
+                if user.assigned_locations:
+                    loc_placeholders = ",".join("?" for _ in user.assigned_locations)
+                    conn.execute(
+                        f"DELETE FROM employee_work_memberships WHERE user_id = ? AND location_id NOT IN ({loc_placeholders})",
+                        (user_id, *user.assigned_locations)
+                    )
+                else:
+                    conn.execute("DELETE FROM employee_work_memberships WHERE user_id = ?", (user_id,))
+
+                now_str = datetime.now().isoformat()
+                for did in user_depts:
+                    for lid in user.assigned_locations:
+                        exists = conn.execute(
+                            "SELECT 1 FROM employee_work_memberships WHERE user_id = ? AND department_id = ? AND location_id = ?",
+                            (user_id, did, lid)
+                        ).fetchone()
+                        if not exists:
+                            m_id = f"EWM_{uuid.uuid4().hex[:12]}"
+                            conn.execute(
+                                "INSERT INTO employee_work_memberships (membership_id, user_id, department_id, location_id, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?)",
+                                (m_id, user_id, did, lid, now_str, "admin")
+                            )
+                conn.commit()
+
+        return user
+
+    def assign_app_manager_locations(self, app_manager_id, location_ids):
+        return self.assign_user_locations(app_manager_id, location_ids)
+
+    def assign_user_departments(self, user_id, department_ids, caller_user=None):
+        import uuid
+        from datetime import datetime
+
+        user = self.get_user(user_id)
+        if not user:
+            raise ValueError("User not found.")
+        role = (user.role or "").lower()
+        if role not in ("employee", "coordinator"):
+            raise ValueError("Department eligibility can only be assigned to Employees and Coordinators.")
+
+        # App manager location scoping check: verify employee shares authorized location
+        if caller_user and (caller_user.role or "").lower() == "app_manager":
+            mgr_locs = {loc.location_id for loc in self.get_app_manager_locations(caller_user.user_id)}
+            user_locs = set(getattr(user, "assigned_locations", None) or [])
+            if getattr(user, "location_id", None):
+                user_locs.add(user.location_id)
+            if not user_locs.intersection(mgr_locs):
+                raise PermissionError("App Managers can only manage employees within their assigned locations.")
+
+        all_depts = {d.department_id: d for d in self.list_departments()}
+        for did in department_ids:
+            if did not in all_depts:
+                raise ValueError(f"Invalid department ID: {did}")
+
+        # Protect coordinator positions from accidental removal
+        with self._connect() as conn:
+            coord_rows = conn.execute(
+                "SELECT department_id, name, 'Coordinator 1' as pos FROM departments WHERE coordinator_id = ? "
+                "UNION ALL "
+                "SELECT department_id, name, 'Coordinator 2' as pos FROM departments WHERE coordinator_2_id = ?",
+                (user_id, user_id),
+            ).fetchall()
+            for cr in coord_rows:
+                if cr["department_id"] not in department_ids:
+                    raise ValueError(
+                        f"Cannot remove '{cr['name']}' because {user.name} is currently assigned as {cr['pos']} for this department. Please reassign the coordinator position first."
+                    )
+
+        # Update primary department
+        new_primary = department_ids[0] if department_ids else None
+        user.department_id = new_primary
+        self.save_user(user)
+
+        with self._connect() as conn:
+            primary_name = all_depts[new_primary].name if new_primary and new_primary in all_depts else None
+            conn.execute(
+                "UPDATE users SET department_id = ? WHERE user_id = ?",
+                (new_primary, user_id),
+            )
+            conn.execute(
+                "UPDATE staff_profiles SET department = ? WHERE user_id = ?",
+                (primary_name, user_id),
+            )
+
+            # Every employee is eligible across all locations on campus
+            all_loc_ids = [l.location_id for l in self.list_locations() if not getattr(l, "archived", False)]
+            user_locs = all_loc_ids
+            user.assigned_locations = all_loc_ids
+            conn.execute(
+                "UPDATE staff_profiles SET assigned_locations = ? WHERE user_id = ?",
+                (json.dumps(all_loc_ids), user_id),
+            )
+
+            # Remove memberships for departments no longer eligible
+            if department_ids:
+                placeholders = ",".join("?" for _ in department_ids)
+                conn.execute(
+                    f"DELETE FROM employee_work_memberships WHERE user_id = ? AND department_id NOT IN ({placeholders})",
+                    (user_id, *department_ids),
+                )
+            else:
+                conn.execute(
+                    "DELETE FROM employee_work_memberships WHERE user_id = ?",
+                    (user_id,),
+                )
+
+            # Add memberships for newly eligible departments
+            now_str = datetime.now().isoformat()
+            creator_id = getattr(caller_user, "user_id", "admin")
+            for did in department_ids:
+                for lid in user_locs:
+                    exists = conn.execute(
+                        "SELECT 1 FROM employee_work_memberships WHERE user_id = ? AND department_id = ? AND location_id = ?",
+                        (user_id, did, lid),
+                    ).fetchone()
+                    if not exists:
+                        m_id = f"EWM_{uuid.uuid4().hex[:12]}"
+                        conn.execute(
+                            "INSERT INTO employee_work_memberships (membership_id, user_id, department_id, location_id, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?)",
+                            (m_id, user_id, did, lid, now_str, creator_id),
+                        )
+            conn.commit()
+
+        return user
+
+    def assign_employee_work_assignments(self, user_id, department_ids, location_ids, caller_user=None):
+        import uuid
+        from datetime import datetime
+
+        user = self.get_user(user_id)
+        if not user:
+            raise ValueError("User not found.")
+        role = (user.role or "").lower()
+        if role not in ("employee", "coordinator"):
+            raise ValueError("Work assignments can only be configured for Employees and Coordinators.")
+
+        # App manager location scoping check: verify employee shares authorized location
+        if caller_user and (caller_user.role or "").lower() == "app_manager":
+            mgr_locs = {loc.location_id for loc in self.get_app_manager_locations(caller_user.user_id)}
+            user_locs = set(getattr(user, "assigned_locations", None) or [])
+            if getattr(user, "location_id", None):
+                user_locs.add(user.location_id)
+            if not user_locs.intersection(mgr_locs):
+                raise PermissionError("App Managers can only manage employees within their assigned locations.")
+
+        all_depts = {d.department_id: d for d in self.list_departments()}
+        for did in department_ids:
+            if did not in all_depts:
+                raise ValueError(f"Invalid department ID: {did}")
+
+        all_locs = {l.location_id: l for l in self.list_locations()}
+        for lid in location_ids:
+            if lid not in all_locs:
+                raise ValueError(f"Invalid location ID: {lid}")
+
+        # Protect coordinator positions from accidental removal
+        with self._connect() as conn:
+            coord_rows = conn.execute(
+                "SELECT department_id, name, 'Coordinator 1' as pos FROM departments WHERE coordinator_id = ? "
+                "UNION ALL "
+                "SELECT department_id, name, 'Coordinator 2' as pos FROM departments WHERE coordinator_2_id = ?",
+                (user_id, user_id),
+            ).fetchall()
+            for cr in coord_rows:
+                if cr["department_id"] not in department_ids:
+                    raise ValueError(
+                        f"Cannot remove '{cr['name']}' because {user.name} is currently assigned as {cr['pos']} for this department. Please reassign the coordinator position first."
+                    )
+
+        # Clean duplicates preserving order
+        clean_dept_ids = list(dict.fromkeys(department_ids or []))
+        clean_loc_ids = list(dict.fromkeys(location_ids or []))
+
+        user.department_id = clean_dept_ids[0] if clean_dept_ids else None
+        user.assigned_departments = clean_dept_ids
+        user.assigned_locations = clean_loc_ids
+        if clean_loc_ids and (not user.location_id or user.location_id not in clean_loc_ids):
+            user.location_id = clean_loc_ids[0]
+        elif not clean_loc_ids:
+            user.location_id = None
+        self.save_user(user)
+
+        with self._connect() as conn:
+            primary_dept_name = all_depts[user.department_id].name if user.department_id and user.department_id in all_depts else None
+            conn.execute(
+                "UPDATE users SET department_id = ?, location_id = ? WHERE user_id = ?",
+                (user.department_id, user.location_id, user_id),
+            )
+            conn.execute(
+                "UPDATE staff_profiles SET department = ?, assigned_locations = ? WHERE user_id = ?",
+                (primary_dept_name, json.dumps(clean_loc_ids), user_id),
+            )
+
+            # Synchronize employee_work_memberships
+            if not clean_dept_ids or not clean_loc_ids:
+                conn.execute("DELETE FROM employee_work_memberships WHERE user_id = ?", (user_id,))
+            else:
+                dept_placeholders = ",".join("?" for _ in clean_dept_ids)
+                loc_placeholders = ",".join("?" for _ in clean_loc_ids)
+                conn.execute(
+                    f"DELETE FROM employee_work_memberships WHERE user_id = ? AND (department_id NOT IN ({dept_placeholders}) OR location_id NOT IN ({loc_placeholders}))",
+                    (user_id, *clean_dept_ids, *clean_loc_ids),
+                )
+
+                now_str = datetime.now().isoformat()
+                creator_id = getattr(caller_user, "user_id", "admin")
+                for did in clean_dept_ids:
+                    for lid in clean_loc_ids:
+                        exists = conn.execute(
+                            "SELECT 1 FROM employee_work_memberships WHERE user_id = ? AND department_id = ? AND location_id = ?",
+                            (user_id, did, lid),
+                        ).fetchone()
+                        if not exists:
+                            m_id = f"EWM_{uuid.uuid4().hex[:12]}"
+                            conn.execute(
+                                "INSERT INTO employee_work_memberships (membership_id, user_id, department_id, location_id, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?)",
+                                (m_id, user_id, did, lid, now_str, creator_id),
+                            )
+            conn.commit()
 
         return user
 

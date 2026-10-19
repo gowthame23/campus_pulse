@@ -30,11 +30,13 @@ class SchedulerService:
 
     def _acquire_lease(self) -> bool:
         """Attempt to acquire or renew the master scheduler lease."""
+        conn = None
         try:
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             self.last_run = now_str
             expires_str = (datetime.now() + timedelta(seconds=self.interval * 2)).strftime("%Y-%m-%d %H:%M:%S")
-            conn = sqlite3.connect(self.db_path)
+            from utils.db import get_db_connection
+            conn = get_db_connection(self.db_path)
             with conn:
                 cursor = conn.execute(
                     """
@@ -50,11 +52,13 @@ class SchedulerService:
                     (self._worker_id, now_str, expires_str),
                 )
                 acquired = cursor.rowcount > 0
-            conn.close()
             return acquired
         except Exception as err:
             logger.warning(f"Scheduler lease acquisition check failed: {err}")
             return False
+        finally:
+            if conn:
+                conn.close()
 
     def _run_tasks(self):
         while self._running:
@@ -123,9 +127,10 @@ def create_scheduler(complaint_service, config_service):
 
     # Task 2: Cleanup expired soft-deleted records
     def cleanup_expired():
+        conn = None
         try:
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = sqlite3.Row
+            from utils.db import get_db_connection
+            conn = get_db_connection(db_path)
 
             cutoff_date = (datetime.now() - timedelta(days=90)).strftime(
                 "%Y-%m-%d %H:%M:%S"
@@ -140,9 +145,11 @@ def create_scheduler(complaint_service, config_service):
                     f"Cleanup: purged {cursor.rowcount} old deleted notifications."
                 )
             conn.commit()
-            conn.close()
         except Exception as e:
             logger.error(f"Cleanup failed: {e}")
+        finally:
+            if conn:
+                conn.close()
 
     scheduler.register_task("Cleanup Expired Records", cleanup_expired)
 

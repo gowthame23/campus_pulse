@@ -75,13 +75,13 @@ export default function SetupChecklistWidget() {
     },
     {
       id: "coverage",
-      label: `Departments / places with no team (${uncovered_places?.count || 0})`,
+      label: `Departments with no coordinator (${uncovered_places?.count || 0})`,
       done: uncovered_places?.is_ready,
-      fixLink: uncovered_places?.link || "/admin/teams",
-      fixLabel: "Fix in Teams",
+      fixLink: uncovered_places?.link || "/admin/departments",
+      fixLabel: "Assign Coordinators",
       desc: uncovered_places?.is_ready
-        ? "All department and location pairs have assigned teams"
-        : `${uncovered_places?.count} uncovered location/department pairs`,
+        ? "All campus departments have assigned coordinators"
+        : `${uncovered_places?.count} departments without a coordinator`,
     },
     {
       id: "backups",

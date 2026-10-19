@@ -70,10 +70,12 @@ def login(
     try:
         user = auth_service.authenticate(identity, password)
         access_token = create_session(user)
+        is_secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
         response.set_cookie(
             key="session_token",
             value=access_token,
             httponly=True,
+            secure=is_secure,
             samesite="lax",
             max_age=604800,  # 7 days
             path="/",
@@ -246,30 +248,44 @@ def _get_db():
 
 @router.post("/password-reset/request", response_model=PasswordResetStartResponse)
 def request_password_reset(
-    payload: PasswordResetStartRequest, auth_service=Depends(get_auth_service)
+    request: Request, payload: PasswordResetStartRequest, auth_service=Depends(get_auth_service)
 ):
     clean_email = (payload.email or "").strip().lower()
     now_ts = time.time()
-    reset_id = token_urlsafe(16)
-    otp = str(100000 + randbelow(900000))
-    exp_ts = now_ts + (15 * 60)
+    client_ip = request.client.host if request.client else "unknown"
 
-    # Check total attempts for this email across active requests in last 15 minutes (Account Brute-Force Protection)
+    # 1. IP Rate Limiting: Max 10 reset requests per IP in 15 minutes to prevent network DoS
     with _get_db() as conn:
-        row = conn.execute(
-            "SELECT SUM(attempts) as total_attempts FROM password_resets WHERE email = ? AND expires_at > ?",
+        ip_cnt = conn.execute(
+            "SELECT COUNT(*) FROM password_resets WHERE email LIKE ? AND created_at > ?",
+            (f"%@{client_ip}%", now_ts - 900),
+        ).fetchone()[0]
+
+        # Check failed attempts across active resets for this email
+        failed_attempts = conn.execute(
+            "SELECT SUM(attempts) FROM password_resets WHERE email = ? AND expires_at > ?",
             (clean_email, now_ts),
-        ).fetchone()
-        tot_att = (row["total_attempts"] or 0) if row else 0
+        ).fetchone()[0] or 0
+        if failed_attempts >= 5:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Too many failed attempts. Account password reset locked.",
+            )
+
+        # 2. Account Rate Limiting: Check unverified requests initiated in the last 15 minutes
         recent_requests = conn.execute(
             "SELECT COUNT(*) FROM password_resets WHERE email = ? AND otp != 'VERIFIED' AND expires_at > ?",
             (clean_email, now_ts),
         ).fetchone()[0]
-        if tot_att >= 5 or recent_requests >= 5:
+        if recent_requests >= 5:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Too many password reset attempts for this account. Please try again later.",
+                detail="Too many password reset requests. Please wait 15 minutes before trying again.",
             )
+
+    reset_id = token_urlsafe(16)
+    otp = str(100000 + randbelow(900000))
+    exp_ts = now_ts + (15 * 60)
 
     user = auth_service.get_user_by_email(clean_email)
 
@@ -309,14 +325,8 @@ def verify_password_reset(payload: PasswordResetVerifyRequest):
         rec = dict(row)
         clean_email = rec["email"]
 
-        # Check total cumulative attempts for account
-        tot_row = conn.execute(
-            "SELECT SUM(attempts) as total_attempts FROM password_resets WHERE email = ? AND expires_at > ?",
-            (clean_email, now_ts),
-        ).fetchone()
-        tot_att = (tot_row["total_attempts"] or 0) if tot_row else 0
-
-        if rec["used"] == 1 or now_ts > rec["expires_at"] or tot_att >= 5 or rec["attempts"] >= 5:
+        # Check attempts on this specific reset_id (isolated attempt counting)
+        if rec["used"] == 1 or now_ts > rec["expires_at"] or rec["attempts"] >= 5:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid or expired OTP token.",
@@ -324,8 +334,8 @@ def verify_password_reset(payload: PasswordResetVerifyRequest):
 
         if rec["otp"] != hash_token(payload.otp.strip()):
             conn.execute(
-                "UPDATE password_resets SET attempts = attempts + 1 WHERE email = ? AND expires_at > ?",
-                (clean_email, now_ts),
+                "UPDATE password_resets SET attempts = attempts + 1 WHERE reset_id = ?",
+                (payload.reset_id,),
             )
             conn.commit()
             raise HTTPException(

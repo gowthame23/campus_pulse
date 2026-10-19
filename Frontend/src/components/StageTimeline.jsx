@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Clock,
   CheckCircle2,
@@ -121,22 +121,7 @@ export function CountdownTimerBadge({ targetIso, label, warningHours = 4, danger
 }
 
 export default function StageTimeline({ complaint, coordinatorUser, wardenUser, attachments = [] }) {
-  if (!complaint) return null;
-
-  const status = complaint.status || "Submitted";
-  const priority = (complaint.priority || "Medium").toLowerCase();
-  const isHighOrCrit = priority === "high" || priority === "critical";
-  const requiresWarden =
-    complaint.requires_warden_check ||
-    complaint.is_spot_check ||
-    isHighOrCrit ||
-    Boolean(complaint.warden_verified_at);
-
-  const isPaused = status === "Waiting for Parts";
-  const wasPaused = Boolean(complaint.paused_at) && !isPaused;
-
-  const workingElapsed = useElapsedTime(complaint.work_started_at);
-  const expectedResolutionTime = formatExpectedTime(complaint.sla_due_at || complaint.target_resolution_at);
+  const workingElapsed = useElapsedTime(complaint?.work_started_at);
 
   // Extract inline progress notes from complaint history
   const progressNotes = useMemo(() => {
@@ -151,6 +136,7 @@ export default function StageTimeline({ complaint, coordinatorUser, wardenUser, 
 
   // Extract before and after photos
   const beforePhoto = useMemo(() => {
+    if (!complaint) return null;
     return (attachments || []).find(
       (a) =>
         a.category === "Before Repair" ||
@@ -161,6 +147,7 @@ export default function StageTimeline({ complaint, coordinatorUser, wardenUser, 
   }, [attachments, complaint]);
 
   const afterPhoto = useMemo(() => {
+    if (!complaint) return null;
     return (attachments || []).find(
       (a) =>
         a.category === "After Repair" ||
@@ -168,7 +155,28 @@ export default function StageTimeline({ complaint, coordinatorUser, wardenUser, 
     );
   }, [attachments, complaint]);
 
+  if (!complaint) return null;
+
+  const status = complaint.status || "Submitted";
+  const priority = (complaint.priority || "Medium").toLowerCase();
+  const isHighOrCrit = priority === "high" || priority === "critical";
+  const requiresWarden =
+    complaint.requires_warden_check ||
+    complaint.is_spot_check ||
+    isHighOrCrit ||
+    Boolean(complaint.warden_verified_at);
+
+  const isPaused = status === "Waiting for Parts";
+  const wasPaused = Boolean(complaint.paused_at) && !isPaused;
+
+  const expectedResolutionTime = formatExpectedTime(complaint.sla_due_at || complaint.target_resolution_at);
+
   const isOverdue = Boolean(complaint.is_overdue || complaint.sla_status === "Breached");
+
+  const isOtherUnrouted =
+    complaint.location_id === "LOC_OTHER" ||
+    complaint.department_id === "DEPT_OTHER_GENERAL" ||
+    (!complaint.assigned_to && complaint.assign_escalation_level === 2);
 
   // Build the vertical stages list
   const stages = [
@@ -184,19 +192,21 @@ export default function StageTimeline({ complaint, coordinatorUser, wardenUser, 
     },
     {
       id: "assigned",
-      title: "Accepted",
+      title: isOtherUnrouted && !complaint.assigned_to ? "Admin Review" : "Accepted",
       actorName:
         coordinatorUser?.name ||
         complaint.coordinator_name ||
         complaint.assigned_to ||
-        "Coordinator Team",
-      actorRole: "Coordinator",
+        (isOtherUnrouted ? "Administration" : "Coordinator Team"),
+      actorRole: isOtherUnrouted && !complaint.assigned_to ? "Admin" : "Coordinator",
       timestamp: complaint.assigned_at,
       status: complaint.assigned_to ? "completed" : status === "Submitted" ? "active" : "pending",
       description: complaint.assigned_to
         ? `Accepted by ${coordinatorUser?.name || complaint.assigned_to}`
-        : "Available in team accept queue",
-      isLate: status === "Submitted" && isOverdue,
+        : isOtherUnrouted
+          ? "Under administrative review for department routing"
+          : "Available in team accept queue",
+      isLate: status === "Submitted" && isOverdue && !isOtherUnrouted,
     },
     {
       id: "work_started",

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
   MessageSquare,
   Send,
@@ -23,6 +23,9 @@ import { getRoleDisplayName } from "../../utils/constants.js";
 
 export default function ChatPage() {
   const { itemId } = useParams();
+  const [searchParams] = useSearchParams();
+  const targetUserId = searchParams.get("userId") || searchParams.get("user_id");
+  const targetUserName = searchParams.get("name") || "";
   const { user } = useAuth();
 
   // If opened for a Lost & Found item, preserve existing item chat interface
@@ -65,10 +68,13 @@ export default function ChatPage() {
     setError("");
     try {
       const [convRes, contactsRes] = await Promise.all([
-        chatService.getConversations().catch(() => ({ data: [] })),
+        chatService.getConversations({ type: "personal" }).catch(() => ({ data: [] })),
         chatService.getContacts().catch(() => ({ data: [] })),
       ]);
-      setConversations(convRes.data || []);
+      const personalOnly = (convRes.data || []).filter(
+        (c) => c.type === "personal" && (c.other_user_role || "").toLowerCase() !== "student"
+      );
+      setConversations(personalOnly);
       setContacts(contactsRes.data || []);
     } catch (err) {
       setError("Failed to load chat conversations. Please try again.");
@@ -80,6 +86,51 @@ export default function ChatPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Auto-connect to target user if specified in URL query
+  useEffect(() => {
+    if (!targetUserId || loading) return;
+
+    // 1. Check if conversation already exists with this user
+    const existing = conversations.find((c) => c.other_user_id === targetUserId);
+    if (existing) {
+      setSelectedConversation(existing);
+      setActiveTab("conversations");
+      return;
+    }
+
+    // 2. Start personal chat with this user
+    async function initPersonalChat() {
+      try {
+        const resp = await chatService.startPersonalChat(targetUserId);
+        const convData = resp.data;
+        const matchingContact = contacts.find((c) => c.user_id === targetUserId);
+        const convObj = {
+          conversation_id: convData.conversation_id,
+          other_user_id: targetUserId,
+          other_user_name: matchingContact?.name || targetUserName || targetUserId,
+          other_user_role: matchingContact?.role || "coordinator",
+          other_user_email: matchingContact?.email || "",
+          last_message: "",
+          last_at: new Date().toISOString(),
+          unread_count: 0,
+          type: "personal",
+        };
+        setConversations((prev) => {
+          if (!prev.some((c) => c.conversation_id === convData.conversation_id)) {
+            return [convObj, ...prev];
+          }
+          return prev;
+        });
+        setSelectedConversation(convObj);
+        setActiveTab("conversations");
+      } catch (err) {
+        console.error("Unable to start personal chat with coordinator:", err);
+      }
+    }
+
+    initPersonalChat();
+  }, [targetUserId, loading, conversations.length]);
 
   // When a conversation is selected, load its messages
   useEffect(() => {

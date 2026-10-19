@@ -25,6 +25,8 @@ class Location:
         archived_by=None,
         app_manager_id=None,
         parent_id=None,
+        public_complaint_access=None,
+        complaint_submission_policy=None,
     ):
         self.location_id = location_id or generate_id("LOC")
         self.name = name
@@ -37,6 +39,19 @@ class Location:
         self.coordinator_id = coordinator_id
         self.archived_by_role = archived_by_role
         self.archived_by = archived_by
+
+        # Unified complaint submission policy: 'everyone' vs 'location_only'
+        policy = complaint_submission_policy or public_complaint_access
+        if policy:
+            p_str = str(policy).strip().lower()
+            if p_str in ("everyone", "allow_all", "all", "public", "allow_everyone"):
+                policy = "everyone"
+            elif p_str in ("location_only", "allow_only_location", "restricted", "resident_only", "location"):
+                policy = "location_only"
+        else:
+            policy = "location_only" if self.location_type == "Hostel" else "everyone"
+        self.complaint_submission_policy = policy
+        self.public_complaint_access = policy
 
     @staticmethod
     def infer_location_type(name):
@@ -68,6 +83,8 @@ class Location:
             "archived_by_role": self.archived_by_role,
             "archived_by": self.archived_by,
             "parent_id": self.parent_id,
+            "public_complaint_access": self.public_complaint_access,
+            "complaint_submission_policy": self.complaint_submission_policy,
         }
 
     @classmethod
@@ -84,6 +101,8 @@ class Location:
             data.get("archived_by"),
             app_manager_id=data.get("app_manager_id"),
             parent_id=data.get("parent_id"),
+            public_complaint_access=data.get("public_complaint_access"),
+            complaint_submission_policy=data.get("complaint_submission_policy"),
         )
 
 

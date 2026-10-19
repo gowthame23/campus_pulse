@@ -20,7 +20,7 @@ class DashboardService:
         role_lower = (role or "").lower()
         if role_lower == "student":
             return self.get_student_dashboard(user_id)
-        elif role_lower in ("coordinator", "location_in_charge"):
+        elif role_lower in ("coordinator", "location_in_charge", "employee"):
             return self.get_coordinator_dashboard(user_id)
         elif role_lower == "warden":
             return self.get_warden_dashboard(user_id)
@@ -339,12 +339,14 @@ class DashboardService:
             except Exception:
                 audit_alerts = 0
 
-            # User breakdown
-            students = conn.execute("SELECT COUNT(*) FROM users WHERE LOWER(role) = 'student'").fetchone()[0]
-            coordinators = conn.execute("SELECT COUNT(*) FROM users WHERE LOWER(role) = 'coordinator'").fetchone()[0]
-            wardens = conn.execute("SELECT COUNT(*) FROM users WHERE LOWER(role) in ('warden', 'location_in_charge')").fetchone()[0]
-            supervisors = conn.execute("SELECT COUNT(*) FROM users WHERE LOWER(role) in ('supervisor', 'app_manager')").fetchone()[0]
-            administrators = conn.execute("SELECT COUNT(*) FROM users WHERE LOWER(role) = 'administrator'").fetchone()[0]
+            # User breakdown in a single GROUP BY query
+            role_rows = conn.execute("SELECT LOWER(role), COUNT(*) FROM users GROUP BY LOWER(role)").fetchall()
+            role_counts = {r[0]: r[1] for r in role_rows}
+            students = role_counts.get("student", 0)
+            coordinators = role_counts.get("coordinator", 0)
+            wardens = role_counts.get("warden", 0) + role_counts.get("location_in_charge", 0)
+            supervisors = role_counts.get("supervisor", 0) + role_counts.get("app_manager", 0)
+            administrators = role_counts.get("administrator", 0)
 
             return {
                 "role": "administrator",

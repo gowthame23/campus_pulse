@@ -1,4 +1,4 @@
-import { User, Mail, Shield, Building, MapPin } from "lucide-react";
+import { User, Mail, Shield, Building, MapPin, Users, Wrench } from "lucide-react";
 import Card from "./Card.jsx";
 
 export default function ResponsiblePersonnelCard({
@@ -9,24 +9,38 @@ export default function ResponsiblePersonnelCard({
 }) {
   if (!complaint) return null;
 
+  const assignedEmpName =
+    complaint.assigned_employee_name ||
+    complaint.assigned_to_name ||
+    (complaint.assigned_to && !complaint.assigned_to.includes("@") ? complaint.assigned_to : null);
+  const isUnassigned =
+    !assignedEmpName ||
+    assignedEmpName === "Awaiting assignment" ||
+    !complaint.assigned_to;
+
   const coordName =
     coordinatorUser?.name ||
+    complaint.assigned_coordinator_name ||
     complaint.coordinator_name ||
-    complaint.assigned_to ||
     null;
   const coordEmail =
     coordinatorUser?.email ||
     complaint.coordinator_email ||
-    (complaint.assigned_to && complaint.assigned_to.includes("@") ? complaint.assigned_to : null);
+    null;
 
   const wardenName =
     wardenUser?.name ||
+    complaint.location_in_charge_name ||
     location?.in_charge_name ||
     null;
   const wardenEmail =
     wardenUser?.email ||
     location?.in_charge_email ||
     null;
+
+  const teamName = complaint.team_name || null;
+  const deptName = complaint.department_name || null;
+  const locName = location?.name || complaint.location_name || complaint.location_id;
 
   return (
     <Card>
@@ -36,14 +50,72 @@ export default function ResponsiblePersonnelCard({
       </h2>
 
       <div className="space-y-3.5 text-xs">
+        {/* Assigned Employee / Field Worker */}
+        <div className="pb-3 border-b border-slate-100 dark:border-slate-800/80">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Assigned Field Employee
+            </span>
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+              isUnassigned
+                ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
+            }`}>
+              {isUnassigned ? "Action Required" : "Assigned"}
+            </span>
+          </div>
+          {!isUnassigned ? (
+            <div className="mt-1">
+              <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                <Wrench className="h-3.5 w-3.5 text-primary" />
+                {assignedEmpName}
+              </div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Designated Field Technician
+              </div>
+            </div>
+          ) : (
+            <div className="mt-1 flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-semibold italic">
+              <span>⚠️</span>
+              <span>Awaiting assignment</span>
+            </div>
+          )}
+        </div>
+
+        {/* Responsible Department & Location */}
+        <div className="pb-3 border-b border-slate-100 dark:border-slate-800/80">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Department & Location
+            </span>
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+              Operational Scope
+            </span>
+          </div>
+          <div className="mt-1 space-y-1">
+            {deptName && (
+              <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                <Building className="h-3.5 w-3.5 text-primary" />
+                {deptName}
+              </div>
+            )}
+            {locName && (
+              <div className="text-[11px] text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                {locName}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Assigned Coordinator */}
         <div className="pb-3 border-b border-slate-100 dark:border-slate-800/80">
           <div className="flex items-center justify-between mb-1">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Assigned Coordinator
+              Responsible Coordinator
             </span>
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300">
-              Field Execution
+              Dispatch & Oversight
             </span>
           </div>
           {coordName ? (
@@ -67,7 +139,7 @@ export default function ResponsiblePersonnelCard({
         <div className="pb-3 border-b border-slate-100 dark:border-slate-800/80">
           <div className="flex items-center justify-between mb-1">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Warden
+              Location Warden
             </span>
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300">
               Verification Authority
@@ -84,12 +156,12 @@ export default function ResponsiblePersonnelCard({
               </div>
               <div className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1 mt-0.5">
                 <MapPin className="h-3 w-3" />
-                {location?.name || complaint.location_name || complaint.location_id}
+                {locName}
               </div>
             </div>
           ) : (
             <div className="mt-1 text-slate-400 dark:text-slate-500 italic">
-              No Warden assigned to this location
+              No Warden assigned to {locName}
             </div>
           )}
         </div>

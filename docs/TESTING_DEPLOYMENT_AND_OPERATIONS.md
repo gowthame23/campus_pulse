@@ -36,6 +36,8 @@ Total: 31 Python test files covering:
 - `test_workflow2_user_management.py`: User CRUD, role changes, CSV import validation.
 - `test_workflow6_lost_found.py`: Lost and found item registration, photo attachment, claim lifecycle, deletion cascading.
 - `test_security_audit_suite.py`: Exhaustive security test harness verifying object-level authorization, path traversal defenses, SQL parameterization, and rate limiter enforcement.
+- `test_multi_department_coordinators.py`: Multi-department coordinator routing, C1/C2 assignments, primary/backup fallback, and work order transitions (14 assertions).
+- `test_remediation_f01_f15.py`: Complete independent verification and regression harness for all 15 audit findings F-01 through F-15 (15 assertions).
 
 #### Frontend Vitest Suites (`Frontend/src/__tests__/`)
 - `App.test.jsx`: Verifies root DOM mounting, React Router provider integration, and fallback loading indicators.
@@ -47,6 +49,8 @@ Total: 31 Python test files covering:
 
 | Test Suite / Command | Scope | Assertions / Files | Actual Status | Execution Time |
 | :--- | :--- | :---: | :---: | :---: |
+| `python -m pytest Backend/tests/test_remediation_f01_f15.py` | Remediations F-01 through F-15 Full Suite | 15 tests | **15/15 PASSED** | 3.12s |
+| `python -m pytest Backend/tests/test_multi_department_coordinators.py` | Multi-Department Coordinator & SLA Engine | 14 tests | **14/14 PASSED** | 2.63s |
 | `python Backend/tests/smoke_test.py` | Live HTTP API Availability & Auth | 19 checks | **19/19 PASSED** | 3.42s |
 | `python -m pytest Backend/tests/test_workflow8_announcements.py` | Announcement RBAC & Admin Contact | 6 tests | **6/6 PASSED** | 3.69s |
 | `python -m pytest Backend/tests/test_workflow4_complaint_management.py` | Complaint Lifecycle & SLA Escalation | 8 tests | **8/8 PASSED** | 6.82s |

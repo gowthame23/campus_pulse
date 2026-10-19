@@ -17,6 +17,8 @@ from api.dependencies import (
     get_classification_service,
     get_comment_service,
     get_complaint_service,
+    get_team_service,
+    get_translation_service,
 )
 from api.schemas import (
     AnalyticsResponse,
@@ -25,8 +27,12 @@ from api.schemas import (
     ComplaintAssignRequest,
     ComplaintCreateRequest,
     ComplaintDeleteRequestPayload,
+    ComplaintCancellationRequestPayload,
+    ComplaintCancellationReviewPayload,
+    ComplaintCancellationRejectPayload,
     ComplaintPriorityUpdateRequest,
     ComplaintReopenRequest,
+    ComplaintRerouteRequest,
     ComplaintResolveRequest,
     ComplaintResponse,
     ComplaintReturnRequest,
@@ -77,6 +83,7 @@ def _build_format_caches(complaint_service):
         all_locs = complaint_service.auth_service.list_locations()
         loc_cache = {l.location_id: l for l in all_locs}
     except Exception:
+        all_locs = []
         loc_cache = {}
 
     try:
@@ -85,11 +92,157 @@ def _build_format_caches(complaint_service):
     except Exception:
         dept_cache = {}
 
+    try:
+        all_users = complaint_service.auth_service.list_users()
+        user_cache = {u.user_id: u for u in all_users}
+    except Exception:
+        user_cache = {}
+
+    team_cache = {}
+    loc_dept_team_cache = {}
+    if hasattr(complaint_service, "team_service"):
+        try:
+            teams = complaint_service.team_service.list_teams(active_only=False)
+            for t in teams:
+                team_cache[t["team_id"]] = t
+                for lid in t.get("location_ids", []):
+                    for did in t.get("department_ids", []):
+                        if (lid, did) not in loc_dept_team_cache:
+                            loc_dept_team_cache[(lid, did)] = t
+        except Exception:
+            pass
+
+    coord_asgn_cache = {}
+    try:
+        assignments = complaint_service.auth_service.list_coordinator_assignments() or []
+        for a in assignments:
+            if a.get("is_active", 1):
+                key = (a.get("location_id"), a.get("department_id"))
+                if key not in coord_asgn_cache:
+                    coord_asgn_cache[key] = a
+    except Exception:
+        pass
+
     affected_cache = complaint_service.get_affected_students_counts()
-    return loc_cache, dept_cache, affected_cache
+    return loc_cache, dept_cache, affected_cache, user_cache, team_cache, loc_dept_team_cache, coord_asgn_cache
 
 
-def _format_complaint(complaint, complaint_service, loc_cache=None, dept_cache=None, affected_cache=None):
+def _get_critical_emergency_contacts(
+    complaint,
+    complaint_service,
+    loc=None,
+    dept=None,
+    user_cache=None,
+    loc_dept_team_cache=None,
+    coord_asgn_cache=None,
+):
+    priority_str = (getattr(complaint, "priority", "") or "").lower()
+    if priority_str != "critical":
+        return []
+
+    contacts = []
+    auth_service = complaint_service.auth_service
+    if loc is None:
+        loc = auth_service.get_location(complaint.location_id)
+    if dept is None:
+        dept = auth_service.get_department(complaint.department_id)
+
+    # 1. Warden / Location In-Charge
+    warden_id = getattr(loc, "in_charge_id", None) if loc else None
+    if warden_id:
+        warden_u = user_cache.get(warden_id) if user_cache is not None else auth_service.get_user(warden_id)
+        if warden_u:
+            phone = getattr(warden_u, "phone_number", None) or getattr(warden_u, "phone", None)
+            contacts.append({
+                "role": "Warden / Location In-Charge",
+                "name": warden_u.name,
+                "user_id": warden_u.user_id,
+                "phone": phone or "",
+                "phone_available": bool(phone and phone.strip()),
+                "location": getattr(loc, "name", complaint.location_id) if loc else complaint.location_id,
+            })
+
+    # 2. Department Coordinator (matching location & dept)
+    coord_u = None
+    if coord_asgn_cache is not None:
+        active_asgn = coord_asgn_cache.get((complaint.location_id, complaint.department_id)) or coord_asgn_cache.get(("ALL", complaint.department_id))
+    else:
+        assignments = auth_service.list_coordinator_assignments(
+            location_id=complaint.location_id, department_id=complaint.department_id
+        ) or []
+        active_asgn = next((a for a in assignments if a.get("is_active", 1)), None)
+
+    if active_asgn:
+        cid = active_asgn["coordinator_id"]
+        coord_u = user_cache.get(cid) if user_cache is not None else auth_service.get_user(cid)
+
+    if not coord_u and loc_dept_team_cache is not None:
+        team = loc_dept_team_cache.get((complaint.location_id, complaint.department_id))
+        if team and team.get("coordinator_id"):
+            cid = team["coordinator_id"]
+            coord_u = user_cache.get(cid) if user_cache is not None else auth_service.get_user(cid)
+    elif not coord_u and hasattr(complaint_service, "team_service"):
+        team = complaint_service.team_service.get_team_for_location_department(
+            complaint.location_id, complaint.department_id
+        )
+        if team and team.get("coordinator_id"):
+            cid = team["coordinator_id"]
+            coord_u = user_cache.get(cid) if user_cache is not None else auth_service.get_user(cid)
+
+    if not coord_u and dept and getattr(dept, "coordinator_id", None):
+        cid = dept.coordinator_id
+        coord_u = user_cache.get(cid) if user_cache is not None else auth_service.get_user(cid)
+
+    if coord_u:
+        phone = getattr(coord_u, "phone_number", None) or getattr(coord_u, "phone", None)
+        contacts.append({
+            "role": "Department Coordinator",
+            "name": coord_u.name,
+            "user_id": coord_u.user_id,
+            "phone": phone or "",
+            "phone_available": bool(phone and phone.strip()),
+            "department": getattr(dept, "name", complaint.department_id) if dept else complaint.department_id,
+        })
+
+    # 3. App Manager
+    app_mgr_id = getattr(loc, "app_manager_id", None) if loc else None
+    if not app_mgr_id and loc:
+        app_mgr_id = auth_service.get_location_app_manager_id(loc.location_id)
+    if not app_mgr_id:
+        mgrs = [u for u in user_cache.values() if u.role == "app_manager"] if user_cache else auth_service.list_users(role="app_manager")
+        for m in mgrs:
+            if loc and auth_service._manager_covers_location(m, loc.location_id, loc.name):
+                app_mgr_id = m.user_id
+                break
+        if not app_mgr_id and mgrs:
+            app_mgr_id = mgrs[0].user_id
+
+    if app_mgr_id:
+        app_mgr_u = user_cache.get(app_mgr_id) if user_cache is not None else auth_service.get_user(app_mgr_id)
+        if app_mgr_u:
+            phone = getattr(app_mgr_u, "phone_number", None) or getattr(app_mgr_u, "phone", None)
+            contacts.append({
+                "role": "App Manager",
+                "name": app_mgr_u.name,
+                "user_id": app_mgr_u.user_id,
+                "phone": phone or "",
+                "phone_available": bool(phone and phone.strip()),
+            })
+
+    return contacts
+
+
+def _format_complaint(
+    complaint,
+    complaint_service,
+    loc_cache=None,
+    dept_cache=None,
+    affected_cache=None,
+    user_cache=None,
+    team_cache=None,
+    loc_dept_team_cache=None,
+    coord_asgn_cache=None,
+):
     data = model_to_dict(complaint)
     if loc_cache is not None:
         loc = loc_cache.get(complaint.location_id)
@@ -100,7 +253,7 @@ def _format_complaint(complaint, complaint_service, loc_cache=None, dept_cache=N
         data["location_name"] = loc.name
         if getattr(loc, "in_charge_id", None):
             data["location_in_charge_id"] = loc.in_charge_id
-            in_charge = complaint_service.auth_service.get_user(loc.in_charge_id)
+            in_charge = user_cache.get(loc.in_charge_id) if user_cache is not None else complaint_service.auth_service.get_user(loc.in_charge_id)
             if in_charge:
                 data["location_in_charge_name"] = in_charge.name
 
@@ -113,9 +266,47 @@ def _format_complaint(complaint, complaint_service, loc_cache=None, dept_cache=N
         data["department_name"] = dept.name
         if getattr(dept, "coordinator_id", None):
             data["assigned_coordinator_id"] = dept.coordinator_id
-            coord = complaint_service.auth_service.get_user(dept.coordinator_id)
+            coord = user_cache.get(dept.coordinator_id) if user_cache is not None else complaint_service.auth_service.get_user(dept.coordinator_id)
             if coord:
                 data["assigned_coordinator_name"] = coord.name
+
+    # Assigned Employee Visibility
+    if complaint.assigned_to:
+        emp_u = user_cache.get(complaint.assigned_to) if user_cache is not None else complaint_service.auth_service.get_user(complaint.assigned_to)
+        emp_name = emp_u.name if emp_u else complaint.assigned_to
+        data["assigned_employee_name"] = emp_name
+        data["assigned_to_name"] = emp_name
+    else:
+        data["assigned_employee_name"] = "Awaiting assignment"
+        data["assigned_to_name"] = "Awaiting assignment"
+
+    # Team Visibility & Fallback Coordinator Resolution
+    team = None
+    if getattr(complaint, "team_id", None):
+        team = team_cache.get(complaint.team_id) if team_cache is not None else (complaint_service.team_service.get_team(complaint.team_id) if hasattr(complaint_service, "team_service") else None)
+    if not team:
+        team = loc_dept_team_cache.get((complaint.location_id, complaint.department_id)) if loc_dept_team_cache is not None else (complaint_service.team_service.get_team_for_location_department(complaint.location_id, complaint.department_id) if hasattr(complaint_service, "team_service") else None)
+    if team:
+        data["team_id"] = team.get("team_id")
+        data["team_name"] = team.get("name")
+        if not data.get("assigned_coordinator_name"):
+            coord_id = team.get("coordinator_id")
+            if coord_id:
+                coord_u = user_cache.get(coord_id) if user_cache is not None else complaint_service.auth_service.get_user(coord_id)
+                if coord_u:
+                    data["assigned_coordinator_id"] = coord_id
+                    data["assigned_coordinator_name"] = coord_u.name
+
+    # Emergency Contacts for Critical Complaints
+    data["emergency_contacts"] = _get_critical_emergency_contacts(
+        complaint,
+        complaint_service,
+        loc=loc,
+        dept=dept,
+        user_cache=user_cache,
+        loc_dept_team_cache=loc_dept_team_cache,
+        coord_asgn_cache=coord_asgn_cache,
+    )
 
     if affected_cache is not None:
         data["affected_count"] = affected_cache.get(complaint.complaint_id, 0)
@@ -181,14 +372,18 @@ def _visible_complaints(current_user, complaint_service, include_archived=False)
 
     visible = []
     if u_role == "student":
+        user_loc_id = getattr(current_user, "location_id", None)
         for c in all_complaints:
             if c.created_by == current_user.user_id:
                 visible.append(c)
-            elif (
-                c.visibility_type == "Community"
-                and c.location_id == current_user.location_id
-            ):
-                visible.append(c)
+            elif c.visibility_type in ("Community", "Public", "public", "community"):
+                loc_obj = loc_map.get(c.location_id)
+                access = (
+                    getattr(loc_obj, "complaint_submission_policy", None)
+                    or getattr(loc_obj, "public_complaint_access", "everyone")
+                ) if loc_obj else "everyone"
+                if access == "everyone" or c.location_id == user_loc_id:
+                    visible.append(c)
 
     elif u_role == "employee":
         acting_team_ids = set()
@@ -197,12 +392,30 @@ def _visible_complaints(current_user, complaint_service, include_archived=False)
                 acting = complaint_service.team_service.get_acting_coordinator(t)
                 if acting and acting.user_id == current_user.user_id:
                     acting_team_ids.add(t["team_id"])
+        coord_assignments = complaint_service.auth_service.list_coordinator_assignments(coordinator_id=current_user.user_id) or []
+        coord_dept_ids = {
+            d.department_id for d in all_depts
+            if current_user.user_id in (getattr(d, "coordinator_id", None), getattr(d, "coordinator_2_id", None))
+        }
         for c in all_complaints:
             if (
                 c.assigned_to == current_user.user_id
                 or c.created_by == current_user.user_id
                 or (getattr(c, "team_id", None) and c.team_id in acting_team_ids)
+                or (c.department_id and c.department_id in coord_dept_ids)
             ):
+                visible.append(c)
+                continue
+            is_coord_match = False
+            for asgn in coord_assignments:
+                a_loc = asgn.get("location_id")
+                a_dept = asgn.get("department_id")
+                loc_match = a_loc in ("ALL", None) or a_loc == c.location_id
+                dept_match = a_dept in ("ALL", None) or a_dept == c.department_id
+                if loc_match and dept_match:
+                    is_coord_match = True
+                    break
+            if is_coord_match:
                 visible.append(c)
 
     elif u_role == "coordinator":
@@ -269,24 +482,145 @@ def _visible_complaints(current_user, complaint_service, include_archived=False)
                             visible.append(c)
 
     elif u_role == "location_in_charge":
-        assigned_loc_ids = {l.location_id for l in all_locs if l.in_charge_id == current_user.user_id}
+        warden_loc_ids = {l.location_id for l in all_locs if getattr(l, "in_charge_id", None) == current_user.user_id}
         for c in all_complaints:
-            if c.location_id in assigned_loc_ids:
+            if c.created_by == current_user.user_id or c.assigned_to == current_user.user_id:
                 visible.append(c)
-            elif c.created_by == current_user.user_id or c.assigned_to == current_user.user_id:
+            elif c.location_id in warden_loc_ids:
+                visible.append(c)
+            elif complaint_service.auth_service.is_warden_assigned(current_user.user_id, c.location_id):
                 visible.append(c)
 
     return visible
 
 
+def is_complaint_visible(complaint, current_user, complaint_service):
+    u_role = (current_user.role or "").lower()
+    if u_role == "super_admin":
+        return False
+    if u_role == "administrator":
+        return True
+
+    if u_role == "student":
+        if complaint.created_by == current_user.user_id or (getattr(current_user, "email", None) and complaint.created_by == current_user.email):
+            return True
+        if (complaint.visibility_type or "").capitalize() in ("Community", "Public"):
+            user_loc_id = getattr(current_user, "location_id", None)
+            if complaint.location_id == user_loc_id:
+                return True
+            loc_obj = complaint_service.auth_service.get_location(complaint.location_id)
+            access = (
+                getattr(loc_obj, "complaint_submission_policy", None)
+                or getattr(loc_obj, "public_complaint_access", "everyone")
+            ) if loc_obj else "everyone"
+            if access == "everyone":
+                return True
+        return False
+
+    if u_role == "location_in_charge":
+        if complaint.created_by == current_user.user_id or complaint.assigned_to == current_user.user_id:
+            return True
+        if complaint_service.auth_service.is_warden_assigned(current_user.user_id, complaint.location_id):
+            return True
+        return False
+
+    if u_role == "employee":
+        if complaint.assigned_to == current_user.user_id or complaint.created_by == current_user.user_id:
+            return True
+        if complaint_service.auth_service.is_coordinator_assigned(current_user.user_id, complaint.location_id, complaint.department_id):
+            return True
+        if hasattr(complaint_service, "team_service") and complaint_service.team_service:
+            team_id = getattr(complaint, "team_id", None)
+            team = complaint_service.team_service.get_team(team_id) if team_id else complaint_service.team_service.get_team_for_location_department(complaint.location_id, complaint.department_id)
+            if team:
+                acting = complaint_service.team_service.get_acting_coordinator(team)
+                if acting and acting.user_id == current_user.user_id:
+                    return True
+                if current_user.user_id in (team.get("coordinator_id"), team.get("backup_coordinator_id")):
+                    return True
+                if complaint_service.team_service.is_user_in_team(team["team_id"], current_user.user_id):
+                    return True
+        return False
+
+    if u_role == "app_manager":
+        if complaint.created_by == current_user.user_id or complaint.assigned_to == current_user.user_id:
+            return True
+        assigned = list(getattr(current_user, "assigned_locations", None) or [])
+        loc = complaint_service.auth_service.get_location(complaint.location_id)
+        if loc:
+            if getattr(loc, "app_manager_id", None) == current_user.user_id:
+                return True
+            for a in assigned:
+                if a == loc.location_id or (loc.name and a.lower() == loc.name.lower()):
+                    return True
+            user_loc_id = getattr(current_user, "location_id", None)
+            if user_loc_id and (user_loc_id == loc.location_id or (loc.name and user_loc_id.lower() == loc.name.lower())):
+                return True
+        return False
+
+    if u_role == "coordinator":
+        if complaint.assigned_to == current_user.user_id:
+            return True
+        if hasattr(complaint_service, "team_service") and complaint_service.team_service:
+            team_id = getattr(complaint, "team_id", None)
+            team = complaint_service.team_service.get_team(team_id) if team_id else complaint_service.team_service.get_team_for_location_department(complaint.location_id, complaint.department_id)
+            if team:
+                if current_user.user_id in (team.get("coordinator_id"), team.get("backup_coordinator_id")):
+                    return True
+                if complaint_service.team_service.is_user_in_team(team["team_id"], current_user.user_id):
+                    return True
+
+        assignments = complaint_service.auth_service.list_coordinator_assignments(coordinator_id=current_user.user_id) or []
+        has_assignments = len(assignments) > 0
+        loc = complaint_service.auth_service.get_location(complaint.location_id)
+        c_loc_id = loc.location_id if loc else complaint.location_id
+        c_loc_type = getattr(loc, "location_type", None) or (loc.infer_location_type(loc.name) if loc else complaint.location_id)
+        dept = complaint_service.auth_service.get_department(complaint.department_id)
+        c_dept_id = dept.department_id if dept else complaint.department_id
+
+        for asgn in assignments:
+            a_loc = asgn.get("location_id")
+            a_dept = asgn.get("department_id")
+            loc_match = (
+                a_loc in ("ALL", None)
+                or a_loc == c_loc_id
+                or a_loc == c_loc_type
+                or (loc and a_loc.lower() == loc.name.lower())
+            )
+            dept_match = (
+                a_dept in ("ALL", None)
+                or a_dept == c_dept_id
+                or (dept and a_dept.lower() == dept.name.lower())
+            )
+            if loc_match and dept_match:
+                return True
+
+        if not has_assignments:
+            coord_dept_obj = complaint_service.auth_service.get_department(current_user.department_id) if current_user.department_id else None
+            coord_loc_id = coord_dept_obj.location_id if coord_dept_obj else None
+            is_match = False
+            if dept and coord_dept_obj and dept.department_id == coord_dept_obj.department_id:
+                if coord_loc_id and c_loc_id == coord_loc_id:
+                    is_match = True
+            if is_match:
+                if complaint.visibility_type == "Private":
+                    if not complaint.assigned_to or complaint.assigned_to == current_user.user_id:
+                        return True
+                else:
+                    return True
+        return False
+
+    return False
+
+
 def _ensure_visible(complaint, current_user, complaint_service):
-    visible_ids = {
-        item.complaint_id
-        for item in _visible_complaints(
-            current_user, complaint_service, include_archived=True
+    u_role = (current_user.role or "").lower()
+    if u_role == "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super Admin cannot access institutional operational data.",
         )
-    }
-    if complaint.complaint_id not in visible_ids:
+    if not is_complaint_visible(complaint, current_user, complaint_service):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Complaint is not visible to this user.",
@@ -320,8 +654,8 @@ def list_complaints(
         start_idx = (page - 1) * limit
         complaints = complaints[start_idx : start_idx + limit]
 
-    loc_cache, dept_cache, affected_cache = _build_format_caches(complaint_service)
-    return [_format_complaint(complaint, complaint_service, loc_cache, dept_cache, affected_cache) for complaint in complaints]
+    caches = _build_format_caches(complaint_service)
+    return [_format_complaint(complaint, complaint_service, *caches) for complaint in complaints]
 
 
 @router.get("/paginated")
@@ -349,8 +683,8 @@ def list_complaints_paginated(
     if not include_archived:
         complaints = [item for item in complaints if not item.archived]
 
-    loc_cache, dept_cache, affected_cache = _build_format_caches(complaint_service)
-    formatted_items = [_format_complaint(c, complaint_service, loc_cache, dept_cache, affected_cache) for c in complaints]
+    caches = _build_format_caches(complaint_service)
+    formatted_items = [_format_complaint(c, complaint_service, *caches) for c in complaints]
     return paginate(formatted_items, page=page, limit=limit)
 
 
@@ -358,6 +692,7 @@ def list_complaints_paginated(
 def get_workload_summary(
     current_user=Depends(get_current_user),
     complaint_service=Depends(get_complaint_service),
+    team_service=Depends(get_team_service),
 ):
     u_role = (current_user.role or "").lower()
     if u_role in ("student", "super_admin"):
@@ -407,10 +742,97 @@ def get_workload_summary(
 
     loc_map = {l.location_id: l.name for l in all_locations}
     dept_map = {d.department_id: d.name for d in all_departments}
+    users_by_id = {u.user_id: u for u in all_users}
 
+    # 1. Department-level workload aggregation
+    departments_data = []
+    coord_map = {}
+    with complaint_service.auth_service._connect() as conn:
+        dept_staff_counts = {}
+        for r in conn.execute(
+            "SELECT department_id, COUNT(DISTINCT user_id) as cnt FROM employee_work_memberships GROUP BY department_id"
+        ).fetchall():
+            dept_staff_counts[r[0]] = r[1]
+
+        for d in all_departments:
+            if getattr(d, "coordinator_id", None):
+                coord_map[d.coordinator_id] = {
+                    "position": "Coordinator 1",
+                    "department_id": d.department_id,
+                    "department_name": d.name,
+                }
+            if getattr(d, "coordinator_2_id", None):
+                coord_map[d.coordinator_2_id] = {
+                    "position": "Coordinator 2",
+                    "department_id": d.department_id,
+                    "department_name": d.name,
+                }
+
+        for dept in all_departments:
+            if getattr(dept, "archived", False):
+                continue
+
+            dept_complaints = [c for c in visible_complaints if c.department_id == dept.department_id]
+            d_total = len(dept_complaints)
+            d_resolved = 0
+            d_left = 0
+            d_unassigned = 0
+            d_assigned = 0
+
+            for c in dept_complaints:
+                is_res = c.status in RESOLVED_STATUSES or c.resolved_at is not None
+                if is_res:
+                    d_resolved += 1
+                else:
+                    d_left += 1
+                    if not c.assigned_to or str(c.assigned_to).strip() == "":
+                        d_unassigned += 1
+                if c.assigned_to and str(c.assigned_to).strip() != "":
+                    d_assigned += 1
+
+            c1_id = getattr(dept, "coordinator_id", None)
+            c2_id = getattr(dept, "coordinator_2_id", None)
+            c1_user = users_by_id.get(c1_id) if c1_id else None
+            c2_user = users_by_id.get(c2_id) if c2_id else None
+
+            c1_leave = team_service.is_user_on_leave(c1_id) if c1_id else False
+            c2_leave = team_service.is_user_on_leave(c2_id) if c2_id else False
+
+            staff_cnt = dept_staff_counts.get(dept.department_id, 0)
+            departments_data.append({
+                "department_id": dept.department_id,
+                "name": dept.name,
+                "coordinator_1_id": c1_id,
+                "coordinator_1_name": c1_user.name if c1_user else "Not Assigned",
+                "coordinator_1_on_leave": c1_leave,
+                "coordinator_2_id": c2_id,
+                "coordinator_2_name": c2_user.name if c2_user else "Not Assigned",
+                "coordinator_2_on_leave": c2_leave,
+                "total": d_total,
+                "unassigned": d_unassigned,
+                "assigned": d_assigned,
+                "left": d_left,
+                "resolved": d_resolved,
+                "staff_count": staff_cnt,
+            })
+
+    departments_data.sort(key=lambda d: (-d["total"], -d["staff_count"], d["name"]))
+
+    # 2. Staff Workload lists
     app_managers = []
     wardens = []
     coordinators = []
+    employees = []
+
+    user_dept_names = {}
+    with complaint_service.auth_service._connect() as conn:
+        for r in conn.execute(
+            "SELECT ewm.user_id, d.name FROM employee_work_memberships ewm JOIN departments d ON ewm.department_id = d.department_id"
+        ).fetchall():
+            uid, dname = r[0], r[1]
+            if uid not in user_dept_names:
+                user_dept_names[uid] = set()
+            user_dept_names[uid].add(dname)
 
     for user in all_users:
         u_r = (user.role or "").lower()
@@ -442,6 +864,14 @@ def get_workload_summary(
                 else:
                     staff_left += 1
 
+        on_leave = team_service.is_user_on_leave(user.user_id)
+        coord_info = coord_map.get(user.user_id)
+        coord_pos_str = f"{coord_info['position']} ({coord_info['department_name']})" if coord_info else None
+
+        user_depts = sorted(list(user_dept_names.get(user.user_id, [])))
+        if coord_info and coord_info["department_name"] not in user_depts:
+            user_depts.append(coord_info["department_name"])
+
         staff_data = {
             "user_id": user.user_id,
             "name": user.name,
@@ -449,8 +879,11 @@ def get_workload_summary(
             "role": user.role,
             "location_id": getattr(user, "location_id", None),
             "location_name": loc_map.get(getattr(user, "location_id", None), getattr(user, "location_id", None) or ""),
-            "department_id": getattr(user, "department_id", None),
-            "department_name": dept_map.get(getattr(user, "department_id", None), getattr(user, "department_id", None) or ""),
+            "department_id": getattr(user, "department_id", None) or (coord_info["department_id"] if coord_info else None),
+            "department_name": dept_map.get(getattr(user, "department_id", None), getattr(user, "department_id", None) or "") or (coord_info["department_name"] if coord_info else ""),
+            "department_names": user_depts,
+            "coordinator_position": coord_pos_str,
+            "on_leave": on_leave,
             "assigned": staff_assigned,
             "left": staff_left,
             "resolved": staff_resolved,
@@ -458,14 +891,17 @@ def get_workload_summary(
 
         if u_r == "app_manager":
             app_managers.append(staff_data)
-        elif u_r == "location_in_charge":
+        elif u_r in ("location_in_charge", "warden"):
             wardens.append(staff_data)
-        elif u_r == "coordinator":
+        elif u_r == "coordinator" or coord_info is not None:
             coordinators.append(staff_data)
 
-    loc_cache, dept_cache, affected_cache = _build_format_caches(complaint_service)
+        if u_r == "employee":
+            employees.append(staff_data)
+
+    caches = _build_format_caches(complaint_service)
     formatted_unassigned = [
-        _format_complaint(c, complaint_service, loc_cache, dept_cache, affected_cache)
+        _format_complaint(c, complaint_service, *caches)
         for c in unassigned_list
     ]
 
@@ -477,9 +913,11 @@ def get_workload_summary(
             "left": left_count,
             "resolved": resolved_count,
         },
+        "departments": departments_data,
+        "coordinators": coordinators,
+        "employees": employees,
         "app_managers": app_managers,
         "wardens": wardens,
-        "coordinators": coordinators,
         "unassigned_complaints": formatted_unassigned,
     }
 
@@ -583,9 +1021,9 @@ def get_resolved_complaints(
     start_idx = (page - 1) * limit
     paginated_items = resolved_complaints[start_idx : start_idx + limit]
 
-    loc_cache, dept_cache, affected_cache = _build_format_caches(complaint_service)
+    caches = _build_format_caches(complaint_service)
     formatted_items = [
-        _format_complaint(c, complaint_service, loc_cache, dept_cache, affected_cache)
+        _format_complaint(c, complaint_service, *caches)
         for c in paginated_items
     ]
 
@@ -784,6 +1222,31 @@ def get_complaint(
     return _format_complaint(complaint, complaint_service)
 
 
+@router.get("/{complaint_id}/emergency-contacts")
+def get_complaint_emergency_contacts(
+    complaint_id: str,
+    current_user=Depends(get_current_user),
+    complaint_service=Depends(get_complaint_service),
+):
+    if (current_user.role or "").lower() == "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super Admin cannot access institutional operational data.",
+        )
+    complaint = complaint_service.get_complaint(complaint_id)
+    if not complaint:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
+        )
+    _ensure_visible(complaint, current_user, complaint_service)
+    contacts = _get_critical_emergency_contacts(complaint, complaint_service)
+    return {
+        "complaint_id": complaint_id,
+        "priority": complaint.priority,
+        "contacts": contacts,
+    }
+
+
 @router.post("", response_model=ComplaintResponse, status_code=status.HTTP_201_CREATED)
 def create_complaint(
     payload: ComplaintCreateRequest,
@@ -867,7 +1330,7 @@ class ComplaintBlockRequest(BaseModel):
 def accept_complaint(
     complaint_id: str,
     current_user=Depends(
-        require_roles(Coordinator.ROLE, Administrator.ROLE)
+        require_roles(Coordinator.ROLE, Administrator.ROLE, Employee.ROLE)
     ),
     complaint_service=Depends(get_complaint_service),
 ):
@@ -878,14 +1341,21 @@ def accept_complaint(
         )
     _ensure_visible(complaint, current_user, complaint_service)
 
-    # Coordinators can only accept complaints for their assigned location + department pairs
-    if (current_user.role or "").lower() == "coordinator":
-        if not complaint_service.auth_service.is_coordinator_assigned(
+    u_role = (current_user.role or "").lower()
+    if u_role in ("coordinator", "employee"):
+        is_coord = complaint_service.auth_service.is_coordinator_assigned(
             current_user.user_id, complaint.location_id, complaint.department_id
-        ):
+        )
+        if not is_coord and getattr(complaint, "team_id", None) and hasattr(complaint_service, "team_service"):
+            team = complaint_service.team_service.get_team(complaint.team_id)
+            if team:
+                acting = complaint_service.team_service.get_acting_coordinator(team)
+                if acting and acting.user_id == current_user.user_id:
+                    is_coord = True
+        if not is_coord:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="You are not mapped to handle complaints for this location and department.",
+                detail="You are not authorized to coordinate complaints for this department.",
             )
 
     try:
@@ -918,7 +1388,7 @@ def accept_complaint(
 def start_work_on_complaint(
     complaint_id: str,
     current_user=Depends(
-        require_roles(Coordinator.ROLE, Administrator.ROLE)
+        require_roles(Coordinator.ROLE, Administrator.ROLE, Employee.ROLE)
     ),
     complaint_service=Depends(get_complaint_service),
 ):
@@ -937,6 +1407,7 @@ def start_work_on_complaint(
 
 
 @router.post("/{complaint_id}/progress", response_model=ComplaintResponse)
+@router.post("/{complaint_id}/progress-notes", response_model=ComplaintResponse)
 def record_complaint_progress(
     complaint_id: str,
     payload: ComplaintProgressRequest,
@@ -966,6 +1437,7 @@ def record_complaint_progress(
 
 
 @router.post("/{complaint_id}/block", response_model=ComplaintResponse)
+@router.post("/{complaint_id}/pause", response_model=ComplaintResponse)
 def block_complaint(
     complaint_id: str,
     payload: ComplaintBlockRequest,
@@ -991,6 +1463,7 @@ def block_complaint(
 
 
 @router.post("/{complaint_id}/unblock", response_model=ComplaintResponse)
+@router.post("/{complaint_id}/resume", response_model=ComplaintResponse)
 def unblock_complaint(
     complaint_id: str,
     current_user=Depends(
@@ -1030,9 +1503,28 @@ def close_complaint(
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
+@router.get("/{complaint_id}/eligible-assignees")
+def get_eligible_assignees(
+    complaint_id: str,
+    current_user=Depends(get_current_user),
+    complaint_service=Depends(get_complaint_service),
+):
+    complaint = complaint_service.get_complaint(complaint_id)
+    if not complaint:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
+        )
+    _ensure_visible(complaint, current_user, complaint_service)
+    try:
+        return complaint_service.get_eligible_assignees(complaint_id)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
 @router.post("/{complaint_id}/reassign", response_model=ComplaintResponse)
 @router.post("/{complaint_id}/assign", response_model=ComplaintResponse)
 def assign_complaint(
+
     complaint_id: str,
     payload: ComplaintAssignRequest,
     current_user=Depends(get_current_user),
@@ -1076,6 +1568,60 @@ def assign_complaint(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@router.post("/{complaint_id}/reroute", response_model=ComplaintResponse)
+def reroute_complaint(
+    complaint_id: str,
+    payload: ComplaintRerouteRequest,
+    current_user=Depends(require_roles(Administrator.ROLE, Coordinator.ROLE, Employee.ROLE, AppManager.ROLE)),
+    complaint_service=Depends(get_complaint_service),
+    audit_service=Depends(get_audit_service),
+):
+    complaint = complaint_service.get_complaint(complaint_id)
+    if not complaint:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
+        )
+
+    _ensure_visible(complaint, current_user, complaint_service)
+
+    u_role = (current_user.role or "").lower()
+    if u_role in ("coordinator", "employee"):
+        if not complaint_service.is_coordinator_in_scope(current_user, complaint):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not authorized to reroute complaints from this department.",
+            )
+
+    old_dept_id = complaint.department_id
+    try:
+        updated = complaint_service.reroute_complaint(
+            complaint_id=complaint_id,
+            destination_department_id=payload.destination_department_id,
+            reason=payload.reason,
+            actor_id=current_user.user_id,
+        )
+        audit_service.log(
+            current_user.user_id,
+            "REROUTE_COMPLAINT",
+            complaint_id,
+            old_value={"department_id": old_dept_id},
+            new_value={"department_id": payload.destination_department_id, "reason": payload.reason},
+        )
+        _broadcast_complaint_event("complaint_rerouted", updated, {
+            "source_department_id": old_dept_id,
+            "destination_department_id": payload.destination_department_id,
+            "reason": payload.reason,
+        })
+        _broadcast_complaint_event("complaint_updated", updated)
+        return _format_complaint(updated, complaint_service)
+    except PermissionError as p_err:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
+    except ValueError as v_err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(v_err))
+    except ComplaintConflictError as c_err:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(c_err))
 
 
 @router.post("/{complaint_id}/return", response_model=ComplaintResponse)
@@ -1177,7 +1723,7 @@ def update_status(
     u_role = current_user.role.lower()
     if u_role in ("coordinator", "employee") and complaint.assigned_to != current_user.user_id:
         is_coord = False
-        if u_role == "coordinator" and complaint.team_id and hasattr(complaint_service, "team_service"):
+        if complaint.team_id and hasattr(complaint_service, "team_service"):
             team = complaint_service.team_service.get_team(complaint.team_id)
             if team:
                 acting = complaint_service.team_service.get_acting_coordinator(team)
@@ -1409,6 +1955,7 @@ def update_complaint(
     current_user=Depends(get_current_user),
     complaint_service=Depends(get_complaint_service),
     audit_service=Depends(get_audit_service),
+    translation_service=Depends(get_translation_service),
 ):
     complaint = complaint_service.get_complaint(complaint_id)
     if not complaint:
@@ -1512,7 +2059,13 @@ def update_complaint(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Description is required."
             )
-        complaint.description = payload.description.strip()
+        new_desc = payload.description.strip()
+        if complaint.description != new_desc:
+            complaint.description = new_desc
+            try:
+                translation_service.invalidate_complaint_translations(complaint_id)
+            except Exception as e:
+                logger.warning(f"Failed to invalidate translations for {complaint_id}: {e}")
 
     if payload.title is not None:
         complaint.title = payload.title.strip()
@@ -1638,7 +2191,7 @@ def delete_complaint(
             "status": "deletion_requested",
         }
 
-    # 3. Student -> Direct Soft Delete if status is Submitted and student is creator
+    # 3. Student -> Direct Soft Delete if status is Submitted and complaint is not assigned
     elif u_role == "student":
         allowed_creators = {current_user.user_id}
         if getattr(current_user, "email", None):
@@ -1648,10 +2201,10 @@ def delete_complaint(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You can only delete your own complaints.",
             )
-        if complaint.status != Complaint.SUBMITTED:
+        if complaint.status != Complaint.SUBMITTED or complaint.assigned_to:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Complaints can only be deleted while in Submitted status.",
+                detail="Complaints can only be deleted in Submitted status without an assignee. Assigned complaints cannot be deleted directly; please submit a cancellation request instead.",
             )
         old_value = complaint.to_dict()
         complaint.archived = True
@@ -1661,6 +2214,17 @@ def delete_complaint(
         complaint.deleted_by = current_user.user_id
         complaint.add_history(f"Soft deleted by student {current_user.name}.")
         complaint_service.save_complaint(complaint)
+        audit_service.log_event(
+            module="Complaint",
+            entity_type="Complaint",
+            entity_id=complaint_id,
+            action="DELETE",
+            performed_by=current_user.user_id,
+            performed_role=current_user.role,
+            old_value=old_value,
+            new_value={"is_deleted": True, "deleted_at": complaint.deleted_at},
+            description=f"Student soft-deleted unassigned complaint {complaint_id}",
+        )
         return {"message": "Complaint deleted successfully.", "complaint_id": complaint_id, "status": "deleted"}
     else:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized to delete complaint.")
@@ -1741,6 +2305,152 @@ def reject_deletion(
     return _format_complaint(complaint, complaint_service)
 
 
+@router.post("/{complaint_id}/request-cancellation", response_model=ComplaintResponse)
+def request_cancellation(
+    complaint_id: str,
+    payload: ComplaintCancellationRequestPayload,
+    current_user=Depends(get_current_user),
+    complaint_service=Depends(get_complaint_service),
+    audit_service=Depends(get_audit_service),
+):
+    complaint = complaint_service.get_complaint(complaint_id)
+    if not complaint:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
+        )
+    _ensure_visible(complaint, current_user, complaint_service)
+    try:
+        old_val = complaint.to_dict()
+        updated = complaint_service.request_cancellation(
+            complaint_id=complaint_id,
+            user=current_user,
+            reason=payload.reason,
+        )
+        audit_service.log_event(
+            module="Complaint",
+            entity_type="Complaint",
+            entity_id=complaint_id,
+            action="REQUEST_CANCELLATION",
+            performed_by=current_user.user_id,
+            performed_role=current_user.role,
+            old_value=old_val,
+            new_value={"status": updated.status, "cancellation_reason": payload.reason},
+            description=f"Cancellation requested for {complaint_id}: {payload.reason}",
+        )
+        _broadcast_complaint_event("complaint_cancellation_requested", updated, {"reason": payload.reason})
+        _broadcast_complaint_event("complaint_updated", updated)
+        return _format_complaint(updated, complaint_service)
+    except ComplaintConflictError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/{complaint_id}/approve-cancellation", response_model=ComplaintResponse)
+def approve_cancellation(
+    complaint_id: str,
+    payload: Optional[ComplaintCancellationReviewPayload] = None,
+    current_user=Depends(require_roles(Coordinator.ROLE, Administrator.ROLE, AppManager.ROLE, Employee.ROLE)),
+    complaint_service=Depends(get_complaint_service),
+    audit_service=Depends(get_audit_service),
+):
+    complaint = complaint_service.get_complaint(complaint_id)
+    if not complaint:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
+        )
+    _ensure_visible(complaint, current_user, complaint_service)
+    note = payload.note if payload and payload.note else ""
+    try:
+        old_val = complaint.to_dict()
+        updated = complaint_service.approve_cancellation(
+            complaint_id=complaint_id,
+            user=current_user,
+            note=note,
+        )
+        audit_service.log_event(
+            module="Complaint",
+            entity_type="Complaint",
+            entity_id=complaint_id,
+            action="APPROVE_CANCELLATION",
+            performed_by=current_user.user_id,
+            performed_role=current_user.role,
+            old_value=old_val,
+            new_value={"status": updated.status, "note": note},
+            description=f"Cancellation approved for {complaint_id}",
+        )
+        _broadcast_complaint_event("complaint_cancelled", updated, {"note": note})
+        _broadcast_complaint_event("complaint_updated", updated)
+        return _format_complaint(updated, complaint_service)
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/{complaint_id}/reject-cancellation", response_model=ComplaintResponse)
+def reject_cancellation(
+    complaint_id: str,
+    payload: ComplaintCancellationRejectPayload,
+    current_user=Depends(require_roles(Coordinator.ROLE, Administrator.ROLE, AppManager.ROLE, Employee.ROLE)),
+    complaint_service=Depends(get_complaint_service),
+    audit_service=Depends(get_audit_service),
+):
+    complaint = complaint_service.get_complaint(complaint_id)
+    if not complaint:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
+        )
+    _ensure_visible(complaint, current_user, complaint_service)
+    try:
+        old_val = complaint.to_dict()
+        updated = complaint_service.reject_cancellation(
+            complaint_id=complaint_id,
+            user=current_user,
+            reason=payload.reason,
+        )
+        audit_service.log_event(
+            module="Complaint",
+            entity_type="Complaint",
+            entity_id=complaint_id,
+            action="REJECT_CANCELLATION",
+            performed_by=current_user.user_id,
+            performed_role=current_user.role,
+            old_value=old_val,
+            new_value={"status": updated.status, "reason": payload.reason},
+            description=f"Cancellation rejected for {complaint_id}: {payload.reason}",
+        )
+        _broadcast_complaint_event("complaint_cancellation_rejected", updated, {"reason": payload.reason})
+        _broadcast_complaint_event("complaint_updated", updated)
+        return _format_complaint(updated, complaint_service)
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/coordinators/stats")
+@router.get("/coordinator-stats")
+def get_coordinator_stats_endpoint(
+    location_id: Optional[str] = None,
+    department_id: Optional[str] = None,
+    from_date: Optional[str] = Query(None, alias="from"),
+    to_date: Optional[str] = Query(None, alias="to"),
+    current_user=Depends(get_current_user),
+    complaint_service=Depends(get_complaint_service),
+):
+    return complaint_service.get_coordinator_stats(
+        location_id=location_id,
+        department_id=department_id,
+        from_date=from_date,
+        to_date=to_date,
+        current_user=current_user,
+    )
+
+
+@router.put("/{complaint_id}/priority", response_model=ComplaintResponse)
 @router.patch("/{complaint_id}/priority", response_model=ComplaintResponse)
 def update_priority(
     complaint_id: str,
@@ -2076,4 +2786,56 @@ def get_complaint_feedback(
         ).fetchall()
 
     return [dict(r) for r in rows]
+
+
+class ComplaintTranslationRequest(BaseModel):
+    target_language: Optional[str] = None
+
+
+@router.post("/{complaint_id}/translate")
+def translate_complaint(
+    complaint_id: str,
+    payload: Optional[ComplaintTranslationRequest] = None,
+    current_user=Depends(get_current_user),
+    complaint_service=Depends(get_complaint_service),
+    translation_service=Depends(get_translation_service),
+):
+    """
+    Translates complaint description into target_language (default: current_user.language or 'en').
+    Enforces strict complaint-level RBAC via _ensure_visible.
+    Returns translated text, source language, target language, and cache metadata.
+    Does NOT modify the underlying complaint or its audit logs.
+    """
+    if (current_user.role or "").lower() == "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super Admin cannot access institutional operational data.",
+        )
+    complaint = complaint_service.get_complaint(complaint_id)
+    if not complaint:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
+        )
+    _ensure_visible(complaint, current_user, complaint_service)
+
+    target_lang = (
+        payload.target_language if payload and payload.target_language else None
+    ) or getattr(current_user, "language", "en") or "en"
+    if target_lang not in ("en", "te", "hi"):
+        target_lang = "en"
+
+    complaint_dict = (
+        complaint.to_dict()
+        if hasattr(complaint, "to_dict")
+        else (dict(complaint) if isinstance(complaint, dict) else complaint.__dict__)
+    )
+
+    result = translation_service.translate_complaint_description(
+        complaint_dict, target_lang
+    )
+    return {
+        "complaint_id": complaint_id,
+        "original_description": complaint.description,
+        **result,
+    }
 

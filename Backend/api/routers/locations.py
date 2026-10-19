@@ -8,6 +8,7 @@ from api.dependencies import (
     get_complaint_service,
 )
 from api.schemas import (
+    AssignDepartmentsToLocationRequest,
     AssignLocationAppManagerRequest,
     AssignLocationInChargeRequest,
     AssignLocationCoordinatorRequest,
@@ -72,12 +73,23 @@ def list_locations(
             )
         ]
 
-    def _enrich_loc(loc, auth_service):
-        d = model_to_dict(loc)
-        d["app_manager_id"] = auth_service.get_location_app_manager_id(loc.location_id)
-        return d
+    auth_service = location_service.auth_service
+    app_managers = None
+    enriched = []
+    for loc in locs:
+        d = location_service.enrich_location_dict(loc)
+        mgr_id = getattr(loc, "app_manager_id", None)
+        if not mgr_id:
+            if app_managers is None:
+                app_managers = auth_service.list_users(role="app_manager")
+            for mgr in app_managers:
+                if auth_service._manager_covers_location(mgr, loc.location_id, loc.name):
+                    mgr_id = mgr.user_id
+                    break
+        d["app_manager_id"] = mgr_id
+        enriched.append(d)
 
-    return [_enrich_loc(l, location_service.auth_service) for l in locs]
+    return enriched
 
 
 @router.get("/types", response_model=list[LocationTypeGroupResponse])
@@ -258,7 +270,12 @@ def get_location(
             )
     try:
         location = location_service.get_location(location_id)
-        return model_to_dict(location)
+        d = location_service.enrich_location_dict(location)
+        mgr_id = getattr(location, "app_manager_id", None)
+        if not mgr_id:
+            mgr_id = location_service.auth_service.get_location_app_manager_id(location.location_id)
+        d["app_manager_id"] = mgr_id
+        return d
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error))
 
@@ -272,7 +289,13 @@ def create_location(
 ):
     try:
         location = location_service.create_location(
-            payload.name, location_type=payload.location_type
+            payload.name,
+            location_type=payload.location_type,
+            public_complaint_access=payload.public_complaint_access,
+            complaint_submission_policy=payload.complaint_submission_policy,
+            department_ids=payload.department_ids,
+            actor_user_id=current_user.user_id,
+            actor_role=current_user.role,
         )
         # Auto-assign App Manager, Warden, and Coordinator so new locations reflect across all dashboards
         try:
@@ -284,7 +307,7 @@ def create_location(
         except Exception:
             pass
 
-        # Create department records for this specific location if provided
+        # Create department records for this specific location if legacy payload.departments provided
         if payload.departments:
             for dept_item in payload.departments:
                 try:
@@ -294,7 +317,7 @@ def create_location(
                 except Exception:
                     pass
 
-        return model_to_dict(location)
+        return location_service.enrich_location_dict(location)
     except Exception as error:
         if hasattr(error, "status_code"):
             raise error
@@ -444,6 +467,7 @@ def unassign_location_coordinator(
 
 
 @router.patch("/{location_id}", response_model=LocationResponse)
+@router.put("/{location_id}", response_model=LocationResponse)
 def update_location(
     location_id: str,
     payload: LocationUpdateRequest,
@@ -491,6 +515,11 @@ def update_location(
             archived=payload.archived,
             archived_by_role=arch_role,
             archived_by=arch_user,
+            public_complaint_access=payload.public_complaint_access,
+            complaint_submission_policy=payload.complaint_submission_policy,
+            department_ids=payload.department_ids,
+            actor_user_id=current_user.user_id,
+            actor_role=current_user.role,
         )
 
         audit_service.log(
@@ -500,7 +529,9 @@ def update_location(
             old_value=old_value,
             new_value=updated_loc.to_dict(),
         )
-        return model_to_dict(updated_loc)
+        return location_service.enrich_location_dict(updated_loc)
+    except PermissionError as error:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(error))
     except ValueError as error:
         if "Cannot archive" in str(error):
             raise HTTPException(
@@ -510,6 +541,62 @@ def update_location(
     except Exception as error:
         if hasattr(error, "status_code"):
             raise error
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+
+@router.get("/{location_id}/departments")
+def get_location_departments(
+    location_id: str,
+    current_user=Depends(get_current_user),
+    location_service=Depends(get_location_service),
+):
+    try:
+        location = location_service.get_location(location_id)
+        depts = location_service.list_location_departments(location_id)
+        return {
+            "location_id": location_id,
+            "location_name": location.name,
+            "departments": depts,
+            "department_ids": [d["department_id"] for d in depts],
+        }
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error))
+
+
+@router.put("/{location_id}/departments")
+def assign_location_departments(
+    location_id: str,
+    payload: AssignDepartmentsToLocationRequest,
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
+    location_service=Depends(get_location_service),
+    audit_service=Depends(get_audit_service),
+):
+    try:
+        loc = location_service.get_location(location_id)
+        old_dept_ids = location_service.get_location_department_ids(location_id)
+        updated_ids = location_service.assign_departments_to_location(
+            location_id,
+            payload.department_ids,
+            actor_user_id=current_user.user_id,
+            actor_role=current_user.role,
+        )
+        depts = location_service.list_location_departments(location_id)
+        audit_service.log(
+            current_user.user_id,
+            "ASSIGN_LOCATION_DEPARTMENTS",
+            location_id,
+            old_value={"department_ids": old_dept_ids},
+            new_value={"department_ids": updated_ids},
+        )
+        return {
+            "location_id": location_id,
+            "location_name": loc.name,
+            "department_ids": updated_ids,
+            "departments": depts,
+        }
+    except PermissionError as error:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(error))
+    except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
 

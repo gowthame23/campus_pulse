@@ -25,7 +25,7 @@ def _get_headers_for(username, password):
 
 def _get_admin_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
+    login_res = client.post("/auth/login", json={"username": "gowthamejjurothu@gmail.com", "password": "Admin@123"})
     assert login_res.status_code == 200
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
@@ -35,7 +35,7 @@ def _new_student():
     admin_headers = _get_admin_headers()
     res = client.post("/users", json={
         "name": "Probe Student", "email": email, "role": "student",
-        "password": "Temp@Pass123", "confirm_password": "Temp@Pass123", "location_id": "LOC_HOSTEL_A",
+        "password": "Temp@Pass123", "confirm_password": "Temp@Pass123", "location_id": "LOC_HOSTEL_1",
     }, headers=admin_headers)
     assert res.status_code == 201
     headers = _get_headers_for(email, "Temp@Pass123")
@@ -56,8 +56,8 @@ def test_attachment_security_cross_user_denial_and_invalid_ids():
     # 2. Student 1 creates a private complaint
     uid = uuid.uuid4().hex[:6]
     c_res = client.post("/complaints", json={
-        "location_id": "LOC_HOSTEL_A",
-        "department_id": "DEPT_ELECTRICAL",
+        "location_id": "LOC_HOSTEL_1",
+        "department_id": "DEPT_HOSTEL_ELECTRICAL",
         "title": "Private attachment test",
         "description": f"Private complaint for attachment testing {uid}",
         "visibility_type": "Private"

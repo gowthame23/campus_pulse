@@ -420,6 +420,7 @@ export default function LostFoundPage() {
       {/* Simplified Report Modal */}
       {showReportModal && (
         <Modal
+          open={showReportModal}
           title={
             reportStep === "choose"
               ? "What happened?"
@@ -587,6 +588,7 @@ export default function LostFoundPage() {
       {/* Item Details Modal */}
       {showDetailModal && selectedItem && (
         <Modal
+          open={showDetailModal && !!selectedItem}
           title={`Report Details: ${selectedItem.report_type}`}
           onClose={() => setShowDetailModal(false)}
         >

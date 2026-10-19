@@ -36,7 +36,7 @@ def get_student_dashboard(
 def get_coordinator_dashboard(
     current_user=Depends(
         require_roles(
-            Coordinator.ROLE, LocationInCharge.ROLE, Administrator.ROLE
+            Coordinator.ROLE, LocationInCharge.ROLE, Administrator.ROLE, "employee"
         )
     ),
     dashboard_service=Depends(get_dashboard_service),

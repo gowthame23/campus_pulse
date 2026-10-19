@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   FileText,
   AlertCircle,
@@ -11,7 +11,7 @@ import {
   Building,
   RotateCw,
   UserPlus,
-  Layers,
+  MessageSquare,
 } from "lucide-react";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
@@ -28,6 +28,7 @@ import { formatDate } from "../../utils/dateFormatter.js";
 import { getStatusTone, getSlaTone } from "../../utils/statusColor.js";
 
 export default function WorkloadPage() {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -193,7 +194,136 @@ export default function WorkloadPage() {
         </Card>
       </div>
 
-      {/* Staff Workload Sections */}
+      {/* 1. Departments Workload */}
+      {data?.departments?.length > 0 && (
+        <Card className="p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Building className="h-4 w-4 text-blue-500" />
+              Departments Workload
+            </h3>
+            <span className="text-xs text-slate-500">
+              Department-level work coordination & staffing
+            </span>
+          </div>
+          <Table
+            columns={[
+              {
+                header: "Department",
+                accessor: "name",
+                render: (row) => (
+                  <div>
+                    <div className="font-semibold text-slate-900 dark:text-white">{row.name}</div>
+                    <div className="text-xs text-slate-400">
+                      {row.staff_count} Staff Member{row.staff_count !== 1 ? "s" : ""}
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                header: "Coordinator 1 (Primary)",
+                accessor: "coordinator_1_name",
+                render: (row) => {
+                  if (!row.coordinator_1_id) {
+                    return <span className="text-xs text-slate-400 italic">Not Assigned</span>;
+                  }
+                  return (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          `/chat?userId=${encodeURIComponent(row.coordinator_1_id)}&name=${encodeURIComponent(
+                            row.coordinator_1_name
+                          )}`
+                        )
+                      }
+                      className="group inline-flex items-center gap-2 text-xs font-semibold text-slate-900 dark:text-slate-100 hover:text-primary dark:hover:text-primary transition-all text-left p-1 -m-1 rounded-lg hover:bg-primary/10"
+                      title={`Click to open 1-on-1 chat with ${row.coordinator_1_name}`}
+                    >
+                      <span className="group-hover:underline underline-offset-2">{row.coordinator_1_name}</span>
+                      <Badge tone={row.coordinator_1_on_leave ? "warning" : "success"}>
+                        {row.coordinator_1_on_leave ? "On Leave" : "Active"}
+                      </Badge>
+                      <MessageSquare className="h-3.5 w-3.5 text-slate-400 group-hover:text-primary shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  );
+                },
+              },
+              {
+                header: "Coordinator 2 (Backup)",
+                accessor: "coordinator_2_name",
+                render: (row) => {
+                  if (!row.coordinator_2_id) {
+                    return <span className="text-xs text-slate-400 italic">Not Assigned</span>;
+                  }
+                  return (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          `/chat?userId=${encodeURIComponent(row.coordinator_2_id)}&name=${encodeURIComponent(
+                            row.coordinator_2_name
+                          )}`
+                        )
+                      }
+                      className="group inline-flex items-center gap-2 text-xs font-semibold text-slate-900 dark:text-slate-100 hover:text-primary dark:hover:text-primary transition-all text-left p-1 -m-1 rounded-lg hover:bg-primary/10"
+                      title={`Click to open 1-on-1 chat with ${row.coordinator_2_name}`}
+                    >
+                      <span className="group-hover:underline underline-offset-2">{row.coordinator_2_name}</span>
+                      <Badge tone={row.coordinator_2_on_leave ? "warning" : "neutral"}>
+                        {row.coordinator_2_on_leave ? "On Leave" : "Backup"}
+                      </Badge>
+                      <MessageSquare className="h-3.5 w-3.5 text-slate-400 group-hover:text-primary shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  );
+                },
+              },
+              {
+                header: "Total Scope",
+                accessor: "total",
+                render: (row) => (
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">{row.total}</span>
+                ),
+              },
+              {
+                header: "Unassigned",
+                accessor: "unassigned",
+                render: (row) => (
+                  <span className={`font-semibold ${row.unassigned > 0 ? "text-amber-600 dark:text-amber-400 font-bold" : "text-slate-400"}`}>
+                    {row.unassigned}
+                  </span>
+                ),
+              },
+              {
+                header: "Assigned",
+                accessor: "assigned",
+                render: (row) => (
+                  <span className="font-semibold text-blue-600 dark:text-blue-400">{row.assigned}</span>
+                ),
+              },
+              {
+                header: "Left (Active)",
+                accessor: "left",
+                render: (row) => (
+                  <span className="font-semibold text-orange-600 dark:text-orange-400">{row.left}</span>
+                ),
+              },
+              {
+                header: "Resolved",
+                accessor: "resolved",
+                render: (row) => (
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">{row.resolved}</span>
+                ),
+              },
+            ]}
+            rows={data?.departments || []}
+            data={data?.departments || []}
+          />
+        </Card>
+      )}
+
+
+      {/* 4. App Managers Workload */}
       {data?.app_managers?.length > 0 && (
         <Card className="p-5">
           <h3 className="mb-4 text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -240,6 +370,7 @@ export default function WorkloadPage() {
         </Card>
       )}
 
+      {/* 5. Wardens Workload */}
       {data?.wardens?.length > 0 && (
         <Card className="p-5">
           <h3 className="mb-4 text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -291,61 +422,6 @@ export default function WorkloadPage() {
             ]}
             rows={data?.wardens || []}
             data={data?.wardens || []}
-          />
-        </Card>
-      )}
-
-      {data?.coordinators?.length > 0 && (
-        <Card className="p-5">
-          <h3 className="mb-4 text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Layers className="h-4 w-4 text-teal-500" />
-            Coordinators Workload
-          </h3>
-          <Table
-            columns={[
-              {
-                header: "Coordinator",
-                accessor: "name",
-                render: (row) => (
-                  <div>
-                    <div className="font-semibold text-slate-900 dark:text-white">{row.name}</div>
-                    <div className="text-xs text-slate-400">{row.email}</div>
-                  </div>
-                ),
-              },
-              {
-                header: "Department",
-                accessor: "department_name",
-                render: (row) => (
-                  <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">
-                    {row.department_name || row.department_id || "Unspecified"}
-                  </span>
-                ),
-              },
-              {
-                header: "Assigned",
-                accessor: "assigned",
-                render: (row) => (
-                  <span className="font-semibold text-blue-600 dark:text-blue-400">{row.assigned}</span>
-                ),
-              },
-              {
-                header: "Left (Active)",
-                accessor: "left",
-                render: (row) => (
-                  <span className="font-semibold text-orange-600 dark:text-orange-400">{row.left}</span>
-                ),
-              },
-              {
-                header: "Resolved",
-                accessor: "resolved",
-                render: (row) => (
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">{row.resolved}</span>
-                ),
-              },
-            ]}
-            rows={data?.coordinators || []}
-            data={data?.coordinators || []}
           />
         </Card>
       )}

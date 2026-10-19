@@ -40,8 +40,10 @@ class BackupService:
         self,
         notification_service=None,
         audit_service=None,
-        db_path="storage/campus_pulse.db",
+        db_path=None,
     ):
+        if db_path is None:
+            db_path = os.getenv("DATABASE_PATH", "storage/campus_pulse.db")
         self.db_path = Path(db_path)
         self.backup_dir = (self.db_path.parent / "backups").resolve()
         self.backup_dir.mkdir(parents=True, exist_ok=True)
