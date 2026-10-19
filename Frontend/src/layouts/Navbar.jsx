@@ -241,8 +241,8 @@ export default function Navbar({ onMenuClick }) {
     searchResults.locations.length > 0;
 
   return (
-    <header className="w-full sticky top-0 z-30 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#101726]/95 backdrop-blur-sm h-14 flex items-center text-slate-900 dark:text-slate-100">
-      <div className="flex w-full items-center justify-between gap-4 px-4 md:px-6">
+    <header className="w-full min-w-full inset-x-0 sticky top-0 z-30 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#101726]/95 backdrop-blur-sm h-14 flex items-center text-slate-900 dark:text-slate-100">
+      <div className="flex w-full items-center justify-between gap-2 sm:gap-4 px-3 sm:px-4 md:px-6">
         {/* Left Section: Menu Toggle, Portal Badge & Breadcrumbs */}
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <button
