@@ -7,11 +7,11 @@ export default function EmptyState({
   onAction,
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 text-center shadow-sm">
-      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500">
+    <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 sm:p-8 text-center shadow-sm">
+      <div className="mx-auto mb-2.5 sm:mb-4 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500">
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className="h-6 w-6"
+          className="h-5 w-5 sm:h-6 sm:w-6"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -24,12 +24,12 @@ export default function EmptyState({
           />
         </svg>
       </div>
-      <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">{title}</h3>
-      <p className="mx-auto mt-1 max-w-sm text-sm text-slate-400 dark:text-slate-400 font-semibold">
+      <h3 className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100">{title}</h3>
+      <p className="mx-auto mt-1 max-w-sm text-xs sm:text-sm text-slate-400 dark:text-slate-400 font-medium">
         {description}
       </p>
       {actionLabel && onAction && (
-        <div className="mt-5">
+        <div className="mt-3.5 sm:mt-5">
           <Button onClick={onAction}>{actionLabel}</Button>
         </div>
       )}
