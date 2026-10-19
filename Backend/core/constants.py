@@ -29,49 +29,74 @@ SLA_REMINDER_FRACTIONS = (0.5, 0.9)
 # Maximum Blocked Time (alert warden and app manager if blocked past this)
 MAX_BLOCKED_HOURS = 72
 
-# Complaint Lifecycle Statuses
-STATUS_SUBMITTED = "Submitted"                      # Filed, unassigned or in team Accept queue
-STATUS_ASSIGNED = "Assigned"                        # Assigned to single coordinator, not yet started
-STATUS_IN_PROGRESS = "In Progress"                  # Coordinator accepted / started work
-STATUS_BLOCKED = "Waiting for Parts"                # Coordinator blocked with reason & expected date
-STATUS_PENDING_WARDEN = "Pending Warden Verification"  # Fixed; awaiting in-person warden sign-off
-STATUS_WAITING_STUDENT = "Waiting for Verification" # Fixed/warden-verified; awaiting student sign-off
-STATUS_WAITING_VERIFICATION = "Waiting for Verification"
-STATUS_REOPENED = "Reopened"                        # Student disputed fix; back to coordinator
-STATUS_ADMIN_REVIEW = "Admin Review"                # Reopened >= 3 times; escalated to administrator
-STATUS_CLOSED = "Closed"                            # Verified and closed
-STATUS_AUTO_CLOSED = "Closed (Auto Closed)"         # Student inactive 48h after resolution
-STATUS_REJECTED = "Rejected"                        # Rejected
-STATUS_CANCELLED = "Cancelled"                      # Cancelled by submitter
-STATUS_CANCELLATION_REQUESTED = "Cancellation Requested" # Cancellation requested by submitter, awaiting review
+# Complaint Lifecycle Statuses — 3 Canonical States: Starred, Going On, Done
+STATUS_STARRED = "Starred"                          # New / Received / Queued
+STATUS_GOING_ON = "Going On"                        # In Progress / Under Maintenance
+STATUS_DONE = "Done"                                # Completed / Resolved
 
-# Legacy status compatibility: old 'Resolved' rows are treated as 'Waiting for Verification'
-STATUS_LEGACY_RESOLVED = "Resolved"
+# Canonical 3 statuses list
+CANONICAL_STATUSES = (STATUS_STARRED, STATUS_GOING_ON, STATUS_DONE)
+
+# Aliases mapped to the 3 canonical statuses
+STATUS_SUBMITTED = STATUS_STARRED
+STATUS_ASSIGNED = STATUS_GOING_ON
+STATUS_IN_PROGRESS = STATUS_GOING_ON
+STATUS_BLOCKED = STATUS_GOING_ON
+STATUS_PENDING_WARDEN = STATUS_DONE
+STATUS_WAITING_STUDENT = STATUS_DONE
+STATUS_WAITING_VERIFICATION = STATUS_DONE
+STATUS_REOPENED = STATUS_GOING_ON
+STATUS_ADMIN_REVIEW = STATUS_GOING_ON
+STATUS_CLOSED = STATUS_DONE
+STATUS_AUTO_CLOSED = STATUS_DONE
+STATUS_REJECTED = "Rejected"
+STATUS_CANCELLED = "Cancelled"
+STATUS_CANCELLATION_REQUESTED = "Cancellation Requested"
+
+# Legacy status compatibility: old 'Resolved' rows are treated as 'Done'
+STATUS_LEGACY_RESOLVED = STATUS_DONE
+
+def normalize_status(status: str) -> str:
+    """Normalize any legacy or incoming status string to one of the 3 canonical statuses."""
+    if not status:
+        return STATUS_STARRED
+    s = str(status).strip()
+    if s in (STATUS_STARRED, STATUS_GOING_ON, STATUS_DONE, STATUS_CANCELLED, STATUS_REJECTED):
+        return s
+    s_lower = s.lower()
+    if s_lower in ("submitted", "pending", "awaiting coordinator assignment", "awaiting assignment", "starred"):
+        return STATUS_STARRED
+    if any(k in s_lower for k in ("closed", "auto closed", "resolved", "verified", "done")):
+        return STATUS_DONE
+    if "cancel" in s_lower:
+        return STATUS_CANCELLED
+    if "reject" in s_lower:
+        return STATUS_REJECTED
+    return STATUS_GOING_ON
 
 # Status Categories
 INACTIVE_STATUSES = (
-    STATUS_CLOSED,
-    STATUS_AUTO_CLOSED,
+    STATUS_DONE,
+    "Closed",
+    "Closed (Auto Closed)",
     "Auto-Closed",
     STATUS_REJECTED,
     STATUS_CANCELLED,
 )
 
 TERMINAL_STATUSES = (
-    STATUS_CLOSED,
-    STATUS_AUTO_CLOSED,
+    STATUS_DONE,
+    "Closed",
+    "Closed (Auto Closed)",
     "Auto-Closed",
     STATUS_REJECTED,
     STATUS_CANCELLED,
 )
 
-# Statuses where the SLA countdown clock is actively ticking (blocked does NOT pause clock)
+# Statuses where the SLA countdown clock is actively ticking
 SLA_ACTIVE_STATUSES = (
-    STATUS_SUBMITTED,
-    STATUS_ASSIGNED,
-    STATUS_IN_PROGRESS,
-    STATUS_BLOCKED,
-    STATUS_REOPENED,
+    STATUS_STARRED,
+    STATUS_GOING_ON,
 )
 
 # Inactivity and Auto-Close Parameters

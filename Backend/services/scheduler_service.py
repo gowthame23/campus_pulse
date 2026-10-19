@@ -15,7 +15,10 @@ class SchedulerService:
     using an atomic SQLite lease lock to ensure only one worker runs tasks."""
 
     def __init__(self, interval_seconds: int = 300, db_path: str = "storage/campus_pulse.db"):
-        self.interval = interval_seconds
+        try:
+            self.interval = int(interval_seconds)
+        except (ValueError, TypeError):
+            self.interval = 300
         self.db_path = db_path
         self._thread = None
         self._running = False

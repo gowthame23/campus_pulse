@@ -73,9 +73,7 @@ function RoleHome() {
   if (user?.role === ROLES.SUPER_ADMIN)
     return <Navigate to="/superadmin" replace />;
   if (user?.role === ROLES.STUDENT) return <Navigate to="/student" replace />;
-  if (user?.role === ROLES.EMPLOYEE)
-    return <Navigate to="/employee" replace />;
-  if (user?.role === ROLES.COORDINATOR)
+  if (user?.role === ROLES.COORDINATOR || user?.role === "employee")
     return <Navigate to="/coordinator" replace />;
   if (user?.role === ROLES.APP_MANAGER)
     return <Navigate to="/manager" replace />;
@@ -254,11 +252,7 @@ export default function AppRoutes() {
         />
         <Route
           path="/employee"
-          element={
-            <ProtectedRoute roles={[ROLES.EMPLOYEE]}>
-              <EmployeeDashboard />
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/coordinator" replace />}
         />
         <Route
           path="/admin/employee-assignments"

@@ -2,27 +2,28 @@ import { COMPLAINT_STATUS } from "./constants";
 
 export function getStatusTone(status) {
   const tones = {
-    [COMPLAINT_STATUS.SUBMITTED]: "info",
-    [COMPLAINT_STATUS.PENDING]: "warning", // Yellow
-    [COMPLAINT_STATUS.ASSIGNED]: "info", // Blue
-    [COMPLAINT_STATUS.IN_PROGRESS]: "info", // Blue
-    [COMPLAINT_STATUS.WAITING_VERIFICATION]: "success", // Green (marked resolved by coordinator)
-    [COMPLAINT_STATUS.CLOSED]: "success", // Green (verified fixed)
-    [COMPLAINT_STATUS.AUTO_CLOSED]: "success", // Green (verified fixed by auto-close)
-    [COMPLAINT_STATUS.REOPENED]: "orange", // Orange
-    [COMPLAINT_STATUS.AWAITING_ASSIGNMENT]: "warning",
-    [COMPLAINT_STATUS.WAITING_FOR_PARTS]: "amber",
+    [COMPLAINT_STATUS.STARRED]: "warning", // Amber / Starred ⭐
+    [COMPLAINT_STATUS.GOING_ON]: "info",   // Blue / Going On ⏳
+    [COMPLAINT_STATUS.DONE]: "success",    // Green / Done ✅
+    "Starred": "warning",
+    "Going On": "info",
+    "Done": "success",
+    "Submitted": "warning",
+    "Pending": "warning",
+    "Assigned": "info",
+    "In Progress": "info",
     "Waiting for Parts": "amber",
-    [COMPLAINT_STATUS.PENDING_WARDEN_VERIFICATION]: "purple",
-    "Pending Warden Verification": "purple",
-    [COMPLAINT_STATUS.ADMIN_REVIEW]: "danger",
-    "Admin Review": "danger",
+    "Waiting for Verification": "success",
+    "Closed": "success",
+    "Closed (Auto Closed)": "success",
+    "Cancelled": "default",
+    "Rejected": "danger",
   };
   if (tones[status]) return tones[status];
   const s = String(status || "").toLowerCase();
-  if (s.includes("warden")) return "purple";
-  if (s.includes("parts")) return "amber";
-  if (s.includes("admin review")) return "danger";
+  if (s.includes("star") || s.includes("submit") || s.includes("pend")) return "warning";
+  if (s.includes("going") || s.includes("progress") || s.includes("assign")) return "info";
+  if (s.includes("done") || s.includes("close") || s.includes("resolv")) return "success";
   return "default";
 }
 
@@ -47,24 +48,24 @@ export function getPriorityTone(priority) {
 
 export function getStatusLabel(status, t) {
   if (!status) return "";
-  if (!t) return status;
+  const s = String(status).trim();
   const map = {
-    "Submitted": t("submitted", "Submitted"),
-    "Pending": t("pending", "Pending"),
-    "Assigned": t("assigned", "Assigned"),
-    "In Progress": t("in_progress", "In Progress"),
-    "Waiting for Parts": t("waiting_for_parts", "Waiting for Parts"),
-    "Blocked": t("waiting_for_parts", "Waiting for Parts"),
-    "Pending Warden Verification": t("pending_warden", "Pending Warden Verification"),
-    "Waiting for Verification": t("waiting_verification", "Waiting for Verification"),
-    "Closed": t("closed", "Closed"),
-    "Closed (Auto Closed)": t("auto_closed", "Closed (Auto Closed)"),
-    "Reopened": t("reopened", "Reopened"),
-    "Admin Review": t("admin_review", "Admin Review"),
-    "Cancelled": t("cancelled", "Cancelled"),
-    "Rejected": t("rejected", "Rejected"),
+    "Starred": t ? t("status.starred", "⭐ Starred") : "⭐ Starred",
+    "Going On": t ? t("status.going_on", "⏳ Going On") : "⏳ Going On",
+    "Done": t ? t("status.done", "✅ Done") : "✅ Done",
+    "Submitted": t ? t("status.starred", "⭐ Starred") : "⭐ Starred",
+    "Pending": t ? t("status.starred", "⭐ Starred") : "⭐ Starred",
+    "Assigned": t ? t("status.going_on", "⏳ Going On") : "⏳ Going On",
+    "In Progress": t ? t("status.going_on", "⏳ Going On") : "⏳ Going On",
+    "Waiting for Parts": t ? t("status.going_on", "⏳ Going On") : "⏳ Going On",
+    "Waiting for Verification": t ? t("status.done", "✅ Done") : "✅ Done",
+    "Pending Warden Verification": t ? t("status.done", "✅ Done") : "✅ Done",
+    "Closed": t ? t("status.done", "✅ Done") : "✅ Done",
+    "Closed (Auto Closed)": t ? t("status.done", "✅ Done") : "✅ Done",
+    "Cancelled": t ? t("status.cancelled", "Cancelled") : "Cancelled",
+    "Rejected": t ? t("status.rejected", "Rejected") : "Rejected",
   };
-  return map[status] || status;
+  return map[s] || s;
 }
 
 export function getPriorityLabel(priority, t) {
@@ -79,4 +80,3 @@ export function getPriorityLabel(priority, t) {
   };
   return map[p] || priority;
 }
-
