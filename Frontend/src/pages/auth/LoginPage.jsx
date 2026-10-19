@@ -84,7 +84,7 @@ export default function LoginPage() {
   return (
     <main className="relative flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 px-4 py-12 transition-colors duration-200">
       {/* Top-Right Corner outside the box: Compact Language Dropdown */}
-      <div className="absolute top-4 right-4 z-20" ref={langRef}>
+      <div className="fixed top-4 right-4 z-30" ref={langRef}>
         <div className="relative">
           <button
             type="button"
