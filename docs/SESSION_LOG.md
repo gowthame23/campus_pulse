@@ -483,5 +483,21 @@
 * **Verification:**
   - `npm run build` completed in 1.24s with 0 errors.
 
+### Entry 33 — Mobile Date Input Picker Fix & Timezone Bug Resolution
+* **User Directive:** "i cant enter the day date and the year"
+* **Issues Addressed & Actions Taken:**
+  1. **Root Cause Analysis ([`LostFoundPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/LostFoundPage.jsx)):**
+     - HTML5 `<input type="date">` on mobile browsers (Android Chrome / WebViews) does not open a virtual alphanumeric keyboard. Tapping on the text placeholder (`mm/dd/yyyy`) without programmatic picker invocation often fails to trigger the native calendar dialog unless the tiny icon is precisely hit.
+     - The `max` attribute was using `new Date().toISOString().split("T")[0]`. Because `toISOString()` runs in UTC, after midnight in IST (+05:30) the UTC date is still yesterday, which artificially disabled today's date in native browser calendar widgets.
+  2. **Touch-Triggered Date Picker & Quick Actions ([`LostFoundPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/LostFoundPage.jsx)):**
+     - Implemented `getLocalTodayDate()` helper computing today's date in user's local timezone.
+     - Added `onClick` and `onFocus` handlers with `e.target.showPicker()` so tapping anywhere on the date input immediately launches the native calendar dialog on Android/iOS.
+     - Added a 1-tap **"Set Today"** button and **"Clear"** button right beside the label for effortless mobile date selection.
+     - Applied `dark:[color-scheme:dark] cursor-pointer` for crisp contrast in dark mode.
+  3. **Applied Same Touch Improvements to Complaints Date Filters ([`ResolvedPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/complaints/ResolvedPage.jsx)):**
+     - Added `showPicker()` touch triggers and `dark:[color-scheme:dark] cursor-pointer` to `From` and `To` inputs.
+* **Verification:**
+  - `npm run build` completed in 1.07s with 0 errors.
+
 ---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
