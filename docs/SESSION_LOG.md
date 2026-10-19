@@ -431,5 +431,17 @@
 * **Verification:**
   - `npm run build` completed in 1.32s with 0 errors.
 
+### Entry 29 — Removal of Recent Activity from Student Dashboard
+* **User Directive:** "i think we do not need recent activity for the student"
+* **Issues Addressed & Actions Taken:**
+  1. **Removed Recent Activity Card ([`StudentDashboard.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/student/StudentDashboard.jsx)):**
+     - Removed the entire bottom `Recent Activity` Card widget from the Student Dashboard.
+     - Notifications remain fully accessible via the top navigation bell icon and the dedicated `/notifications` page.
+  2. **Cleaned up Unused Hooks & Imports ([`StudentDashboard.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/student/StudentDashboard.jsx)):**
+     - Removed `notificationService.listPaginated` fetch on mount and `reloadNotifications()` calls.
+     - Cleaned up unused `Bell` and `notificationService` imports, reducing dashboard mount overhead and bundle size.
+* **Verification:**
+  - `npm run build` completed in 1.30s with 0 errors.
+
 ---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
