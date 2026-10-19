@@ -186,7 +186,17 @@ export default function ResolvedPage() {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-                className="flex-1 sm:w-36 rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 outline-none focus:border-primary"
+                onClick={(e) => {
+                  try {
+                    if (e.target.showPicker) e.target.showPicker();
+                  } catch (err) {}
+                }}
+                onFocus={(e) => {
+                  try {
+                    if (e.target.showPicker) e.target.showPicker();
+                  } catch (err) {}
+                }}
+                className="flex-1 sm:w-36 rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:[color-scheme:dark] cursor-pointer outline-none focus:border-primary"
               />
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -197,7 +207,17 @@ export default function ResolvedPage() {
                 type="date"
                 value={dateTo}
                 onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-                className="flex-1 sm:w-36 rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 outline-none focus:border-primary"
+                onClick={(e) => {
+                  try {
+                    if (e.target.showPicker) e.target.showPicker();
+                  } catch (err) {}
+                }}
+                onFocus={(e) => {
+                  try {
+                    if (e.target.showPicker) e.target.showPicker();
+                  } catch (err) {}
+                }}
+                className="flex-1 sm:w-36 rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:[color-scheme:dark] cursor-pointer outline-none focus:border-primary"
               />
             </div>
           </div>

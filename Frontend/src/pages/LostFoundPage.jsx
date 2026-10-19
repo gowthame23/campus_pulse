@@ -55,6 +55,14 @@ function ItemPhotoImg({ itemId, photo, alt, className }) {
   return <img src={src} alt={alt} className={className} />;
 }
 
+function getLocalTodayDate() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function LostFoundPage() {
   const { user } = useAuth();
 
@@ -546,15 +554,45 @@ export default function LostFoundPage() {
 
               {/* Date Field */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Date / Time (Optional)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Date / Time (Optional)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setLostDate(getLocalTodayDate())}
+                      className="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+                    >
+                      Set Today
+                    </button>
+                    {lostDate && (
+                      <button
+                        type="button"
+                        onClick={() => setLostDate("")}
+                        className="text-[11px] font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <input
                   type="date"
                   value={lostDate}
-                  max={new Date().toISOString().split("T")[0]}
+                  max={getLocalTodayDate()}
                   onChange={(e) => setLostDate(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  onClick={(e) => {
+                    try {
+                      if (e.target.showPicker) e.target.showPicker();
+                    } catch (err) {}
+                  }}
+                  onFocus={(e) => {
+                    try {
+                      if (e.target.showPicker) e.target.showPicker();
+                    } catch (err) {}
+                  }}
+                  className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:[color-scheme:dark] cursor-pointer"
                 />
               </div>
 
