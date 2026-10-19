@@ -567,5 +567,29 @@
 * **Verification:**
   - Frontend build (`npm run build`) succeeded in 1.37s with 0 errors.
 
+### Entry 38 — Coordinator 2-Button Action (Start -> Done) & Student 3-Stage Experience (Complaint Raised -> Going On -> Fixed)
+* **User Directive:** "i dont now what you did but coordinator will have like he sees the complaint he has only two options start after clicking that done thats it. the student will see complaint raised, goingon and fixed. yes now do it"
+* **Issues Addressed & Actions Taken:**
+  1. **Canonical Status Names ([`Backend/core/constants.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/core/constants.py), [`Backend/models/complaint.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/models/complaint.py), [`Frontend/src/utils/constants.js`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/utils/constants.js)):**
+     - Established the exact 3 canonical statuses requested by the user:
+       - 🟡 **Complaint Raised** (`STATUS_RAISED = "Complaint Raised"`)
+       - 🔵 **Going On** (`STATUS_GOING_ON = "Going On"`)
+       - 🟢 **Fixed** (`STATUS_FIXED = "Fixed"`)
+     - Updated database records: 64 to `Complaint Raised`, 5 to `Going On`, 9 to `Fixed`.
+  2. **Streamlined Coordinator 2-Button Action Flow ([`ComplaintDetailsPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/complaints/ComplaintDetailsPage.jsx), [`CoordinatorDashboard.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/coordinator/CoordinatorDashboard.jsx)):**
+     - Replaced the confusing multi-button action card (Assign, Reassign, Pause, Progress Notes, Proof URL) with **only two sequential buttons**:
+       - When ticket is **Complaint Raised**: Coordinator sees only **[ Start ]** (moves to *Going On*).
+       - When ticket is **Going On**: Button turns into **[ Done ]** (moves to *Fixed*).
+       - When ticket is **Fixed**: Shows a clean **Fixed & Resolved** badge.
+     - On [`CoordinatorDashboard.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/coordinator/CoordinatorDashboard.jsx), replaced the "Assign to..." modal button in the queue directly with **[ Start ]**, and active department jobs with **[ Done ]**.
+  3. **Student Live Tracking Timeline & Confirmation ([`StageTimeline.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/components/StageTimeline.jsx), [`statusColor.js`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/utils/statusColor.js)):**
+     - Live tracking timeline now displays the 3 student stages:
+       1. 🟡 **Complaint Raised** — Filed and waiting in queue
+       2. 🔵 **Going On** — Coordinator clicked Start; repairs underway
+       3. 🟢 **Fixed** — Completed and verified
+     - When Fixed, the student is presented with a simple 1-tap confirmation: **"Yes, All Fixed"** or **"Not Fixed"** (dispute kicks back to *Going On*).
+* **Verification:**
+  - Frontend build (`npm run build`) succeeded in 1.56s with 0 errors and valid PWA service worker.
+
 ---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*

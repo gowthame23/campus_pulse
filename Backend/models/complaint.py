@@ -20,27 +20,30 @@ from utils.helper import add_days_string, generate_id, now_string
 
 
 class Complaint:
-    STARRED = "Starred"
+    RAISED = "Complaint Raised"
     GOING_ON = "Going On"
-    DONE = "Done"
+    FIXED = "Fixed"
 
-    SUBMITTED = "Starred"
-    PENDING = "Starred"
+    STARRED = "Complaint Raised"
+    DONE = "Fixed"
+
+    SUBMITTED = "Complaint Raised"
+    PENDING = "Complaint Raised"
     ASSIGNED = "Going On"
     IN_PROGRESS = "Going On"
-    RESOLVED = "Done"
+    RESOLVED = "Fixed"
     BLOCKED = "Going On"
-    WAITING_VERIFICATION = "Done"
-    PENDING_WARDEN_VERIFICATION = "Done"
-    CLOSED = "Done"
-    AUTO_CLOSED = "Done"
+    WAITING_VERIFICATION = "Fixed"
+    PENDING_WARDEN_VERIFICATION = "Fixed"
+    CLOSED = "Fixed"
+    AUTO_CLOSED = "Fixed"
     REOPENED = "Going On"
     ADMIN_REVIEW = "Going On"
     REJECTED = "Rejected"
     CANCELLED = "Cancelled"
     CANCELLATION_REQUESTED = "Cancellation Requested"
     STATUS_CANCELLATION_REQUESTED = "Cancellation Requested"
-    AWAITING_ASSIGNMENT = "Starred"
+    AWAITING_ASSIGNMENT = "Complaint Raised"
 
     def __init__(
         self,
@@ -152,7 +155,7 @@ class Complaint:
         self.complaint_type = complaint_type
         self.description = description
         self.attachment_url = attachment_url
-        self.status = normalize_status(status or self.STARRED)
+        self.status = normalize_status(status or self.RAISED)
         self.assigned_to = assigned_to
         self.created_at = created_at or now_string()
         self.updated_at = updated_at or self.created_at
