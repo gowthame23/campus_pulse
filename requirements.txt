@@ -1,0 +1,11 @@
+fastapi==0.115.6
+uvicorn==0.34.0
+scikit-learn==1.6.0
+python-multipart==0.0.31
+pydantic==2.10.4
+email-validator==2.2.0
+openpyxl==3.1.5
+pytest==9.0.3
+pywebpush>=2.0.0
+psycopg[binary]>=3.2.0
+psycopg-pool>=3.2.0
