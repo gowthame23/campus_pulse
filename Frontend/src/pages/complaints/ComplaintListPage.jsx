@@ -672,21 +672,21 @@ export default function ComplaintListPage() {
 
       {/* Grid List Table with Single Merged Filter Toolbar */}
       <Card className="p-3 sm:p-6 w-full min-w-0 max-w-full overflow-hidden">
-        {/* Top-Level Division: Remaining/Active vs Closed & Auto-Closed vs All */}
+        {/* Top-Level Division: Active vs Closed vs All */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 sm:pb-3 mb-1.5 border-b border-slate-100 dark:border-slate-800 w-full min-w-0 max-w-full">
           <div className="w-full overflow-x-auto scrollbar-none pb-0.5">
             <div className="inline-flex items-center p-0.5 sm:p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl gap-1 shrink-0">
               <button
                 type="button"
                 onClick={() => handleTabChange("remaining")}
-                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   lifecycleTab === "remaining"
-                    ? "bg-white dark:bg-slate-900 text-primary shadow-2xs font-semibold"
+                    ? "bg-white dark:bg-slate-900 text-primary shadow-2xs font-bold"
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
                 }`}
               >
                 <Clock className="h-3.5 w-3.5 text-amber-500" />
-                <span>Remaining / Active</span>
+                <span>Active</span>
                 <span
                   className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
                     lifecycleTab === "remaining"
@@ -701,14 +701,14 @@ export default function ComplaintListPage() {
               <button
                 type="button"
                 onClick={() => handleTabChange("closed")}
-                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   lifecycleTab === "closed"
-                    ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-2xs font-semibold"
+                    ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-2xs font-bold"
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
                 }`}
               >
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                <span>Closed & Auto-Closed</span>
+                <span>Closed</span>
                 <span
                   className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
                     lifecycleTab === "closed"
@@ -723,9 +723,9 @@ export default function ComplaintListPage() {
               <button
                 type="button"
                 onClick={() => handleTabChange("all")}
-                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   lifecycleTab === "all"
-                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-semibold"
+                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs font-bold"
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
                 }`}
               >
@@ -737,35 +737,35 @@ export default function ComplaintListPage() {
         </div>
 
         {/* Single Merged Filter & Search Toolbar */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 my-1.5 w-full min-w-0 max-w-full">
+        <div className="flex flex-col gap-1.5 sm:gap-2.5 my-1.5 w-full min-w-0 max-w-full">
           {/* Search Box - Takes full width on mobile, flexible on desktop */}
-          <div className="relative w-full min-w-0 max-w-full sm:flex-1 sm:min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
+          <div className="relative w-full min-w-0 max-w-full">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search complaints..."
-              className="h-9 sm:h-10 w-full min-w-0 max-w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-9 sm:pl-10 pr-8 text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-primary transition-colors"
+              className="h-8 sm:h-9 w-full min-w-0 max-w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pl-8 pr-7 text-xs font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-primary transition-colors"
             />
             {query && (
               <button
                 type="button"
                 onClick={() => setQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
 
-          {/* 2-Column Grid on Mobile, Flex Inline on Desktop */}
-          <div className="grid grid-cols-2 gap-2 w-full min-w-0 max-w-full sm:w-auto sm:flex sm:items-center sm:gap-3">
+          {/* Stacked 1-by-1 Filters on Mobile, Responsive Inline on Desktop */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2.5 w-full min-w-0 max-w-full">
             {/* Merged Location Dropdown Filter */}
             <select
               value={activeLocationTab}
               onChange={(e) => setActiveLocationTab(e.target.value)}
-              className="h-9 sm:h-10 w-full min-w-0 max-w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 sm:px-3 text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-primary truncate cursor-pointer"
+              className="h-8 sm:h-9 w-full sm:w-auto min-w-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 text-xs font-medium text-slate-800 dark:text-slate-100 outline-none focus:border-primary truncate cursor-pointer"
             >
               <option value="all">📍 All Locations ({getLocationCount("all")})</option>
               {locations.map((loc) => {
@@ -782,7 +782,7 @@ export default function ComplaintListPage() {
             <select
               value={selectedDepartment}
               onChange={(e) => setSelectedDepartment(e.target.value)}
-              className="h-9 sm:h-10 w-full min-w-0 max-w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 sm:px-3 text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-primary truncate cursor-pointer"
+              className="h-8 sm:h-9 w-full sm:w-auto min-w-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 text-xs font-medium text-slate-800 dark:text-slate-100 outline-none focus:border-primary truncate cursor-pointer"
             >
               <option value="">🏢 All Depts ({getDepartmentCount("")})</option>
               {availableDepartments.map((deptName) => {
@@ -799,7 +799,7 @@ export default function ComplaintListPage() {
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="h-9 sm:h-10 w-full min-w-0 max-w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 sm:px-3 text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-primary truncate cursor-pointer"
+              className="h-8 sm:h-9 w-full sm:w-auto min-w-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 text-xs font-medium text-slate-800 dark:text-slate-100 outline-none focus:border-primary truncate cursor-pointer"
             >
               {lifecycleTab === "remaining" && (
                 <>
@@ -838,7 +838,7 @@ export default function ComplaintListPage() {
             <select
               value={slaFilter}
               onChange={(e) => setSlaFilter(e.target.value)}
-              className="h-9 sm:h-10 w-full min-w-0 max-w-full sm:w-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 sm:px-3 text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-primary truncate cursor-pointer"
+              className="h-8 sm:h-9 w-full sm:w-auto min-w-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 text-xs font-medium text-slate-800 dark:text-slate-100 outline-none focus:border-primary truncate cursor-pointer"
             >
               <option value="">All SLA</option>
               <option value="On Time">🟢 On Time</option>

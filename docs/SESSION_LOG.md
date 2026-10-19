@@ -411,5 +411,25 @@
 * **Verification:**
   - `npm run build` completed in 1.30s with 0 errors.
 
+### Entry 28 — Complaints Tabs Simplification, Vertical Filter Stacking & Dashboard Metric Refinement
+* **User Directive:** "it is still in the same way i have something chnage that remaingn and active to active closed and auto closed to closed and keep the filters one by one like one under another but make it small liek text and the button so even if it one under another it wont take much space and one more thing is in main dash borad we have need attention what does that mean like its not even redirecting anywhere so if posiible remove it and one more thing is if it important say me yy we need that"
+* **Issues Addressed & Actions Taken:**
+  1. **Tab Label Simplification ([`ComplaintListPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/complaints/ComplaintListPage.jsx)):**
+     - Renamed tab 1 from `"Remaining / Active"` to concise **`"Active"`**.
+     - Renamed tab 2 from `"Closed & Auto-Closed"` to concise **`"Closed"`**.
+     - Tab 3 remains `"All"`.
+  2. **Vertical 1-by-1 Compact Filter Stacking ([`ComplaintListPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/complaints/ComplaintListPage.jsx)):**
+     - Replaced the 2-column mobile filter grid with a vertical 1-by-1 stacked layout on mobile (`flex flex-col gap-1.5 w-full min-w-0 max-w-full`) and inline row on desktop (`sm:flex-row sm:items-center sm:gap-2.5`).
+     - Reduced input and dropdown heights to compact `h-8` (`sm:h-9`), padding to `px-2.5`, and font size to `text-xs font-medium`.
+     - Ensured each filter takes 100% of available mobile card width (`w-full min-w-0 max-w-full`), completely preventing horizontal overflow while keeping total filter section height minimal (~140px).
+  3. **Student Dashboard Metrics Streamlining ([`StudentDashboard.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/student/StudentDashboard.jsx)):**
+     - Removed the redundant `"Need Attention"` metric card from the top metrics grid.
+     - Adjusted grid layout to a balanced 2-card row on desktop/tablet (`grid-cols-1 sm:grid-cols-2`):
+       - `Active Problems` (redirects to `/complaints` with `{ status: "active" }`)
+       - `Resolved & Closed` (redirects to `/complaints` with `{ status: "Closed" }`)
+     - Preserved the dedicated `"Action Required: Verify Resolved Work"` amber banner which automatically surfaces whenever tickets require student inspection/confirmation.
+* **Verification:**
+  - `npm run build` completed in 1.32s with 0 errors.
+
 ---
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*

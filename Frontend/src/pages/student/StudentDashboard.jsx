@@ -263,22 +263,15 @@ export default function StudentDashboard() {
         />
       </div>
 
-      {/* 3 Key Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3.5">
+      {/* 2 Key Metrics Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5">
         {complaintsLoading ? (
           <>
-            <div className="h-12 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-800" />
             <div className="h-12 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-800" />
             <div className="h-12 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-800" />
           </>
         ) : (
           <>
-            <StatCard
-              label="Need Attention"
-              value={needAttentionComplaints.length}
-              accent={needAttentionComplaints.length > 0}
-              onClick={() => setActiveTab("need_attention")}
-            />
             <StatCard
               label="Active Problems"
               value={activeComplaints.length}
