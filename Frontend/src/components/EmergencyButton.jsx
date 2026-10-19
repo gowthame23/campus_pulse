@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, Phone, Shield } from "lucide-react";
 import { emergencyService } from "../services/emergencyService.js";
 import EmergencySheet from "./EmergencySheet.jsx";
@@ -66,46 +67,55 @@ export default function EmergencyButton({ userLocationId, compact = false }) {
           <Phone className="h-3 w-3" /> Emergency numbers
         </button>
 
-        {fallbackOpen && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-rose-600" />
-                  Emergency Numbers
-                </h3>
+        {fallbackOpen &&
+          typeof document !== "undefined" &&
+          createPortal(
+            <div
+              className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+              onClick={() => setFallbackOpen(false)}
+            >
+              <div
+                className="bg-white dark:bg-slate-900 rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                  <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-rose-600" />
+                    Emergency Numbers
+                  </h3>
+                  <button
+                    onClick={() => setFallbackOpen(false)}
+                    className="text-slate-400 hover:text-slate-600 text-xs font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  <a
+                    href="tel:112"
+                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-900 dark:text-slate-100"
+                  >
+                    <span>112 National Emergency</span>
+                    <span className="text-rose-600">📞 Call</span>
+                  </a>
+                  <a
+                    href="tel:+919876543210"
+                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-900 dark:text-slate-100"
+                  >
+                    <span>Campus Security Desk</span>
+                    <span className="text-emerald-600">📞 Call</span>
+                  </a>
+                </div>
                 <button
                   onClick={() => setFallbackOpen(false)}
-                  className="text-slate-400 hover:text-slate-600 text-xs font-bold"
+                  className="w-full py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold"
                 >
-                  ✕
+                  Close
                 </button>
               </div>
-              <div className="space-y-2">
-                <a
-                  href="tel:112"
-                  className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-900 dark:text-slate-100"
-                >
-                  <span>112 National Emergency</span>
-                  <span className="text-rose-600">📞 Call</span>
-                </a>
-                <a
-                  href="tel:+919876543210"
-                  className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-900 dark:text-slate-100"
-                >
-                  <span>Campus Security Desk</span>
-                  <span className="text-emerald-600">📞 Call</span>
-                </a>
-              </div>
-              <button
-                onClick={() => setFallbackOpen(false)}
-                className="w-full py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        )}
+            </div>,
+            document.body
+          )}
       </div>
     );
   }
