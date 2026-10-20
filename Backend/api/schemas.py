@@ -56,8 +56,10 @@ class PasswordResetCompleteRequest(BaseModel):
 
 
 class AccountActivationRequest(BaseModel):
-    activation_token: str
-    password: str = Field(min_length=8)
+    activation_token: Optional[str] = None
+    token: Optional[str] = None
+    password: Optional[str] = None
+    new_password: Optional[str] = None
     confirm_password: Optional[str] = None
 
 
@@ -129,6 +131,8 @@ class ExcelImportRowReport(BaseModel):
     temporary_password: Optional[str] = None
     activation_token: Optional[str] = None
     activation_link: Optional[str] = None
+    activation_token: Optional[str] = None
+    activation_link: Optional[str] = None
     action: Optional[str] = "created"
     status: str  # "Success" or "Failed"
     reason: Optional[str] = None
@@ -155,6 +159,8 @@ class UserResponse(BaseModel):
     department_id: Optional[str] = None
     location_id: Optional[str] = None
     temporary_password: Optional[str] = None
+    activation_token: Optional[str] = None
+    activation_link: Optional[str] = None
     created_at: str
     updated_at: Optional[str] = None
     last_login: Optional[str] = None

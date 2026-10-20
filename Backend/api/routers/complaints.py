@@ -1387,6 +1387,7 @@ def accept_complaint(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
 
+@router.post("/{complaint_id}/start", response_model=ComplaintResponse)
 @router.post("/{complaint_id}/start-work", response_model=ComplaintResponse)
 def start_work_on_complaint(
     complaint_id: str,
@@ -1793,6 +1794,7 @@ def update_status(
 
 @router.put("/{complaint_id}/resolve", response_model=ComplaintResponse)
 @router.post("/{complaint_id}/resolve", response_model=ComplaintResponse)
+@router.post("/{complaint_id}/done", response_model=ComplaintResponse)
 def resolve_complaint(
     complaint_id: str,
     payload: ComplaintResolveRequest,

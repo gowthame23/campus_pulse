@@ -401,15 +401,26 @@ def verify_activation_token(token: str, auth_service=Depends(get_auth_service)):
 def complete_activation(
     payload: AccountActivationRequest, auth_service=Depends(get_auth_service)
 ):
-    if payload.confirm_password and payload.password != payload.confirm_password:
+    token = payload.activation_token or payload.token
+    pwd = payload.password or payload.new_password
+    conf = payload.confirm_password
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Activation token is required.",
+        )
+    if not pwd:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password is required.",
+        )
+    if conf and pwd != conf:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Passwords do not match.",
         )
     try:
-        user = auth_service.complete_activation(
-            payload.activation_token, payload.password
-        )
+        user = auth_service.complete_activation(token, pwd)
         from api.security import invalidate_user_sessions
         invalidate_user_sessions(user.user_id)
         return {

@@ -1078,9 +1078,9 @@ def _migrate_location_departments_table(conn):
     except Exception as e:
         logger.warning(f"Note during medical and fire department verification: {e}")
 
-    common_hostel_depts = ['DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_HOSTEL_FURNITURE', 'DEPT_HOSTEL_NETWORK', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
-    academic_depts = ['DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_HOSTEL_FURNITURE', 'DEPT_HOSTEL_NETWORK', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
-    mess_depts = ['DEPT_MESS_FOOD', 'DEPT_MESS_MAINTENANCE', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_FURNITURE', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
+    common_hostel_depts = ['DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_HOSTEL_NETWORK', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
+    academic_depts = ['DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_HOSTEL_NETWORK', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
+    mess_depts = ['DEPT_MESS_FOOD', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_HOSTEL_PLUMBING', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
     sac_depts = ['DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
     sports_depts = ['DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
     other_depts = ['DEPT_OTHER_GENERAL', 'DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE']
@@ -1099,8 +1099,13 @@ def _migrate_location_departments_table(conn):
         'LOC_OTHER': other_depts,
     }
 
+    # Fetch valid department IDs to ensure zero foreign key violations
+    valid_depts = {row[0] for row in conn.execute("SELECT department_id FROM departments").fetchall()}
+
     for loc_id, dept_ids in loc_mappings.items():
         for dept_id in dept_ids:
+            if dept_id not in valid_depts:
+                continue
             try:
                 conn.execute('''
                     INSERT OR IGNORE INTO location_departments (id, location_id, department_id, created_at, created_by, is_active)

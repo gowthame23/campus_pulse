@@ -458,7 +458,24 @@ def create_user(
             old_value=None,
             new_value={"name": user.name, "email": user.email, "role": user.role},
         )
-        return user_to_response(user)
+
+        # Generate activation token & link, and dispatch welcome/activation email
+        act_token = None
+        act_link = None
+        if user.email and not str(user.email).endswith("@worker.campuspulse"):
+            try:
+                act_token = auth_service.generate_activation_token(user.user_id, user.email)
+                act_link = f"/activate?token={act_token}"
+                from utils.email import send_activation_email
+                send_activation_email(user.email, act_link, user.name)
+            except Exception as mail_err:
+                pass
+
+        resp_data = user_to_response(user)
+        if act_token:
+            resp_data["activation_token"] = act_token
+            resp_data["activation_link"] = act_link
+        return resp_data
     except PermissionError as p_err:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
     except ValueError as error:
@@ -879,6 +896,36 @@ def reset_user_password(
     auth_service.save_user(target_user)
     invalidate_user_sessions(user_id)
     return user_to_response(target_user)
+
+
+@router.post("/{user_id}/resend-activation")
+def resend_activation_email(
+    user_id: str,
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
+    auth_service=Depends(get_auth_service),
+):
+    target_user = auth_service.get_user(user_id)
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found."
+        )
+    if not target_user.email or str(target_user.email).endswith("@worker.campuspulse"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot send activation link to an account without a valid email address.",
+        )
+    act_token = auth_service.generate_activation_token(target_user.user_id, target_user.email)
+    act_link = f"/activate?token={act_token}"
+    try:
+        from utils.email import send_activation_email
+        send_activation_email(target_user.email, act_link, target_user.name)
+    except Exception as mail_err:
+        pass
+    return {
+        "message": f"Activation email dispatched successfully to {target_user.email}.",
+        "activation_token": act_token,
+        "activation_link": act_link,
+    }
 
 
 @router.post("/import", response_model=ExcelImportReportResponse)
