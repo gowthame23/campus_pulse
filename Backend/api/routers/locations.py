@@ -297,15 +297,7 @@ def create_location(
             actor_user_id=current_user.user_id,
             actor_role=current_user.role,
         )
-        # Auto-assign App Manager, Warden, and Coordinator so new locations reflect across all dashboards
-        try:
-            location_service.auth_service.assign_location_app_manager(location.location_id, "USR_MANAGER")
-            if (current_user.role or "").lower() == AppManager.ROLE.lower() and current_user.user_id != "USR_MANAGER":
-                location_service.auth_service.assign_location_app_manager(location.location_id, current_user.user_id)
-            location_service.update_location(location.location_id, in_charge_id="USR_WARDEN")
-            location_service.auth_service.assign_location_coordinator(location.location_id, "USR_COORDINATOR")
-        except Exception:
-            pass
+        # New locations are created unassigned; Admin assigns App Manager, Warden, and Coordinator as needed.
 
         # Create department records for this specific location if legacy payload.departments provided
         if payload.departments:

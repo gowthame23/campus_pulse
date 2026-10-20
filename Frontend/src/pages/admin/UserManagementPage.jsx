@@ -799,9 +799,14 @@ export default function UserManagementPage() {
       location_id: null,
     };
     try {
-      await userService.create(payload);
+      const res = await userService.create(payload);
+      const createdUser = res?.data;
       reset({ role: defaultRole, password: "", confirmPassword: "" });
-      setMessage("User account created successfully.");
+      if (createdUser?.activation_link) {
+        setMessage(`User account created successfully! Welcome & activation email dispatched to ${payload.email}.`);
+      } else {
+        setMessage("User account created successfully.");
+      }
       reload();
     } catch (err) {
       setError(getApiError(err, "Unable to create user."));

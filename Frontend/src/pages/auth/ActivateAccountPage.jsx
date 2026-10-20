@@ -52,8 +52,11 @@ export default function ActivateAccountPage() {
     setSubmitError("");
     try {
       await authService.completeActivation({
+        activation_token: token,
         token,
+        password: values.new_password,
         new_password: values.new_password,
+        confirm_password: values.confirm_password,
       });
       setIsSuccess(true);
       setTimeout(() => {

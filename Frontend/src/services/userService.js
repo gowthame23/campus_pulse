@@ -19,6 +19,7 @@ export const userService = {
     }),
   getDeletionImpact: (userId) =>
     apiClient.get(`/users/${userId}/deletion-impact`),
+  resendActivation: (userId) => apiClient.post(`/users/${userId}/resend-activation`),
   forceDelete: (userId) => apiClient.delete(`/users/${userId}`),
   listRecycleBin: () => apiClient.get("/users/recycle-bin"),
   restoreUser: (userId) => apiClient.post(`/users/${userId}/restore`),

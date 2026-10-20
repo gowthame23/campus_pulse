@@ -210,76 +210,22 @@ class AuthService:
                 },
             },
             {
-                "id": "USR_EMP_A1",
-                "class": Employee,
-                "name": "Employee A1",
-                "email": "employee.a1@campuspulse.edu",
-                "password": "Employee@123",
+                "id": "USR_COORD_1",
+                "class": Coordinator,
+                "name": "Coordinator 1",
+                "email": "coordinator1@campuspulse.edu",
+                "password": "Coord@123",
                 "first_login": False,
-                "kwargs": {
-                    "department_id": "DEPT_HOSTEL_ELECTRICAL",
-                    "location_id": "LOC_HOSTEL_1"
-                },
+                "kwargs": {},
             },
             {
-                "id": "USR_EMP_A2",
-                "class": Employee,
-                "name": "Employee A2",
-                "email": "employee.a2@campuspulse.edu",
-                "password": "Employee@123",
+                "id": "USR_COORD_2",
+                "class": Coordinator,
+                "name": "Coordinator 2",
+                "email": "coordinator2@campuspulse.edu",
+                "password": "Coord@123",
                 "first_login": False,
-                "kwargs": {
-                    "department_id": "DEPT_HOSTEL_ELECTRICAL",
-                    "location_id": "LOC_HOSTEL_1"
-                },
-            },
-            {
-                "id": "USR_EMP_A3",
-                "class": Employee,
-                "name": "Employee A3",
-                "email": "employee.a3@campuspulse.edu",
-                "password": "Employee@123",
-                "first_login": False,
-                "kwargs": {
-                    "department_id": "DEPT_HOSTEL_ELECTRICAL",
-                    "location_id": "LOC_HOSTEL_1"
-                },
-            },
-            {
-                "id": "USR_EMP_B1",
-                "class": Employee,
-                "name": "Employee B1",
-                "email": "employee.b1@campuspulse.edu",
-                "password": "Employee@123",
-                "first_login": False,
-                "kwargs": {
-                    "department_id": "DEPT_HOSTEL_PLUMBING",
-                    "location_id": "LOC_HOSTEL_2"
-                },
-            },
-            {
-                "id": "USR_EMP_B2",
-                "class": Employee,
-                "name": "Employee B2",
-                "email": "employee.b2@campuspulse.edu",
-                "password": "Employee@123",
-                "first_login": False,
-                "kwargs": {
-                    "department_id": "DEPT_HOSTEL_PLUMBING",
-                    "location_id": "LOC_HOSTEL_2"
-                },
-            },
-            {
-                "id": "USR_EMP_B3",
-                "class": Employee,
-                "name": "Employee B3",
-                "email": "employee.b3@campuspulse.edu",
-                "password": "Employee@123",
-                "first_login": False,
-                "kwargs": {
-                    "department_id": "DEPT_HOSTEL_PLUMBING",
-                    "location_id": "LOC_HOSTEL_2"
-                },
+                "kwargs": {},
             },
             {
                 "id": "USR_STUDENT",
@@ -439,16 +385,14 @@ class AuthService:
             conn.execute("UPDATE users SET location_id = 'LOC_HOSTEL_1' WHERE user_id = 'USR_STUDENT' AND (location_id IS NULL OR location_id = '')")
             conn.execute("UPDATE users SET location_id = 'LOC_HOSTEL_2' WHERE user_id = 'USR_STUDENT_2' AND (location_id IS NULL OR location_id = '')")
 
-            # Staff profiles for the 6 employees
-            employee_profiles = [
-                ('USR_EMP_A1', 'EMP_A1', 'Electrical Coordinator / Electrician', 'Electrical', '["LOC_HOSTEL_1"]'),
-                ('USR_EMP_A2', 'EMP_A2', 'Backup Coordinator / Electrician', 'Electrical', '["LOC_HOSTEL_1"]'),
-                ('USR_EMP_A3', 'EMP_A3', 'HVAC Specialist', 'Electrical', '["LOC_HOSTEL_1"]'),
-                ('USR_EMP_B1', 'EMP_B1', 'Plumbing Coordinator / Plumber', 'Plumbing', '["LOC_HOSTEL_2"]'),
-                ('USR_EMP_B2', 'EMP_B2', 'Backup Coordinator / Plumber', 'Plumbing', '["LOC_HOSTEL_2"]'),
-                ('USR_EMP_B3', 'EMP_B3', 'Sanitation Technician', 'Plumbing', '["LOC_HOSTEL_2"]'),
+            # Staff profiles for the coordinators (clean setup)
+            conn.execute("DELETE FROM users WHERE role = 'employee'")
+            conn.execute("DELETE FROM staff_profiles WHERE user_id LIKE 'USR_EMP_%'")
+            coordinator_profiles = [
+                ('USR_COORD_1', 'EMP_COORD_1', 'Coordinator', None, '[]'),
+                ('USR_COORD_2', 'EMP_COORD_2', 'Coordinator', None, '[]'),
             ]
-            for uid, empid, desig, dept, locs in employee_profiles:
+            for uid, empid, desig, dept, locs in coordinator_profiles:
                 conn.execute("""
                     INSERT INTO staff_profiles (user_id, employee_id, designation, department, assigned_locations)
                     VALUES (?, ?, ?, ?, ?)
@@ -3161,7 +3105,7 @@ class AuthService:
             user = self.get_user(rec["user_id"])
             if not user:
                 raise ValueError("Associated user account not found.")
-            return {"user_id": user.user_id, "name": user.name, "email": user.email, "valid": True}
+            return {"user_id": user.user_id, "name": user.name, "email": user.email, "role": user.role, "valid": True}
 
     def complete_activation(self, token, new_password):
         from utils.passwords import validate_password_complexity, hash_password
