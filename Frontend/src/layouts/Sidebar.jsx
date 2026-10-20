@@ -166,10 +166,9 @@ export default function Sidebar({ isOpen, onClose }) {
               subItems: [
                 { to: "/admin/users?tab=students", label: "Students", icon: GraduationCap },
                 { to: "/admin/users?tab=supervisors", label: "App Managers & Wardens", icon: ShieldCheck },
-                { to: "/admin/users?tab=staff", label: "Employees & Coordinators", icon: Wrench },
+                { to: "/admin/users?tab=staff", label: "Coordinators", icon: Wrench },
               ],
             },
-            { to: "/admin/employee-assignments", label: "Employee Assignments", icon: UserCheck },
             { to: "/admin/locations", label: "Locations", icon: MapPin },
             { to: "/admin/departments", label: "Departments", icon: Building },
             { to: "/admin/coverage-gaps", label: "Coverage Gaps", icon: Activity },
@@ -228,10 +227,9 @@ export default function Sidebar({ isOpen, onClose }) {
               subItems: [
                 { to: "/admin/users?tab=students", label: "Students", icon: GraduationCap },
                 { to: "/admin/users?tab=supervisors", label: "App Managers & Wardens", icon: ShieldCheck },
-                { to: "/admin/users?tab=staff", label: "Employees & Coordinators", icon: Wrench },
+                { to: "/admin/users?tab=staff", label: "Coordinators", icon: Wrench },
               ],
             },
-            { to: "/admin/employee-assignments", label: "Employee Assignments", icon: UserCheck },
             { to: "/admin/locations", label: "Locations", icon: MapPin },
             { to: "/admin/departments", label: "Departments", icon: Building },
             { to: "/admin/coverage-gaps", label: "Coverage Gaps", icon: Activity },
@@ -313,22 +311,7 @@ export default function Sidebar({ isOpen, onClose }) {
       ];
     }
 
-    // 6. EMPLOYEE (Worker)
-    if (role === ROLES.EMPLOYEE) {
-      return [
-        {
-          title: "WORK",
-          items: [
-            { to: "/employee", label: "My Jobs", icon: Home },
-            { to: "/notifications", label: "Notifications", icon: Bell },
-          ],
-        },
-        {
-          title: "ACCOUNT",
-          items: [{ to: "/profile", label: "Profile", icon: User }],
-        },
-      ];
-    }
+
 
     // 7. STUDENT (Default)
     return [

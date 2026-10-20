@@ -467,8 +467,7 @@ export default function ComplaintDetailsPage() {
 
   const userRole = (user?.role || "").toLowerCase();
   const isCoordinator = userRole === "coordinator";
-  const isEmployee = userRole === "employee";
-  const isWorker = isCoordinator || isEmployee;
+  const isWorker = isCoordinator;
   const isWarden = userRole === "location_in_charge" || userRole === "warden";
   const isAppManager = userRole === "app_manager";
   const isAdmin = userRole === "administrator" || userRole === "admin";
@@ -488,7 +487,7 @@ export default function ComplaintDetailsPage() {
 
   const canWardenVerify =
     (isLocationWarden || isAdmin) &&
-    complaint?.status === "Pending Warden Verification" &&
+    Boolean(complaint?.requires_warden_check || complaint?.status === "Pending Warden Verification") &&
     !isSelfWorkOnTicket;
 
   const canStudentConfirmOrReopen =
@@ -1747,6 +1746,35 @@ export default function ComplaintDetailsPage() {
                       Fixed
                     </div>
                   )}
+                </div>
+              )}
+
+                            {/* Warden Physical Inspection Controls */}
+              {canWardenVerify && (
+                <div className="p-3.5 rounded-xl border border-sky-200 dark:border-sky-900/60 bg-sky-50/50 dark:bg-sky-950/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-sky-900 dark:text-sky-100 flex items-center gap-1.5">
+                      <ShieldCheck className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                      Physical Inspection Required
+                    </span>
+                    <Badge tone="sky">Warden Authority</Badge>
+                  </div>
+                  <p className="text-[11px] text-sky-700 dark:text-sky-300">
+                    Verify this repair on-site to confirm resolution or flag incomplete work.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    onClick={() => {
+                      setWardenVerdictChoice("Verified");
+                      setWardenVerdictNotes("");
+                      setShowWardenVerifyModal(true);
+                    }}
+                    className="w-full font-bold text-xs py-2 flex items-center justify-center gap-1.5"
+                  >
+                    <ClipboardCheck className="h-4 w-4" />
+                    Conduct In-Person Inspection
+                  </Button>
                 </div>
               )}
 

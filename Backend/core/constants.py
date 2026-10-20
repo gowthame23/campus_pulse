@@ -44,14 +44,14 @@ CANONICAL_STATUSES = (STATUS_RAISED, STATUS_GOING_ON, STATUS_FIXED)
 STATUS_SUBMITTED = STATUS_RAISED
 STATUS_ASSIGNED = STATUS_GOING_ON
 STATUS_IN_PROGRESS = STATUS_GOING_ON
-STATUS_BLOCKED = STATUS_GOING_ON
-STATUS_PENDING_WARDEN = STATUS_FIXED
-STATUS_WAITING_STUDENT = STATUS_FIXED
-STATUS_WAITING_VERIFICATION = STATUS_FIXED
-STATUS_REOPENED = STATUS_GOING_ON
-STATUS_ADMIN_REVIEW = STATUS_GOING_ON
-STATUS_CLOSED = STATUS_FIXED
-STATUS_AUTO_CLOSED = STATUS_FIXED
+STATUS_BLOCKED = "Waiting for Parts"
+STATUS_PENDING_WARDEN = "Pending Warden Verification"
+STATUS_WAITING_STUDENT = "Waiting for Verification"
+STATUS_WAITING_VERIFICATION = "Waiting for Verification"
+STATUS_REOPENED = "Reopened"
+STATUS_ADMIN_REVIEW = "Admin Review"
+STATUS_CLOSED = "Closed"
+STATUS_AUTO_CLOSED = "Closed (Auto Closed)"
 STATUS_REJECTED = "Rejected"
 STATUS_CANCELLED = "Cancelled"
 STATUS_CANCELLATION_REQUESTED = "Cancellation Requested"
@@ -65,7 +65,7 @@ def normalize_status(status: str) -> str:
     if not status:
         return STATUS_RAISED
     s = str(status).strip()
-    if s in (STATUS_RAISED, STATUS_GOING_ON, STATUS_FIXED, STATUS_CANCELLED, STATUS_REJECTED):
+    if s in (STATUS_RAISED, STATUS_GOING_ON, STATUS_FIXED, STATUS_CANCELLED, STATUS_REJECTED, "Admin Review", "Waiting for Parts", "Pending Warden Verification", "Waiting for Verification", "Closed", "Closed (Auto Closed)"):
         return s
     s_lower = s.lower()
     if any(k in s_lower for k in ("raised", "submitted", "pending", "awaiting", "starred", "new")):
@@ -146,8 +146,7 @@ ROLE_ALIASES = {
     "supervisor": ROLE_APP_MANAGER,
 }
 
-# Rule 1.1 & 1.3: The ONLY role names shown to users anywhere are:
-# Admin | App Manager | Coordinator | Employee | Warden | Student (Super Admin platform-level)
+# Role display names: Employee role is deprecated and maps to Coordinator
 ROLE_DISPLAY_NAMES = {
     "administrator": "Admin",
     "admin": "Admin",
@@ -155,7 +154,7 @@ ROLE_DISPLAY_NAMES = {
     "manager": "App Manager",
     "supervisor": "App Manager",
     "coordinator": "Coordinator",
-    "employee": "Employee",
+    "employee": "Coordinator",
     "location_in_charge": "Warden",
     "warden": "Warden",
     "student": "Student",

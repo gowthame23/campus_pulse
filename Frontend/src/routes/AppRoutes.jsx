@@ -50,8 +50,6 @@ const CoordinatorPerformancePage = lazy(() => import("../pages/coordinator/Coord
 const HealthMapPage = lazy(() => import("../pages/admin/HealthMapPage.jsx"));
 const SafetyReportPage = lazy(() => import("../pages/student/SafetyReportPage.jsx"));
 const SafetyReportsAdminPage = lazy(() => import("../pages/admin/SafetyReportsAdminPage.jsx"));
-const EmployeeDashboard = lazy(() => import("../pages/employee/EmployeeDashboard.jsx"));
-const EmployeeAssignmentsPage = lazy(() => import("../pages/admin/EmployeeAssignmentsPage.jsx"));
 const CoverageGapsPage = lazy(() => import("../pages/admin/CoverageGapsPage.jsx"));
 const EmergencyManagementPage = lazy(() => import("../pages/admin/EmergencyManagementPage.jsx"));
 
@@ -73,7 +71,7 @@ function RoleHome() {
   if (user?.role === ROLES.SUPER_ADMIN)
     return <Navigate to="/superadmin" replace />;
   if (user?.role === ROLES.STUDENT) return <Navigate to="/student" replace />;
-  if (user?.role === ROLES.COORDINATOR || user?.role === "employee")
+  if (user?.role === ROLES.COORDINATOR)
     return <Navigate to="/coordinator" replace />;
   if (user?.role === ROLES.APP_MANAGER)
     return <Navigate to="/manager" replace />;
@@ -256,19 +254,11 @@ export default function AppRoutes() {
         />
         <Route
           path="/admin/employee-assignments"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMINISTRATOR, ROLES.APP_MANAGER]}>
-              <EmployeeAssignmentsPage />
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/admin/departments" replace />}
         />
         <Route
           path="/admin/teams"
-          element={
-            <ProtectedRoute roles={[ROLES.ADMINISTRATOR, ROLES.APP_MANAGER]}>
-              <EmployeeAssignmentsPage />
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/admin/departments" replace />}
         />
         <Route
           path="/admin/coverage-gaps"

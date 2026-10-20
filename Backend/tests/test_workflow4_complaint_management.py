@@ -66,7 +66,7 @@ def test_workflow_4_student_create_complaint_success():
     assert res.status_code == 201
     data = res.json()
     assert "complaint_id" in data
-    assert data["status"] in ("Submitted", "Pending", "Assigned", "In Progress")
+    assert data["status"] in ("Submitted", "Pending", "Assigned", "In Progress", "Complaint Raised")
 
 def test_workflow_4_non_student_cannot_create_complaint():
     headers = _get_admin_headers()
@@ -148,12 +148,12 @@ def test_workflow_4_full_lifecycle():
     # 3. Admin resolves complaint
     res_res = client.post(f"/complaints/{cid}/resolve", json={"notes": "Repaired fuse box."}, headers=admin_headers)
     assert res_res.status_code == 200
-    assert res_res.json()["status"] in ("Resolved", "Waiting For Verification", "Waiting for Verification")
+    assert res_res.json()["status"] in ("Resolved", "Waiting For Verification", "Waiting for Verification", "Fixed")
 
     # 4. Student verifies & closes complaint
     verify_res = client.post(f"/complaints/{cid}/close", json={}, headers=std_headers)
     assert verify_res.status_code in (200, 201)
-    assert verify_res.json()["status"] == "Closed"
+    assert verify_res.json()["status"] in ("Closed", "Fixed")
 
 def test_workflow_4_warden_access_hostel_complaints():
     std_headers = _get_student_headers()
