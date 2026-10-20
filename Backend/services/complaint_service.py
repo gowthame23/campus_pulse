@@ -20,6 +20,9 @@ from core.constants import (
     SPOT_CHECK_RATE,
     STATUS_ADMIN_REVIEW,
     STATUS_ASSIGNED,
+    STATUS_RAISED,
+    STATUS_GOING_ON,
+    STATUS_FIXED,
     STATUS_AUTO_CLOSED,
     STATUS_BLOCKED,
     STATUS_CLOSED,
@@ -967,6 +970,8 @@ class ComplaintService:
             complaint.started_at = complaint.started_at or now_string()
             complaint.add_history("Work implicitly started upon resolution.")
         elif complaint.status not in (
+            STATUS_GOING_ON,
+            "Going On",
             Complaint.IN_PROGRESS,
             STATUS_IN_PROGRESS,
             Complaint.REOPENED,
@@ -1215,12 +1220,37 @@ class ComplaintService:
         # Permission check: must be warden of this location or administrator
         if warden_role != "administrator":
             loc = self.auth_service.get_location(complaint.location_id)
-            loc_in_charge = getattr(loc, "in_charge_id", None)
+            loc_in_charge = getattr(loc, "in_charge_id", None) if loc else None
             user_loc = getattr(warden_user, "location_id", None)
-            if warden_id != loc_in_charge and user_loc != complaint.location_id:
+            assigned_locs = getattr(warden_user, "assigned_locations", []) or []
+            if isinstance(assigned_locs, str):
+                import json
+                try:
+                    assigned_locs = json.loads(assigned_locs)
+                except Exception:
+                    assigned_locs = [assigned_locs]
+            is_loc_warden = (
+                (loc_in_charge and warden_id == loc_in_charge)
+                or (user_loc and user_loc == complaint.location_id)
+                or (complaint.location_id in assigned_locs)
+                or (loc is None and warden_role in ("location_in_charge", "warden"))
+            )
+            if not is_loc_warden:
                 raise PermissionError("Only the warden of this location or an administrator can verify.")
 
-        if complaint.status not in (STATUS_PENDING_WARDEN, Complaint.PENDING_WARDEN_VERIFICATION, "Pending Warden Verification"):
+        if not getattr(complaint, "requires_warden_check", False) and complaint.status not in (
+            STATUS_PENDING_WARDEN,
+            Complaint.PENDING_WARDEN_VERIFICATION,
+            "Pending Warden Verification",
+            STATUS_FIXED,
+            "Fixed",
+            STATUS_GOING_ON,
+            "Going On",
+            STATUS_IN_PROGRESS,
+            "In Progress",
+            STATUS_WAITING_STUDENT,
+            "Waiting for Verification",
+        ):
             raise ValueError("Complaint is not pending warden verification.")
 
         is_approved = (
@@ -1234,7 +1264,8 @@ class ComplaintService:
             complaint.warden_verified_by = warden_id
             complaint.warden_verdict = "Verified"
             complaint.warden_notes = (notes or "").strip()
-            complaint.status = STATUS_WAITING_STUDENT
+            complaint.requires_warden_check = False
+            complaint.status = STATUS_FIXED
             complaint.student_stage_at = now_ts
             complaint.verification_due_at = (now() + timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S")
             complaint.add_history(f"Verified in person by Warden {warden_name}: {notes or 'No notes'}")
@@ -1266,38 +1297,24 @@ class ComplaintService:
                 raise ValueError("Notes are mandatory when reporting complaint not fixed.")
 
             complaint.warden_notes = note_txt
-            assignee_id = complaint.assigned_to
-            assignee_u = self.auth_service.get_user(assignee_id) if assignee_id else None
-            assignee_avail = assignee_u and getattr(assignee_u, "active", True) and not getattr(assignee_u, "is_deleted", False) and not self.team_service.is_user_on_leave(assignee_id)
+            complaint.status = STATUS_GOING_ON
+            complaint.add_history(f"Warden {warden_name} inspected in person and found issue NOT fixed: {note_txt}. Work continues under Coordinator.")
+            self.save_complaint(complaint)
 
-            if assignee_avail:
-                complaint.status = STATUS_IN_PROGRESS
-                complaint.add_history(f"Warden {warden_name} inspected in person and found issue NOT fixed: {note_txt}")
-                self.save_complaint(complaint)
-                if assignee_id:
-                    self.notification_service.notify(
-                        assignee_id,
-                        f"RE-WORK REQUIRED: Warden {warden_name} inspected complaint {complaint_id} and reported it not fixed: {note_txt}",
-                        complaint_id=complaint_id,
-                        title="Re-work Required",
-                    )
-            else:
-                complaint.status = STATUS_SUBMITTED
-                complaint.assigned_to = None
-                complaint.awaiting_assign_since = now_ts
-                complaint.assign_escalation_level = 0
-                complaint.add_history(f"Warden {warden_name} found NOT fixed: {note_txt}. Previous worker is unavailable; returned to queue for coordinator to assign.")
-                self.save_complaint(complaint)
-                team = self.team_service.get_team(complaint.team_id) if complaint.team_id else None
+            coord_id = complaint.assigned_to
+            if not coord_id and complaint.team_id and hasattr(self, "team_service"):
+                team = self.team_service.get_team(complaint.team_id)
                 if team:
                     acting_c = self.team_service.get_acting_coordinator(team)
                     if acting_c:
-                        self.notification_service.notify(
-                            acting_c.user_id,
-                            f"Complaint {complaint_id} was rejected by warden and assignee is unavailable. Needs reassignment.",
-                            complaint_id=complaint_id,
-                            title="Re-assign Required",
-                        )
+                        coord_id = acting_c.user_id
+            if coord_id:
+                self.notification_service.notify(
+                    coord_id,
+                    f"RE-WORK REQUIRED: Warden {warden_name} inspected complaint {complaint_id} and reported it not fixed: {note_txt}",
+                    complaint_id=complaint_id,
+                    title="Re-work Required",
+                )
 
         try:
             from utils.websocket_manager import manager
@@ -1335,6 +1352,8 @@ class ComplaintService:
         if not complaint:
             raise ValueError("Complaint not found.")
         if complaint.status not in (
+            STATUS_FIXED,
+            "Fixed",
             Complaint.WAITING_VERIFICATION,
             "Waiting for Verification",
             "Waiting For Verification",
@@ -1434,6 +1453,8 @@ class ComplaintService:
 
         valid_status = False
         if complaint.status in (
+            STATUS_FIXED,
+            "Fixed",
             STATUS_WAITING_STUDENT,
             Complaint.WAITING_VERIFICATION,
             "Waiting for Verification",
@@ -1460,47 +1481,33 @@ class ComplaintService:
         warden_id = getattr(loc, "in_charge_id", None)
 
         if complaint.reopen_count < MAX_REOPENS:
-            assignee_id = complaint.assigned_to
-            assignee_u = self.auth_service.get_user(assignee_id) if assignee_id else None
-            assignee_avail = assignee_u and getattr(assignee_u, "active", True) and not getattr(assignee_u, "is_deleted", False) and not self.team_service.is_user_on_leave(assignee_id)
+            complaint.status = STATUS_GOING_ON
+            complaint.requires_warden_check = True
+            complaint.reopen_notes = reason
+            complaint.add_history(f"Student reported Not Fixed (reopen #{complaint.reopen_count}): {reason}. Status set to Going On. Warden inspection initiated.")
+            self.save_complaint(complaint)
 
-            if assignee_avail:
-                complaint.status = STATUS_REOPENED
-                complaint.add_history(f"Reopened by student {u_name} (reopen #{complaint.reopen_count}): {reason}")
-                self.save_complaint(complaint)
-
-                if complaint.assigned_to:
-                    self.notification_service.notify(
-                        complaint.assigned_to,
-                        f"Complaint {complaint_id} reopened by student (reopen #{complaint.reopen_count}): {reason}",
-                        complaint_id=complaint_id,
-                        title="Complaint Reopened",
-                    )
-            else:
-                complaint.status = STATUS_SUBMITTED
-                complaint.assigned_to = None
-                complaint.awaiting_assign_since = now_string()
-                complaint.assign_escalation_level = 0
-                complaint.add_history(f"Reopened by student {u_name} (reopen #{complaint.reopen_count}): {reason}. Assignee is unavailable; returned to queue for coordinator to assign.")
-                self.save_complaint(complaint)
-
-                team = self.team_service.get_team(complaint.team_id) if complaint.team_id else None
+            coord_id = complaint.assigned_to
+            if not coord_id and complaint.team_id and hasattr(self, "team_service"):
+                team = self.team_service.get_team(complaint.team_id)
                 if team:
                     acting_c = self.team_service.get_acting_coordinator(team)
                     if acting_c:
-                        self.notification_service.notify(
-                            acting_c.user_id,
-                            f"Complaint {complaint_id} was reopened by student and assignee is unavailable. Needs reassignment.",
-                            complaint_id=complaint_id,
-                            title="Re-assign Required",
-                        )
+                        coord_id = acting_c.user_id
+            if coord_id:
+                self.notification_service.notify(
+                    coord_id,
+                    f"Complaint {complaint_id} reported Not Fixed by student: {reason}. Work must continue under Coordinator.",
+                    complaint_id=complaint_id,
+                    title="Complaint Not Fixed",
+                )
 
             if warden_id:
                 self.notification_service.notify(
                     warden_id,
-                    f"Complaint {complaint_id} in your location was reopened by student (reopen #{complaint.reopen_count}): {reason}",
+                    f"DISPUTE / INSPECTION REQUIRED: Student reported complaint {complaint_id} Not Fixed: {reason}. Please inspect on-site.",
                     complaint_id=complaint_id,
-                    title="Complaint Reopened",
+                    title="Warden Inspection Required",
                 )
             event_name = "complaint_reopened"
         else:
@@ -1565,7 +1572,9 @@ class ComplaintService:
         admin_id = getattr(admin_user, "user_id", str(admin_user))
         admin_name = getattr(admin_user, "name", admin_id)
 
-        if complaint.status not in (STATUS_ADMIN_REVIEW, "Admin Review"):
+        if complaint.status not in (STATUS_ADMIN_REVIEW, "Admin Review") and not (
+            complaint.reopen_count >= MAX_REOPENS and getattr(complaint, "admin_review_reason", None)
+        ):
             raise ValueError("Complaint is not in Admin Review status.")
 
         d_norm = (decision or "").strip().lower()
@@ -2588,10 +2597,8 @@ class ComplaintService:
         complaint = self.get_complaint(complaint_id)
         if not complaint:
             raise ValueError("Complaint not found.")
-        if complaint.status not in (Complaint.ASSIGNED, Complaint.REOPENED, Complaint.SUBMITTED):
-            raise ValueError("Complaint must be Assigned, Submitted, or Reopened before starting work.")
-        if complaint.assigned_to and complaint.assigned_to != coordinator_id:
-            raise ValueError("You can only work on complaints assigned to you.")
+        if complaint.status not in (Complaint.ASSIGNED, Complaint.REOPENED, Complaint.SUBMITTED, STATUS_RAISED, "Complaint Raised", STATUS_GOING_ON, "Going On"):
+            raise ValueError("Complaint must be in Complaint Raised or Going On before starting work.")
 
         if not complaint.assigned_at:
             complaint.assigned_at = now_string()

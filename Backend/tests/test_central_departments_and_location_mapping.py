@@ -37,8 +37,13 @@ def test_scenario_1_to_4_central_department_creation_and_multi_location_mapping(
     3. Associate the same Electrical department with Hostel 2.
     4. Verify that only one Electrical department record exists.
     """
-    # 1. Create a new central department
+    from api.dependencies import get_auth_service
+    auth_svc = get_auth_service()
     dept_name = "Central Robotics & Automation"
+    with auth_svc._connect() as conn:
+        conn.execute("DELETE FROM location_departments WHERE department_id IN (SELECT department_id FROM departments WHERE lower(name) = lower(?))", (dept_name,))
+        conn.execute("DELETE FROM departments WHERE lower(name) = lower(?)", (dept_name,))
+        conn.commit()
     res = client.post(
         "/departments",
         json={
@@ -120,10 +125,10 @@ def test_scenario_5_to_7_dissociation_and_complaint_filtering(admin_hdr, student
     h2_depts = [d["department_id"] for d in res.json()]
     assert dept_id in h2_depts, "Department must still be offered at Hostel 2"
 
-    # Restore Electrical mapping to Hostel 1 for subsequent tests
+    # Restore Electrical mapping for subsequent tests
     client.put(
         f"/departments/{dept_id}/locations",
-        json={"location_ids": ["LOC_HOSTEL_1", "LOC_HOSTEL_2"]},
+        json={"location_ids": ["LOC_HOSTEL_1", "LOC_HOSTEL_2", "LOC_ACADEMIC_1", "LOC_ACADEMIC_2", "LOC_SAC_1", "LOC_SAC_2", "LOC_SPORTS_1", "LOC_SPORTS_2", "LOC_OTHER"]},
         headers=admin_hdr,
     )
 
@@ -135,17 +140,12 @@ def test_scenario_8_reject_unassociated_department_complaint(student_hdr, admin_
     Backend must return HTTP 400 Bad Request with an informative error message.
     """
     # DEPT_SAC_AV is for SAC, not associated with LOC_HOSTEL_1
-    # Verify DEPT_SAC_AV is not associated with LOC_HOSTEL_1
-    res = client.get("/departments/DEPT_SAC_AV/locations", headers=admin_hdr)
-    assert res.status_code == 200
-    loc_ids = res.json().get("location_ids", [])
-    if "LOC_HOSTEL_1" in loc_ids:
-        # Disassociate it
-        client.put(
-            "/departments/DEPT_SAC_AV/locations",
-            json={"location_ids": [l for l in loc_ids if l != "LOC_HOSTEL_1"]},
-            headers=admin_hdr,
-        )
+    # Ensure DEPT_SAC_AV is actively mapped to LOC_SAC_1 only
+    client.put(
+        "/departments/DEPT_SAC_AV/locations",
+        json={"location_ids": ["LOC_SAC_1"]},
+        headers=admin_hdr,
+    )
 
     # Attempt to submit complaint to LOC_HOSTEL_1 with DEPT_SAC_AV
     res = client.post(

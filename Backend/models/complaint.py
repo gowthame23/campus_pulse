@@ -32,7 +32,7 @@ class Complaint:
     ASSIGNED = "Going On"
     IN_PROGRESS = "Going On"
     RESOLVED = "Fixed"
-    BLOCKED = "Going On"
+    BLOCKED = "Waiting for Parts"
     WAITING_VERIFICATION = "Fixed"
     PENDING_WARDEN_VERIFICATION = "Fixed"
     CLOSED = "Fixed"

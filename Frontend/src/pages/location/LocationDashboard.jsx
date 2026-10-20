@@ -163,7 +163,8 @@ export default function LocationDashboard() {
   // Filter complaints needing this warden's verification
   const needsMyVerificationComplaints = useMemo(() => {
     return complaints.filter((c) => {
-      if (c.status !== "Pending Warden Verification") return false;
+      const needsInspection = Boolean(c.requires_warden_check || c.status === "Pending Warden Verification");
+      if (!needsInspection) return false;
       if (user?.location_id && c.location_id !== user.location_id) return false;
       return true;
     });

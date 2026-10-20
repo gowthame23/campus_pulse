@@ -4,6 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from core.constants import (
+    STATUS_RAISED,
+    STATUS_GOING_ON,
+    STATUS_FIXED,
     INACTIVE_STATUSES,
     STATUS_CLOSED,
     STATUS_AUTO_CLOSED,
@@ -1804,6 +1807,8 @@ def resolve_complaint(
             status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found."
         )
     if complaint.status not in (
+        STATUS_GOING_ON,
+        "Going On",
         Complaint.IN_PROGRESS,
         Complaint.ASSIGNED,
         "In Progress",
@@ -1812,7 +1817,7 @@ def resolve_complaint(
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Complaint must be In Progress or Assigned before it can be resolved.",
+            detail="Complaint must be Going On before it can be resolved.",
         )
 
     u_role = current_user.role.lower()

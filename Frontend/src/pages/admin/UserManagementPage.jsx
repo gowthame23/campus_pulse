@@ -205,8 +205,8 @@ export default function UserManagementPage() {
       },
       {
         key: "staff",
-        label: "Employees & Coordinators",
-        subLabel: "Department Coordinators & Maintenance Staff",
+        label: "Coordinators",
+        subLabel: "Department Coordinators",
         icon: Wrench,
       },
       {
@@ -3567,7 +3567,7 @@ export default function UserManagementPage() {
                   onChange={(e) => setSelectedRespRole(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 font-semibold"
                 >
-                  <option value="employee">Employee (Operational & Technical Staff)</option>
+                  
                   <option value="coordinator">Coordinator (Department Coordinator)</option>
                   <option value="location_in_charge">Location In-Charge / Warden</option>
                   <option value="app_manager">App Manager</option>

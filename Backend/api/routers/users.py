@@ -537,7 +537,7 @@ def update_user_responsibility_and_role(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot alter administrator system role.",
             )
-        valid_roles = ("employee", "coordinator", "location_in_charge", "app_manager", "student")
+        valid_roles = ("coordinator", "location_in_charge", "app_manager", "student", "administrator")
         if new_role not in valid_roles:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
