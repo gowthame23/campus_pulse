@@ -47,13 +47,68 @@ def _get_db_conn():
     return conn
 
 
-SESSION_LIFETIME = 604800  # 7 days (604,800 seconds)
+SESSION_LIFETIME = 604800  # 7 days (604,800 seconds) -- idle/sliding renewal window
+# Hard ceiling on a session's total lifetime from creation, independent of how
+# often it is used. Without this, the sliding renewal below would let a
+# session (and therefore a stolen token) stay valid forever as long as it's
+# used once every few days.
+ABSOLUTE_MAX_LIFETIME = 30 * 86400  # 30 days
 
 
-def create_session(user):
+def _parse_user_agent(ua: str):
+    """Best-effort device/browser/OS extraction from a User-Agent header.
+    No external dependency; good enough for the sessions/devices list to show
+    genuine info instead of a hardcoded placeholder."""
+    ua = ua or ""
+    ua_l = ua.lower()
+
+    if "windows" in ua_l:
+        os_name = "Windows"
+    elif "mac os" in ua_l or "macintosh" in ua_l:
+        os_name = "macOS"
+    elif "android" in ua_l:
+        os_name = "Android"
+    elif "iphone" in ua_l or "ipad" in ua_l or "ios" in ua_l:
+        os_name = "iOS"
+    elif "linux" in ua_l:
+        os_name = "Linux"
+    else:
+        os_name = "Unknown"
+
+    if "edg/" in ua_l:
+        browser = "Edge"
+    elif "chrome/" in ua_l and "chromium" not in ua_l:
+        browser = "Chrome"
+    elif "firefox/" in ua_l:
+        browser = "Firefox"
+    elif "safari/" in ua_l and "chrome/" not in ua_l:
+        browser = "Safari"
+    else:
+        browser = "Unknown"
+
+    device_type = "Mobile" if ("mobile" in ua_l or "android" in ua_l or "iphone" in ua_l) else "Desktop"
+    device_name = f"{browser} on {os_name}"
+    return device_name, device_type, browser, os_name
+
+
+def _client_ip(request: Optional[Request]):
+    if not request:
+        return "unknown"
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def create_session(user, request: Optional[Request] = None):
     token = token_urlsafe(32)
     created_ts = time.time()
     expires_ts = created_ts + SESSION_LIFETIME
+
+    ip_address = _client_ip(request)
+    device_name, device_type, browser, os_name = _parse_user_agent(
+        request.headers.get("user-agent") if request else None
+    )
 
     conn = _get_db_conn()
     try:
@@ -66,11 +121,16 @@ def create_session(user):
                 """
                 INSERT OR REPLACE INTO user_sessions
                 (session_id, user_id, device_name, device_type, browser, operating_system, ip_address, country, city, login_time, last_activity, expires_at, status, created_at)
-                VALUES (?, ?, 'Web Browser', 'Desktop', 'Chrome', 'Windows', '127.0.0.1', 'India', 'Campus City', ?, ?, ?, 'Active', ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, 'Active', ?)
                 """,
                 (
                     hash_token(token),
                     user.user_id,
+                    device_name,
+                    device_type,
+                    browser,
+                    os_name,
+                    ip_address,
                     now_string(),
                     now_string(),
                     str(expires_ts),
@@ -188,7 +248,7 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token."
         )
 
-    if time.time() - session["created_at"] > SESSION_LIFETIME:
+    if time.time() - session["created_at"] > ABSOLUTE_MAX_LIFETIME:
         delete_session(token)
         logger.warning(
             f"Authentication Failed - Session expired. User ID: {session['user_id']} | Path: {request.url.path}"
