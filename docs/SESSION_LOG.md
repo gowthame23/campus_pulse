@@ -769,4 +769,18 @@
 
 ---
 
+### Entry 49 — Unified Auth UI Styling (Language & Theme Parity with Login)
+* **User Directive:** "the language and the theme should be like the login page onlt"
+* **Issues Addressed & Actions Taken:**
+  1. **ForgotPasswordPage UI Alignment with LoginPage (`Frontend/src/pages/auth/ForgotPasswordPage.jsx`):**
+     - Replaced the bulky button rows (`[English | Telugu | Hindi]` and `[Light | Dark | System]`) at the top of the Reset Password page with the identical controls from `LoginPage.jsx`:
+       - Language: Compact, elegant dropdown pill in the top-right corner of the viewport (`fixed top-4 right-4 z-30`).
+       - Theme: Single icon toggle button (`Sun` / `Moon`) positioned directly in the top-right corner inside the card (`absolute top-3.5 right-3.5 z-20`).
+  2. **Build & Quality Assurance:**
+     - Executed production build (`npm run build`): completed in 1.17s with 0 errors.
+     - Database confirmed at baseline: **0 complaints, 0 attachments, 0 notifications, 0 FK errors**.
+     - Changes committed and pushed to remote `main`.
+
+---
+
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
