@@ -1556,7 +1556,7 @@ def assign_complaint(
 
     complaint_id: str,
     payload: ComplaintAssignRequest,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_roles(Administrator.ROLE, Coordinator.ROLE, Employee.ROLE, AppManager.ROLE)),
     complaint_service=Depends(get_complaint_service),
     audit_service=Depends(get_audit_service),
 ):

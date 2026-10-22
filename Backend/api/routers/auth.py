@@ -55,6 +55,7 @@ def login(
 ):
     identity = (payload.username or payload.email or "").strip()
     password = (payload.password or "").strip()
+    client_ip = request.client.host if request.client else "unknown"
 
     if not identity:
         raise HTTPException(
@@ -68,8 +69,8 @@ def login(
         )
 
     try:
-        user = auth_service.authenticate(identity, password)
-        access_token = create_session(user)
+        user = auth_service.authenticate(identity, password, ip=client_ip)
+        access_token = create_session(user, request=request)
         is_secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
         response.set_cookie(
             key="session_token",
@@ -80,7 +81,6 @@ def login(
             max_age=604800,  # 7 days
             path="/",
         )
-        client_ip = request.client.host if request.client else "unknown"
         from middleware.rate_limiter import record_login_attempt
         record_login_attempt(client_ip, identity, success=True)
 
@@ -102,7 +102,6 @@ def login(
             "permissions": get_role_permissions(user.role),
         }
     except PermissionError as p_err:
-        client_ip = request.client.host if request.client else "unknown"
         from middleware.rate_limiter import record_login_attempt
         record_login_attempt(client_ip, identity, success=False)
         audit_service.log(
@@ -114,7 +113,6 @@ def login(
         )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(p_err))
     except ValueError as error:
-        client_ip = request.client.host if request.client else "unknown"
         from middleware.rate_limiter import record_login_attempt
         record_login_attempt(client_ip, identity, success=False)
         detail_msg = str(error)
@@ -307,7 +305,6 @@ def request_password_reset(
     return {
         "reset_id": reset_id,
         "message": "If the account exists, reset instructions have been sent to your email.",
-        "simulated_otp": otp,
     }
 
 

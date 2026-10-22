@@ -41,9 +41,15 @@ export default function Table({ columns = [], rows, data, getRowKey, pageSize = 
     setPage(1);
   };
 
+  const cellValue = (column, row) =>
+    column.render
+      ? column.render(row)
+      : (row[column.key] ?? (column.accessor ? row[column.accessor] : ""));
+
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#101726] shadow-2xs transition-shadow duration-200">
-      <div className="overflow-x-auto">
+      {/* Desktop/tablet: standard scrollable table (sm and up) */}
+      <div className="hidden overflow-x-auto sm:block">
         <table className="min-w-full divide-y divide-slate-100 dark:divide-slate-800/80 text-sm">
           <thead className="bg-slate-50/80 dark:bg-slate-800/50 text-left text-[11px] uppercase font-semibold tracking-wider text-slate-500 dark:text-slate-400">
             <tr>
@@ -119,9 +125,7 @@ export default function Table({ columns = [], rows, data, getRowKey, pageSize = 
                       key={column.key || column.accessor || column.header || colIdx}
                       className="px-4 py-3.5 text-slate-700 dark:text-slate-200 font-medium"
                     >
-                      {column.render
-                        ? column.render(row)
-                        : (row[column.key] ?? (column.accessor ? row[column.accessor] : ""))}
+                      {cellValue(column, row)}
                     </td>
                   ))}
                 </tr>
@@ -129,6 +133,52 @@ export default function Table({ columns = [], rows, data, getRowKey, pageSize = 
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile: one stacked card per row instead of a cramped, sideways-scrolling
+          table -- a tiny horizontally-scrolled grid is the #1 "this is awkward
+          on my phone" complaint for data tables, so below `sm` every row
+          becomes a label/value card instead. */}
+      <div className="divide-y divide-slate-100 dark:divide-slate-800/80 sm:hidden">
+        {visibleRows.length === 0 ? (
+          <div className="px-4 py-8 text-center text-slate-400 dark:text-slate-500 font-medium text-sm">
+            No matching records found.
+          </div>
+        ) : (
+          visibleRows.map((row, rowIdx) => {
+            const actionsColumn = columns.find((c) => (c.key || c.accessor) === "actions");
+            const infoColumns = columns.filter((c) => c !== actionsColumn);
+            return (
+              <div
+                key={getRowKey ? getRowKey(row) : (row.user_id || row.id || row.complaint_id || rowIdx)}
+                className="flex flex-col gap-2 p-4 active:bg-slate-50 dark:active:bg-slate-800/40"
+              >
+                {infoColumns.map((column, colIdx) => {
+                  const value = cellValue(column, row);
+                  if (value === null || value === undefined || value === "") return null;
+                  return (
+                    <div
+                      key={column.key || column.accessor || column.header || colIdx}
+                      className="flex items-start justify-between gap-3 text-sm"
+                    >
+                      <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 pt-0.5">
+                        {column.header}
+                      </span>
+                      <span className="text-right text-slate-700 dark:text-slate-200 font-medium min-w-0">
+                        {value}
+                      </span>
+                    </div>
+                  );
+                })}
+                {actionsColumn && (
+                  <div className="mt-1 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800 pt-2.5">
+                    {cellValue(actionsColumn, row)}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800 px-4 py-3 text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-[#101726]">

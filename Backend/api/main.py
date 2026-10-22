@@ -82,7 +82,13 @@ if not cors_origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_origin_regex=r"https://.*\.vercel\.app|http://localhost:\d+|http://127\.0\.0\.1:\d+",
+    # Only ever matches localhost/127.0.0.1 dev ports. Any other allowed origin
+    # (including the production Vercel domain) must be listed explicitly in
+    # cors_origins / CORS_ORIGINS -- do NOT widen this to a wildcard TLD like
+    # `*.vercel.app`: with allow_credentials=True that would let anyone who
+    # registers a free subdomain on that host send credentialed requests
+    # (cookies included) to this API from attacker-controlled JS.
+    allow_origin_regex=r"http://localhost:\d+|http://127\.0\.0\.1:\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

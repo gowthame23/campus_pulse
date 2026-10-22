@@ -38,7 +38,6 @@ class PasswordResetStartRequest(BaseModel):
 class PasswordResetStartResponse(BaseModel):
     reset_id: str
     message: str
-    simulated_otp: Optional[str] = None
 
 
 class PasswordResetVerifyRequest(BaseModel):

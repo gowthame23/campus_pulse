@@ -16,6 +16,7 @@ from models.student import Student
 from models.user import User
 from storage.sqlite_repository import SQLiteRepository
 from utils.helper import generate_id, now_string
+from utils.logger import get_logger
 from utils.passwords import (
     generate_temp_password,
     hash_password,
@@ -26,6 +27,7 @@ from utils.passwords import (
 )
 
 _DUMMY_PASSWORD_HASH = hash_password("timing-equalization-only")
+logger = get_logger(__name__)
 
 class AuthService:
     EMAIL_REGEX = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
@@ -172,7 +174,8 @@ class AuthService:
                 "class": User,
                 "name": "Platform Super Admin",
                 "email": os.environ.get("SUPER_ADMIN_EMAIL", "superadmin@campuspulse.edu"),
-                "password": os.environ.get("SUPER_ADMIN_PASSWORD", "Superadmin@123"),
+                "password_env": "SUPER_ADMIN_PASSWORD",
+                "default_password": "Superadmin@123",
                 "first_login": False,
                 "kwargs": {"role": "super_admin"},
             },
@@ -181,7 +184,8 @@ class AuthService:
                 "class": Administrator,
                 "name": "Platform Administrator",
                 "email": os.environ.get("ADMIN_EMAIL", "gowthamejjurothu@gmail.com"),
-                "password": os.environ.get("ADMIN_PASSWORD", "Admin@123"),
+                "password_env": "ADMIN_PASSWORD",
+                "default_password": "Admin@123",
                 "first_login": False,
                 "kwargs": {},
             },
@@ -190,7 +194,8 @@ class AuthService:
                 "class": AppManager,
                 "name": "App Manager 1",
                 "email": os.environ.get("MANAGER_EMAIL", "ejjurothugowtham@gmail.com"),
-                "password": os.environ.get("MANAGER_PASSWORD", "Manager@123"),
+                "password_env": "MANAGER_PASSWORD",
+                "default_password": "Manager@123",
                 "first_login": False,
                 "kwargs": {
                     "location_id": "LOC_HOSTEL_1",
@@ -202,7 +207,8 @@ class AuthService:
                 "class": AppManager,
                 "name": "App Manager 2",
                 "email": os.environ.get("MANAGER_2_EMAIL", "appmanager2@campus.edu"),
-                "password": os.environ.get("MANAGER_2_PASSWORD", "Manager@123"),
+                "password_env": "MANAGER_2_PASSWORD",
+                "default_password": "Manager@123",
                 "first_login": False,
                 "kwargs": {
                     "location_id": "LOC_HOSTEL_2",
@@ -214,7 +220,8 @@ class AuthService:
                 "class": Coordinator,
                 "name": "Coordinator 1",
                 "email": "coordinator1@campuspulse.edu",
-                "password": "Coord@123",
+                "password_env": None,
+                "default_password": "Coord@123",
                 "first_login": False,
                 "kwargs": {},
             },
@@ -223,7 +230,8 @@ class AuthService:
                 "class": Coordinator,
                 "name": "Coordinator 2",
                 "email": "coordinator2@campuspulse.edu",
-                "password": "Coord@123",
+                "password_env": None,
+                "default_password": "Coord@123",
                 "first_login": False,
                 "kwargs": {},
             },
@@ -232,7 +240,8 @@ class AuthService:
                 "class": Student,
                 "name": "Student 1",
                 "email": os.environ.get("STUDENT_EMAIL", "gowtham.e23@iiits.in"),
-                "password": os.environ.get("STUDENT_PASSWORD", "Student@123"),
+                "password_env": "STUDENT_PASSWORD",
+                "default_password": "Student@123",
                 "first_login": False,
                 "kwargs": {"location_id": "LOC_HOSTEL_1"},
             },
@@ -241,7 +250,8 @@ class AuthService:
                 "class": Student,
                 "name": "Student 2",
                 "email": "student2@campus.edu",
-                "password": "Student@123",
+                "password_env": None,
+                "default_password": "Student@123",
                 "first_login": False,
                 "kwargs": {"location_id": "LOC_HOSTEL_2"},
             },
@@ -250,7 +260,8 @@ class AuthService:
                 "class": LocationInCharge,
                 "name": "Warden 1",
                 "email": os.environ.get("WARDEN_EMAIL", "naveen@campus.edu"),
-                "password": os.environ.get("WARDEN_PASSWORD", "Warden@123"),
+                "password_env": "WARDEN_PASSWORD",
+                "default_password": "Warden@123",
                 "first_login": False,
                 "kwargs": {
                     "location_id": "LOC_HOSTEL_1",
@@ -262,7 +273,8 @@ class AuthService:
                 "class": LocationInCharge,
                 "name": "Warden 2",
                 "email": os.environ.get("WARDEN_2_EMAIL", "warden2@campus.edu"),
-                "password": os.environ.get("WARDEN_2_PASSWORD", "Warden@123"),
+                "password_env": "WARDEN_2_PASSWORD",
+                "default_password": "Warden@123",
                 "first_login": False,
                 "kwargs": {
                     "location_id": "LOC_HOSTEL_2",
@@ -281,11 +293,38 @@ class AuthService:
         }
 
         is_production = os.environ.get("ENVIRONMENT", "").lower() == "production"
+        # Local/demo convenience: explicitly opt in (e.g. in your local .env, or
+        # set by tests/conftest.py) to keep the well-known Admin@123-style demo
+        # passwords for a fresh non-production database. Without this flag, a
+        # fresh non-production boot that wasn't given an explicit password env
+        # var gets a random one instead of a predictable default -- so
+        # forgetting ENVIRONMENT=production on a real deployment no longer
+        # hands out documented, guessable admin credentials.
+        allow_demo_passwords = os.environ.get("ALLOW_DEMO_SEED_PASSWORDS", "").lower() in ("1", "true", "yes")
         for spec in seed_users_spec:
+            explicit_password = os.environ.get(spec["password_env"]) if spec.get("password_env") else None
+            force_first_login = False
+
             if is_production:
                 spec["password"] = os.environ.get(f"SEED_{spec['id']}_PASSWORD")
                 if not spec["password"]:
                     continue
+            elif explicit_password:
+                spec["password"] = explicit_password
+            elif allow_demo_passwords:
+                spec["password"] = spec["default_password"]
+            else:
+                spec["password"] = generate_temp_password()
+                force_first_login = True
+                env_note = (
+                    f"no {spec['password_env']} set and" if spec.get("password_env")
+                    else "no explicit password configured and"
+                )
+                logger.warning(
+                    f"{env_note} ALLOW_DEMO_SEED_PASSWORDS is not enabled -- generated a random "
+                    f"first-login password for {spec['id']} ({spec['email']}): {spec['password']}"
+                )
+
             email_lower = spec["email"].strip().lower()
             target_user = user_by_id.get(spec["id"]) or user_by_email.get(email_lower)
 
@@ -295,7 +334,7 @@ class AuthService:
                     spec["name"],
                     spec["email"],
                     hash_password(spec["password"]),
-                    first_login=spec["first_login"],
+                    first_login=spec["first_login"] or force_first_login,
                     status="Active",
                     **spec["kwargs"],
                 ).to_dict()
@@ -1164,7 +1203,7 @@ class AuthService:
             "student@example.com": "USR_STUDENT",
             "warden@example.com": "USR_WARDEN",
             "manager@example.com": "USR_MANAGER",
-            "coordinator@example.com": "USR_EMP_A1",
+            "coordinator@example.com": "USR_COORD_1",
         }
         alias_target = legacy_test_aliases.get(clean_id.lower())
         if alias_target:
@@ -1183,20 +1222,52 @@ class AuthService:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS login_attempts (
-                identity TEXT PRIMARY KEY,
+                identity TEXT NOT NULL,
+                ip TEXT NOT NULL DEFAULT 'unknown',
                 failed_count INTEGER NOT NULL DEFAULT 0,
                 locked_until REAL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (identity, ip)
             )
             """
         )
+        # Migrate any pre-existing table from the old (identity-only PK, no
+        # `ip` column) schema. Lockout state is short-lived/non-critical, so
+        # a clean rebuild (rather than a data-preserving ALTER) is safe here.
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(login_attempts)").fetchall()}
+        if "ip" not in cols:
+            with conn:
+                conn.execute("ALTER TABLE login_attempts RENAME TO login_attempts_old")
+                conn.execute(
+                    """
+                    CREATE TABLE login_attempts (
+                        identity TEXT NOT NULL,
+                        ip TEXT NOT NULL DEFAULT 'unknown',
+                        failed_count INTEGER NOT NULL DEFAULT 0,
+                        locked_until REAL,
+                        updated_at TEXT NOT NULL,
+                        PRIMARY KEY (identity, ip)
+                    )
+                    """
+                )
+                conn.execute("DROP TABLE login_attempts_old")
         return conn
 
-    def _check_login_lockout(self, identity):
+    @staticmethod
+    def _norm_ip(ip):
+        # Keyed per (identity, ip) so an attacker who doesn't control the
+        # victim's IP can only lock out login attempts *from their own IP*,
+        # never the victim's real account/IP -- it can no longer be used to
+        # remotely deny a legitimate user access to their own account.
+        return (ip or "unknown").strip() or "unknown"
+
+    def _check_login_lockout(self, identity, ip=None):
         import time
+        ip = self._norm_ip(ip)
         with self._login_attempts_conn() as conn:
             row = conn.execute(
-                "SELECT locked_until FROM login_attempts WHERE identity = ?", (identity,)
+                "SELECT locked_until FROM login_attempts WHERE identity = ? AND ip = ?",
+                (identity, ip),
             ).fetchone()
             if row and row["locked_until"] and time.time() < row["locked_until"]:
                 wait_seconds = int(row["locked_until"] - time.time())
@@ -1204,12 +1275,14 @@ class AuthService:
                     f"Too many failed login attempts. Try again in {wait_seconds} seconds."
                 )
 
-    def _register_login_failure(self, identity):
+    def _register_login_failure(self, identity, ip=None):
         import time
+        ip = self._norm_ip(ip)
         now_ts = time.time()
         with self._login_attempts_conn() as conn:
             row = conn.execute(
-                "SELECT failed_count FROM login_attempts WHERE identity = ?", (identity,)
+                "SELECT failed_count FROM login_attempts WHERE identity = ? AND ip = ?",
+                (identity, ip),
             ).fetchone()
             failed_count = (row["failed_count"] if row else 0) + 1
             locked_until = None
@@ -1223,37 +1296,47 @@ class AuthService:
                 locked_until = now_ts + duration
             conn.execute(
                 """
-                INSERT INTO login_attempts (identity, failed_count, locked_until, updated_at)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(identity) DO UPDATE SET
+                INSERT INTO login_attempts (identity, ip, failed_count, locked_until, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(identity, ip) DO UPDATE SET
                     failed_count = excluded.failed_count,
                     locked_until = excluded.locked_until,
                     updated_at = excluded.updated_at
                 """,
-                (identity, failed_count, locked_until, now_string()),
+                (identity, ip, failed_count, locked_until, now_string()),
             )
 
-    def _clear_login_failures(self, identity):
+    def _clear_login_failures(self, identity, ip=None):
         with self._login_attempts_conn() as conn:
-            conn.execute("DELETE FROM login_attempts WHERE identity = ?", (identity,))
+            if ip is None:
+                # Successful login/password change clears every IP's failure
+                # count for this identity -- clearing is not attacker-triggerable
+                # on its own, so this stays safe while letting a legitimate user
+                # who just proved their password recover from any stray lockouts.
+                conn.execute("DELETE FROM login_attempts WHERE identity = ?", (identity,))
+            else:
+                conn.execute(
+                    "DELETE FROM login_attempts WHERE identity = ? AND ip = ?",
+                    (identity, self._norm_ip(ip)),
+                )
 
-    def authenticate(self, identity_or_email, password):
+    def authenticate(self, identity_or_email, password, ip=None):
         if not identity_or_email or not str(identity_or_email).strip():
             raise ValueError("Username is required.")
         if not password or not str(password).strip():
             raise ValueError("Password is required.")
 
         identity = str(identity_or_email).strip().lower()
-        self._check_login_lockout(identity)
+        self._check_login_lockout(identity, ip=ip)
 
         user = self.get_user_by_identity(identity_or_email)
         if not user or user.is_deleted:
             verify_password(password, _DUMMY_PASSWORD_HASH)
-            self._register_login_failure(identity)
+            self._register_login_failure(identity, ip=ip)
             raise ValueError("Invalid credentials.")
 
         if not user.check_password(password):
-            self._register_login_failure(identity)
+            self._register_login_failure(identity, ip=ip)
             raise ValueError("Invalid credentials.")
 
         if user.status in (User.STATUS_INACTIVE, User.STATUS_SUSPENDED, User.STATUS_ARCHIVED) or not user.active:

@@ -14,6 +14,13 @@ BASE_DB_PATH = os.path.join(ROOT, "storage", "campus_pulse.db")
 # Force DATABASE_PATH to pytest_isolated.db at import time so tests never touch main campus_pulse.db
 os.environ["DATABASE_PATH"] = TEST_DB_PATH
 
+# The full suite logs in as the seeded demo accounts (admin@..., coordinator1@...,
+# etc.) with their documented default passwords. Outside of tests, AuthService
+# only grants those well-known passwords when this flag is explicitly set --
+# otherwise a fresh non-production boot gets a random, first-login-forced
+# password instead. Tests are not a real deployment, so opt in here.
+os.environ.setdefault("ALLOW_DEMO_SEED_PASSWORDS", "true")
+
 
 def _cleanup_isolated_db():
     for ext in ["", "-wal", "-shm", "-journal"]:
