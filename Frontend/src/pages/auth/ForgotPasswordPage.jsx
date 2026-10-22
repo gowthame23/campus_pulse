@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import {
@@ -10,8 +10,9 @@ import {
   Loader2,
   Sun,
   Moon,
-  Monitor,
   Globe,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import Button from "../../components/Button.jsx";
 import Input from "../../components/Input.jsx";
@@ -20,9 +21,27 @@ import { authService } from "../../services/authService.js";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import { useLanguage } from "../../context/LanguageContext.jsx";
 
+const LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "te", label: "తెలుగు" },
+  { code: "hi", label: "हिन्दी" },
+];
+
 export default function ForgotPasswordPage() {
-  const { themeMode, setThemeMode } = useTheme();
+  const { setThemeMode, activeTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const langRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (langRef.current && !langRef.current.contains(e.target)) {
+        setLangMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
   const [step, setStep] = useState(1);
   const [resetId, setResetId] = useState("");
   const [resetToken, setResetToken] = useState("");
@@ -86,95 +105,63 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950 px-4 py-12 transition-colors">
-      {/* Top Right Controls: Compact Language Selector & Compact Theme Selector */}
-      <div className="absolute top-4 right-4 flex items-center gap-2 flex-wrap justify-end z-20">
-        {/* Compact Language Selector */}
-        <div className="flex items-center gap-0.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 p-0.5 shadow-xs backdrop-blur-xs">
+    <main className="relative flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 px-4 py-12 transition-colors duration-200">
+      {/* Top-Right Corner outside the box: Compact Language Dropdown (Exact match to Login Page) */}
+      <div className="fixed top-4 right-4 z-30" ref={langRef}>
+        <div className="relative">
           <button
             type="button"
-            onClick={() => setLanguage("en")}
-            title="English"
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
-              language === "en"
-                ? "bg-primary text-white shadow-2xs"
-                : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
+            onClick={() => setLangMenuOpen((prev) => !prev)}
+            className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 hover:bg-white dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 shadow-xs backdrop-blur-xs transition-colors cursor-pointer"
+            title="Select language"
+            aria-label="Select language"
           >
-            <Globe className="h-3 w-3" />
-            <span>English</span>
+            <Globe className="h-3.5 w-3.5 text-primary" />
+            <span>{LANGUAGES.find((l) => l.code === language)?.label || "English"}</span>
+            <ChevronDown className={`h-3 w-3 text-slate-400 transition-transform ${langMenuOpen ? "rotate-180" : ""}`} />
           </button>
-          <button
-            type="button"
-            onClick={() => setLanguage("te")}
-            title="తెలుగు (Telugu)"
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
-              language === "te"
-                ? "bg-primary text-white shadow-2xs"
-                : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            <span>తెలుగు</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setLanguage("hi")}
-            title="हिन्दी (Hindi)"
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
-              language === "hi"
-                ? "bg-primary text-white shadow-2xs"
-                : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            <span>हिन्दी</span>
-          </button>
-        </div>
 
-        {/* Compact Theme Selector */}
-        <div className="flex items-center gap-0.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 p-0.5 shadow-xs backdrop-blur-xs">
-          <button
-            type="button"
-            onClick={() => setThemeMode("light")}
-            title="Light Theme"
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
-              themeMode === "light"
-                ? "bg-primary text-white shadow-2xs"
-                : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            <Sun className="h-3 w-3" />
-            <span>Light</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setThemeMode("dark")}
-            title="Dark Theme"
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
-              themeMode === "dark"
-                ? "bg-primary text-white shadow-2xs"
-                : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            <Moon className="h-3 w-3" />
-            <span>Dark</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setThemeMode("system")}
-            title="System Default Theme"
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-all cursor-pointer ${
-              themeMode === "system"
-                ? "bg-primary text-white shadow-2xs"
-                : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            <Monitor className="h-3 w-3" />
-            <span>System</span>
-          </button>
+          {langMenuOpen && (
+            <div className="absolute right-0 mt-1 w-28 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg py-1 z-30 animate-in fade-in zoom-in-95 duration-100">
+              {LANGUAGES.map((l) => (
+                <button
+                  key={l.code}
+                  type="button"
+                  onClick={() => {
+                    setLanguage(l.code);
+                    setLangMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-medium text-left transition-colors cursor-pointer ${
+                    language === l.code
+                      ? "bg-primary/10 text-primary font-bold"
+                      : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <span>{l.label}</span>
+                  {language === l.code && <Check className="h-3.5 w-3.5 text-primary" />}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="w-full max-w-[420px] rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-md md:p-8 animate-in fade-in duration-200">
+      <div className="relative w-full max-w-[420px] rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-md md:p-8 animate-in fade-in duration-200">
+        {/* Single Theme Toggle Button inside corner of Card (Exact match to Login Page) */}
+        <button
+          type="button"
+          onClick={() => setThemeMode(activeTheme === "dark" ? "light" : "dark")}
+          title={activeTheme === "dark" ? "Switch to Light mode" : "Switch to Dark mode"}
+          aria-label="Toggle theme"
+          className="absolute top-3.5 right-3.5 z-20 flex items-center justify-center h-8 w-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+        >
+          {activeTheme === "dark" ? (
+            <Sun className="h-4 w-4 text-amber-400" />
+          ) : (
+            <Moon className="h-4 w-4 text-slate-600" />
+          )}
+        </button>
+
         {/* Header Section */}
         <div className="mb-6 text-center">
           <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary font-semibold text-lg shadow-sm">
