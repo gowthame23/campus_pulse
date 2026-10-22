@@ -88,7 +88,7 @@ app.add_middleware(
     # `*.vercel.app`: with allow_credentials=True that would let anyone who
     # registers a free subdomain on that host send credentialed requests
     # (cookies included) to this API from attacker-controlled JS.
-    allow_origin_regex=r"http://localhost:\d+|http://127\.0\.0\.1:\d+",
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
