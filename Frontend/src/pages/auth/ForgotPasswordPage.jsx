@@ -46,7 +46,7 @@ export default function ForgotPasswordPage() {
       });
       setResetId(response.data.reset_id);
       setSimulatedOtp(response.data.simulated_otp);
-      setMessage("OTP sent. For local simulation, use the code below.");
+      setMessage("OTP sent to your email. Enter the verification code below.");
       setStep(2);
     } catch (err) {
       setError(err?.response?.data?.detail || "Email verification failed.");
@@ -260,11 +260,16 @@ export default function ForgotPasswordPage() {
         {/* STEP 2: Verify OTP Form */}
         {step === 2 && (
           <form className="mt-4 grid gap-4" onSubmit={handleSubmit(verifyOtp)}>
-            {/* Future-proof OTP simulation notice box. Can be replaced with actual email routing. */}
-            <div className="rounded-xl border border-blue-100 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/30 p-4 text-xs text-blue-800 dark:text-blue-200 leading-normal">
-              <span className="font-bold">Simulation Notice:</span> Enter the
-              code <strong>{simulatedOtp}</strong> below to verify.
-            </div>
+            {/* Verification OTP Box with email confirmation */}
+            {simulatedOtp ? (
+              <div className="rounded-xl border border-blue-100 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/30 p-4 text-xs text-blue-800 dark:text-blue-200 leading-normal">
+                <span className="font-bold">Verification OTP:</span> An email has been sent to your inbox. For testing convenience, your verification code is <strong>{simulatedOtp}</strong>.
+              </div>
+            ) : (
+              <div className="rounded-xl border border-blue-100 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/30 p-4 text-xs text-blue-800 dark:text-blue-200 leading-normal">
+                <span className="font-bold">Email Sent:</span> Please check your email inbox (and Spam folder) for your 6-digit verification code.
+              </div>
+            )}
 
             <Input
               label="Enter OTP"

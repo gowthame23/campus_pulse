@@ -16,6 +16,7 @@ import {
   Check,
   Upload,
   Layers,
+  Shield,
 } from "lucide-react";
 import Button from "../../components/Button.jsx";
 import Card from "../../components/Card.jsx";
@@ -683,6 +684,10 @@ export default function LocationManagementPage() {
   };
 
   const archiveLocation = async (locationId) => {
+    if (locationId === "LOC_OTHER") {
+      setError("The default 'Other / Not Sure' location is required by system triage and cannot be archived.");
+      return;
+    }
     setMessage("");
     setError("");
     try {
@@ -695,6 +700,10 @@ export default function LocationManagementPage() {
   };
 
   const startDelete = (location) => {
+    if (location?.location_id === "LOC_OTHER") {
+      setError("The default 'Other / Not Sure' location is required by system triage and cannot be deleted.");
+      return;
+    }
     setDeleteTarget(location);
     setDeleteInput("");
     setDeleteDependencyError("");
@@ -1163,99 +1172,145 @@ export default function LocationManagementPage() {
     {
       header: "App Manager",
       accessor: "app_manager_id",
-      render: (row) => (
-        <Select
-          value={row.app_manager_id || ""}
-          onChange={(e) => assignAppManager(row.location_id, e.target.value)}
-          className="!py-1 !px-2 !text-xs font-semibold"
-        >
-          <option value="">Unassigned</option>
-          {(data?.appManagers || []).map((u) => (
-            <option key={u.user_id} value={u.user_id}>
-              {u.name} ({u.email})
-            </option>
-          ))}
-        </Select>
-      ),
+      render: (row) => {
+        const isOther =
+          row.location_id === "LOC_OTHER" ||
+          (row.name || "").toLowerCase().includes("other");
+        if (isOther) {
+          return (
+            <div className="py-1">
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                <Shield className="h-3 w-3" /> Admin Triage
+              </span>
+              <p className="text-[10px] text-slate-400 mt-0.5">Automated to Admin</p>
+            </div>
+          );
+        }
+        return (
+          <Select
+            value={row.app_manager_id || ""}
+            onChange={(e) => assignAppManager(row.location_id, e.target.value)}
+            className="!py-1 !px-2 !text-xs font-semibold"
+          >
+            <option value="">Unassigned</option>
+            {(data?.appManagers || []).map((u) => (
+              <option key={u.user_id} value={u.user_id}>
+                {u.name} ({u.email})
+              </option>
+            ))}
+          </Select>
+        );
+      },
     },
     {
       header: "In-Charge Warden",
       accessor: "in_charge_id",
-      render: (row) => (
-        <Select
-          value={row.in_charge_id || ""}
-          onChange={(e) => assignInCharge(row.location_id, e.target.value)}
-          className="!py-1 !px-2 !text-xs font-semibold"
-        >
-          <option value="">Unassigned</option>
-          {(data?.inCharges || []).map((u) => (
-            <option key={u.user_id} value={u.user_id}>
-              {u.name} ({u.email})
-            </option>
-          ))}
-        </Select>
-      ),
+      render: (row) => {
+        const isOther =
+          row.location_id === "LOC_OTHER" ||
+          (row.name || "").toLowerCase().includes("other");
+        if (isOther) {
+          return (
+            <span className="text-xs text-slate-400 italic">Admin Managed</span>
+          );
+        }
+        return (
+          <Select
+            value={row.in_charge_id || ""}
+            onChange={(e) => assignInCharge(row.location_id, e.target.value)}
+            className="!py-1 !px-2 !text-xs font-semibold"
+          >
+            <option value="">Unassigned</option>
+            {(data?.inCharges || []).map((u) => (
+              <option key={u.user_id} value={u.user_id}>
+                {u.name} ({u.email})
+              </option>
+            ))}
+          </Select>
+        );
+      },
     },
     {
       header: "Actions",
       accessor: "location_id",
-      render: (row) => (
-        <div className="flex items-center gap-1.5">
-          {row.archived ? (
-            <Button
-              variant="subtle"
-              size="sm"
-              onClick={async () => {
-                try {
-                  await locationService.update(row.location_id, {
-                    archived: false,
-                  });
-                  setMessage(`Location "${row.name}" restored successfully.`);
-                  reload();
-                } catch (err) {
-                  setError(
-                    err?.response?.data?.detail || "Unable to restore location.",
-                  );
-                }
-              }}
-              className="!p-1.5 text-emerald-600 hover:text-emerald-700"
-              title="Restore"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-          ) : (
-            <>
+      render: (row) => {
+        const isOther =
+          row.location_id === "LOC_OTHER" ||
+          (row.name || "").toLowerCase().includes("other");
+        if (isOther) {
+          return (
+            <div className="flex items-center gap-1.5">
               <Button
                 variant="subtle"
                 size="sm"
                 onClick={() => startEdit(row)}
-                className="!p-1.5"
-                title="Edit"
+                className="!p-1.5 text-primary hover:text-primary/80"
+                title="Edit Operating Departments"
               >
-                <Edit2 className="h-4 w-4 text-slate-500" />
+                <Edit2 className="h-4 w-4" />
               </Button>
+              <span className="text-[11px] text-slate-400 italic">System Protected</span>
+            </div>
+          );
+        }
+        return (
+          <div className="flex items-center gap-1.5">
+            {row.archived ? (
               <Button
                 variant="subtle"
                 size="sm"
-                onClick={() => archiveLocation(row.location_id)}
-                className="!p-1.5"
-                title="Archive"
+                onClick={async () => {
+                  try {
+                    await locationService.update(row.location_id, {
+                      archived: false,
+                    });
+                    setMessage(`Location "${row.name}" restored successfully.`);
+                    reload();
+                  } catch (err) {
+                    setError(
+                      err?.response?.data?.detail || "Unable to restore location.",
+                    );
+                  }
+                }}
+                className="!p-1.5 text-emerald-600 hover:text-emerald-700"
+                title="Restore"
               >
-                <Archive className="h-4 w-4 text-slate-500" />
+                <RefreshCw className="h-4 w-4" />
               </Button>
-              <Button
-                variant="subtle"
-                size="sm"
-                onClick={() => startDelete(row)}
-                className="!p-1.5 hover:!bg-red-50 text-red-500"
-                title="Delete"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </>
-          )}
-        </div>
-      ),
+            ) : (
+              <>
+                <Button
+                  variant="subtle"
+                  size="sm"
+                  onClick={() => startEdit(row)}
+                  className="!p-1.5"
+                  title="Edit"
+                >
+                  <Edit2 className="h-4 w-4 text-slate-500" />
+                </Button>
+                <Button
+                  variant="subtle"
+                  size="sm"
+                  onClick={() => archiveLocation(row.location_id)}
+                  className="!p-1.5"
+                  title="Archive"
+                >
+                  <Archive className="h-4 w-4 text-slate-500" />
+                </Button>
+                <Button
+                  variant="subtle"
+                  size="sm"
+                  onClick={() => startDelete(row)}
+                  className="!p-1.5 hover:!bg-red-50 text-red-500"
+                  title="Delete"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+          </div>
+        );
+      },
     },
   ];
 

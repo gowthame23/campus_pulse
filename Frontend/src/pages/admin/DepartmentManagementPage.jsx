@@ -850,13 +850,30 @@ export default function DepartmentManagementPage() {
       key: "coordinators",
       header: "Department Coordinators (1 & 2)",
       render: (row) => {
+        const isOther =
+          row.department_id === "DEPT_OTHER_GENERAL" ||
+          row.department_id === "DEPT_OTHER" ||
+          (row.name || "").toLowerCase().includes("other");
+
+        if (isOther) {
+          return (
+            <div className="py-1">
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                <Shield className="h-3 w-3" /> Admin Triage
+              </span>
+              <p className="text-[10px] text-slate-400 mt-0.5">Automated to Admin</p>
+            </div>
+          );
+        }
+
         const u1 = (data?.coordinators || []).find((u) => u.user_id === row.coordinator_id);
         const u2 = (data?.coordinators || []).find((u) => u.user_id === row.coordinator_2_id);
         const name1 = u1?.name || (row.coordinator_id ? row.coordinator_id : null);
         const name2 = u2?.name || (row.coordinator_2_id ? row.coordinator_2_id : null);
+        const hasCoordinators = !!(name1 || name2);
 
         return (
-          <div className="space-y-1 text-xs">
+          <div className="space-y-1.5 text-xs py-1 min-w-[170px]">
             <div className="flex items-center gap-1.5">
               <span className="font-semibold text-slate-500 w-16 shrink-0">Coord 1:</span>
               {name1 ? (
@@ -867,14 +884,21 @@ export default function DepartmentManagementPage() {
                       `/chat?userId=${encodeURIComponent(row.coordinator_id)}&name=${encodeURIComponent(name1)}`
                     )
                   }
-                  className="group inline-flex items-center gap-1 font-semibold text-slate-900 dark:text-slate-100 hover:text-primary transition-colors text-left"
+                  className="group inline-flex items-center gap-1 font-semibold text-slate-900 dark:text-slate-100 hover:text-primary transition-colors text-left truncate"
                   title={`Open 1-on-1 chat with ${name1}`}
                 >
-                  <span className="group-hover:underline underline-offset-2">{name1}</span>
+                  <span className="group-hover:underline underline-offset-2 truncate">{name1}</span>
                   <MessageSquare className="h-3 w-3 text-slate-400 group-hover:text-primary shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
                 </button>
               ) : (
-                <span className="text-rose-500 italic">Unassigned</span>
+                <button
+                  type="button"
+                  onClick={() => openAssignCoordsModal(row)}
+                  className="text-rose-500 italic hover:underline cursor-pointer inline-flex items-center gap-1"
+                  title="Click to assign Coordinator 1"
+                >
+                  <span>Unassigned</span>
+                </button>
               )}
             </div>
             <div className="flex items-center gap-1.5">
@@ -887,16 +911,32 @@ export default function DepartmentManagementPage() {
                       `/chat?userId=${encodeURIComponent(row.coordinator_2_id)}&name=${encodeURIComponent(name2)}`
                     )
                   }
-                  className="group inline-flex items-center gap-1 font-medium text-slate-700 dark:text-slate-300 hover:text-primary transition-colors text-left"
+                  className="group inline-flex items-center gap-1 font-medium text-slate-700 dark:text-slate-300 hover:text-primary transition-colors text-left truncate"
                   title={`Open 1-on-1 chat with ${name2}`}
                 >
-                  <span className="group-hover:underline underline-offset-2">{name2}</span>
+                  <span className="group-hover:underline underline-offset-2 truncate">{name2}</span>
                   <MessageSquare className="h-3 w-3 text-slate-400 group-hover:text-primary shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
                 </button>
               ) : (
-                <span className="text-amber-500 italic">Unassigned</span>
+                <button
+                  type="button"
+                  onClick={() => openAssignCoordsModal(row)}
+                  className="text-amber-500 italic hover:underline cursor-pointer inline-flex items-center gap-1"
+                  title="Click to assign Coordinator 2"
+                >
+                  <span>Unassigned</span>
+                </button>
               )}
             </div>
+            <button
+              type="button"
+              onClick={() => openAssignCoordsModal(row)}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors pt-0.5 cursor-pointer"
+              title="Assign or change department coordinators"
+            >
+              <UserCheck className="h-3.5 w-3.5" />
+              <span>{hasCoordinators ? "Change Coordinators" : "Assign Coordinators"}</span>
+            </button>
           </div>
         );
       },
@@ -904,17 +944,26 @@ export default function DepartmentManagementPage() {
     {
       key: "eligible_workforce",
       header: "Eligible Staff",
-      render: (row) => (
-        <button
-          type="button"
-          onClick={() => openWorkforceModal(row)}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition-colors cursor-pointer"
-          title="Click to view eligible employees"
-        >
-          <Users className="h-3.5 w-3.5" />
-          <span>{row.eligible_employee_count || 0} Staff</span>
-        </button>
-      ),
+      render: (row) => {
+        const isOther =
+          row.department_id === "DEPT_OTHER_GENERAL" ||
+          row.department_id === "DEPT_OTHER" ||
+          (row.name || "").toLowerCase().includes("other");
+        if (isOther) {
+          return <span className="text-xs text-slate-400 italic">Admin Managed</span>;
+        }
+        return (
+          <button
+            type="button"
+            onClick={() => openWorkforceModal(row)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition-colors cursor-pointer"
+            title="Click to view eligible employees"
+          >
+            <Users className="h-3.5 w-3.5" />
+            <span>{row.eligible_employee_count || 0} Staff</span>
+          </button>
+        );
+      },
     },
     {
       key: "active_complaints",
@@ -928,12 +977,42 @@ export default function DepartmentManagementPage() {
     {
       key: "sla_days",
       header: "SLA Limit",
-      render: (row) => `${row.sla_days} days`,
+      render: (row) => {
+        const isOther =
+          row.department_id === "DEPT_OTHER_GENERAL" ||
+          row.department_id === "DEPT_OTHER" ||
+          (row.name || "").toLowerCase().includes("other");
+        return isOther ? (
+          <span className="text-xs text-slate-400 italic">No SLA (Triage)</span>
+        ) : (
+          `${row.sla_days} days`
+        );
+      },
     },
     {
       key: "actions",
       header: "Actions",
-      render: (row) => (
+      render: (row) => {
+        const isOther =
+          row.department_id === "DEPT_OTHER_GENERAL" ||
+          row.department_id === "DEPT_OTHER" ||
+          (row.name || "").toLowerCase().includes("other");
+        if (isOther) {
+          return (
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="subtle"
+                size="sm"
+                onClick={() => openEditCategoriesModal(row)}
+                className="!p-1.5 text-primary hover:text-primary/80"
+                title="Edit Categories"
+              >
+                <Edit2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          );
+        }
+        return (
         <div className="flex items-center gap-1.5">
           {row.archived ? (
             <Button
@@ -1004,10 +1083,10 @@ export default function DepartmentManagementPage() {
             </>
           )}
         </div>
-      ),
+      );
     },
-
-  ];
+  },
+];
 
   const columns = [
     {
@@ -1079,13 +1158,30 @@ export default function DepartmentManagementPage() {
       key: "coordinators",
       header: "Coordinators (1 & 2)",
       render: (row) => {
+        const isOther =
+          row.department_id === "DEPT_OTHER_GENERAL" ||
+          row.department_id === "DEPT_OTHER" ||
+          (row.name || "").toLowerCase().includes("other");
+
+        if (isOther) {
+          return (
+            <div className="py-1">
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                <Shield className="h-3 w-3" /> Admin Triage
+              </span>
+              <p className="text-[10px] text-slate-400 mt-0.5">Automated to Admin</p>
+            </div>
+          );
+        }
+
         const u1 = (data?.coordinators || []).find((u) => u.user_id === row.coordinator_id);
         const u2 = (data?.coordinators || []).find((u) => u.user_id === row.coordinator_2_id);
         const name1 = u1?.name || (row.coordinator_id ? row.coordinator_id : null);
         const name2 = u2?.name || (row.coordinator_2_id ? row.coordinator_2_id : null);
+        const hasCoordinators = !!(name1 || name2);
 
         return (
-          <div className="space-y-1 text-xs">
+          <div className="space-y-1.5 text-xs py-1 min-w-[170px]">
             <div className="flex items-center gap-1.5">
               <span className="font-semibold text-slate-500 w-14 shrink-0">Coord 1:</span>
               {name1 ? (
@@ -1096,14 +1192,21 @@ export default function DepartmentManagementPage() {
                       `/chat?userId=${encodeURIComponent(row.coordinator_id)}&name=${encodeURIComponent(name1)}`
                     )
                   }
-                  className="group inline-flex items-center gap-1 font-semibold text-slate-900 dark:text-slate-100 hover:text-primary transition-colors text-left"
+                  className="group inline-flex items-center gap-1 font-semibold text-slate-900 dark:text-slate-100 hover:text-primary transition-colors text-left truncate"
                   title={`Open 1-on-1 chat with ${name1}`}
                 >
-                  <span className="group-hover:underline underline-offset-2">{name1}</span>
+                  <span className="group-hover:underline underline-offset-2 truncate">{name1}</span>
                   <MessageSquare className="h-3 w-3 text-slate-400 group-hover:text-primary shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
                 </button>
               ) : (
-                <span className="text-rose-500 italic">Unassigned</span>
+                <button
+                  type="button"
+                  onClick={() => openAssignCoordsModal(row)}
+                  className="text-rose-500 italic hover:underline cursor-pointer inline-flex items-center gap-1"
+                  title="Click to assign Coordinator 1"
+                >
+                  <span>Unassigned</span>
+                </button>
               )}
             </div>
             <div className="flex items-center gap-1.5">
@@ -1116,16 +1219,32 @@ export default function DepartmentManagementPage() {
                       `/chat?userId=${encodeURIComponent(row.coordinator_2_id)}&name=${encodeURIComponent(name2)}`
                     )
                   }
-                  className="group inline-flex items-center gap-1 font-medium text-slate-700 dark:text-slate-300 hover:text-primary transition-colors text-left"
+                  className="group inline-flex items-center gap-1 font-medium text-slate-700 dark:text-slate-300 hover:text-primary transition-colors text-left truncate"
                   title={`Open 1-on-1 chat with ${name2}`}
                 >
-                  <span className="group-hover:underline underline-offset-2">{name2}</span>
+                  <span className="group-hover:underline underline-offset-2 truncate">{name2}</span>
                   <MessageSquare className="h-3 w-3 text-slate-400 group-hover:text-primary shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
                 </button>
               ) : (
-                <span className="text-amber-500 italic">Unassigned</span>
+                <button
+                  type="button"
+                  onClick={() => openAssignCoordsModal(row)}
+                  className="text-amber-500 italic hover:underline cursor-pointer inline-flex items-center gap-1"
+                  title="Click to assign Coordinator 2"
+                >
+                  <span>Unassigned</span>
+                </button>
               )}
             </div>
+            <button
+              type="button"
+              onClick={() => openAssignCoordsModal(row)}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 transition-colors pt-0.5 cursor-pointer"
+              title="Assign or change department coordinators"
+            >
+              <UserCheck className="h-3.5 w-3.5" />
+              <span>{hasCoordinators ? "Change Coordinators" : "Assign Coordinators"}</span>
+            </button>
           </div>
         );
       },

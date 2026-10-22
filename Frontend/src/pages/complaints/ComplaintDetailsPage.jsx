@@ -1291,69 +1291,39 @@ export default function ComplaintDetailsPage() {
               <FileText className="h-4 w-4 text-primary" />
               Complaint Overview
             </h2>
-            <dl className="grid gap-4 sm:grid-cols-2 text-sm">
-              <div className="flex items-center gap-3">
-                <Building className="h-4 w-4 text-slate-400 shrink-0" />
-                <div>
-                  <dt className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                    Department
-                  </dt>
-                  <dd className="font-medium text-slate-800 dark:text-slate-200 mt-0.5">
-                    {department?.name || complaint.department_name || complaint.department_id}
-                  </dd>
-                </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Department</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 block truncate">
+                  {department?.name || complaint.department_name || complaint.department_id}
+                </span>
               </div>
-
-              <div className="flex items-center gap-3">
-                <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
-                <div>
-                  <dt className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                    Location
-                  </dt>
-                  <dd className="font-medium text-slate-800 dark:text-slate-200 mt-0.5">
-                    {location?.name || complaint.location_name || complaint.location_id}
-                  </dd>
-                </div>
+              <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Location</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 block truncate">
+                  {location?.name || complaint.location_name || complaint.location_id}
+                </span>
               </div>
-
+              <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Category</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 block truncate">
+                  {complaint.category || complaint.complaint_type || "General Issue"}
+                </span>
+              </div>
+              <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                <span className="text-[10px] font-semibold text-slate-400 block uppercase">Date Filed</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 block truncate">
+                  {formatDate(complaint.created_at)}
+                </span>
+              </div>
               {complaint.exact_spot && (
-                <div className="flex items-center gap-3 p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60">
-                  <MapPin className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                  <div>
-                    <dt className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
-                      Exact Spot
-                    </dt>
-                    <dd className="font-bold text-slate-900 dark:text-slate-100 mt-0.5 text-xs">
-                      {complaint.exact_spot}
-                    </dd>
-                  </div>
+                <div className="col-span-2 p-2 rounded-lg bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 flex items-center gap-2">
+                  <MapPin className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                  <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300">Spot:</span>
+                  <span className="text-[11px] font-semibold text-slate-800 dark:text-slate-100 truncate">{complaint.exact_spot}</span>
                 </div>
               )}
-
-              <div className="flex items-center gap-3">
-                <Tag className="h-4 w-4 text-primary shrink-0" />
-                <div>
-                  <dt className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                    Category / Issue
-                  </dt>
-                  <dd className="font-medium text-slate-800 dark:text-slate-100 mt-0.5">
-                    {complaint.category || complaint.complaint_type || "General Issue"}
-                  </dd>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
-                <div>
-                  <dt className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                    Date Filed
-                  </dt>
-                  <dd className="font-medium text-slate-800 dark:text-slate-200 mt-0.5">
-                    {formatDate(complaint.created_at)}
-                  </dd>
-                </div>
-              </div>
-            </dl>
+            </div>
 
             {/* Description Text Box with AI Translation */}
             <div className="mt-5 border-t border-slate-100 dark:border-slate-800/80 pt-4">
@@ -1470,6 +1440,28 @@ export default function ComplaintDetailsPage() {
                       />
                     </a>
 
+                    {/* Duplicate & Tamper Flags Badge */}
+                    {Array.isArray(att.flags) && att.flags.length > 0 && (
+                      <div className="absolute top-1.5 left-1.5 z-10 flex flex-col gap-1 pointer-events-none">
+                        {att.flags.includes("REUSED") && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-500 text-white shadow-xs backdrop-blur-xs"
+                            title="Duplicate photo detected across complaints (SHA-256 match)"
+                          >
+                            <AlertTriangle className="h-3 w-3" /> Reused Image
+                          </span>
+                        )}
+                        {att.flags.includes("OLDER_THAN_JOB") && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-rose-500 text-white shadow-xs backdrop-blur-xs"
+                            title="EXIF capture date pre-dates complaint start time"
+                          >
+                            <Clock className="h-3 w-3" /> Pre-dates Job
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     {/* Tooltip Overlay */}
                     <div className="absolute inset-0 bg-slate-900/70 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-2 text-[10px] text-white font-medium pointer-events-none">
                       <div className="truncate font-bold mb-0.5">
@@ -1500,14 +1492,30 @@ export default function ComplaintDetailsPage() {
               };
 
               return (
-                <div className="mt-6 border-t border-slate-100 dark:border-slate-800/80 pt-5">
-                  <dt className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">
-                    Photo Evidence & Attachments ({attachments.length}/20)
-                  </dt>
+                <div className="mt-5 border-t border-slate-100 dark:border-slate-800/80 pt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <dt className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                      Photo Evidence ({attachments.length})
+                    </dt>
+                    {canUploadAttachments && attachments.length === 0 && (
+                      <label className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-semibold text-primary cursor-pointer shadow-2xs">
+                        <Plus className="h-3 w-3" />
+                        <span>{uploadingFile ? "Uploading..." : "Add Photos"}</span>
+                        <input
+                          type="file"
+                          multiple
+                          onChange={handleAttachmentUpload}
+                          disabled={uploadingFile}
+                          accept=".jpg,.jpeg,.png,.pdf"
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
 
                   {attachments.length === 0 ? (
-                    <dd className="text-xs font-medium text-slate-400 dark:text-slate-500 py-1">
-                      No photo evidence uploaded yet.
+                    <dd className="text-xs text-slate-400 italic py-0.5">
+                      No photos attached
                     </dd>
                   ) : (
                     <div className="grid gap-5">
@@ -1550,7 +1558,7 @@ export default function ComplaintDetailsPage() {
                   )}
 
                   {/* Upload Input Area */}
-                  {canUploadAttachments && attachments.length < 20 && (
+                  {canUploadAttachments && attachments.length > 0 && attachments.length < 20 && (
                     <div className="mt-4 border-t border-slate-100 dark:border-slate-800/80 pt-3 flex flex-wrap items-center gap-3">
                       {user?.role?.toLowerCase() === "coordinator" && (
                         <div className="flex items-center gap-2">
@@ -1602,26 +1610,31 @@ export default function ComplaintDetailsPage() {
             )}
           </Card>
 
-          {/* Activity & Audit History Timeline */}
+          {/* Activity & Audit History Timeline (Collapsible) */}
           {complaint.history && complaint.history.length > 0 && (
             <Card>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-4 flex items-center gap-2">
-                <History className="h-4 w-4 text-primary" />
-                Activity & Audit History ({complaint.history.length})
-              </h2>
-              <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800">
-                {complaint.history.map((item, idx) => (
-                  <div key={idx} className="relative">
-                    <span className="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full border-2 border-white dark:border-[#101726] bg-primary" />
-                    <div className="text-xs text-slate-800 dark:text-slate-200 font-medium">
-                      {item.message}
+              <details className="group">
+                <summary className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center justify-between cursor-pointer list-none select-none">
+                  <span className="flex items-center gap-2">
+                    <History className="h-4 w-4 text-primary" />
+                    Activity & Audit History ({complaint.history.length})
+                  </span>
+                  <span className="text-slate-400 group-open:rotate-180 transition-transform text-[10px]">▼</span>
+                </summary>
+                <div className="relative pl-6 space-y-3 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                  {complaint.history.map((item, idx) => (
+                    <div key={idx} className="relative">
+                      <span className="absolute -left-[22px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-[#101726] bg-primary" />
+                      <div className="text-xs text-slate-800 dark:text-slate-200 font-medium">
+                        {item.message}
+                      </div>
+                      <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                        {formatDate(item.at)}
+                      </div>
                     </div>
-                    <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                      {formatDate(item.at)}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </details>
             </Card>
           )}
 
@@ -1826,42 +1839,39 @@ export default function ComplaintDetailsPage() {
                 </div>
               </div>
 
-              <div className="space-y-3 text-xs">
+              <div className="space-y-2 text-xs">
                 {(complaint.emergency_contacts && complaint.emergency_contacts.length > 0) ? (
                   complaint.emergency_contacts.map((contact, idx) => (
                     <div
                       key={idx}
-                      className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-rose-200/80 dark:border-rose-900/50 flex items-center justify-between gap-3 shadow-2xs"
+                      className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-rose-200/80 dark:border-rose-900/50 flex items-center justify-between gap-2 shadow-2xs"
                     >
                       <div className="min-w-0">
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
-                          {contact.role}
-                        </div>
-                        <div className="font-semibold text-slate-900 dark:text-slate-100 truncate text-xs mt-0.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                          {contact.role}:
+                        </span>
+                        <span className="font-semibold text-slate-900 dark:text-slate-100 truncate text-xs ml-1.5">
                           {contact.name}
-                        </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                          {contact.phone_available ? contact.phone : "No phone registered"}
-                        </div>
+                        </span>
                       </div>
 
                       {contact.phone_available ? (
                         <a
                           href={`tel:${contact.phone}`}
-                          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-colors"
+                          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-colors"
                         >
-                          <PhoneCall className="h-3.5 w-3.5" />
+                          <PhoneCall className="h-3 w-3" />
                           Call
                         </a>
                       ) : (
-                        <span className="shrink-0 text-[10px] font-semibold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">
-                          Phone unavailable
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 italic">
+                          No phone registered
                         </span>
                       )}
                     </div>
                   ))
                 ) : (
-                  <div className="p-2.5 rounded-lg bg-white/60 dark:bg-slate-900/60 text-center text-rose-700 dark:text-rose-300 text-xs">
+                  <div className="p-2 rounded-lg bg-white/60 dark:bg-slate-900/60 text-center text-rose-700 dark:text-rose-300 text-xs font-medium">
                     Authorities notified via priority broadcast
                   </div>
                 )}
@@ -1911,11 +1921,9 @@ export default function ComplaintDetailsPage() {
                 </div>
               )}
               {(!complaint.due_date || complaint.location_id === "LOC_OTHER" || complaint.department_id === "DEPT_OTHER_GENERAL") && (
-                <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-300">
-                  <p className="font-semibold">Informational Submission / Under Review</p>
-                  <p className="mt-0.5 text-amber-700 dark:text-amber-400">
-                    This complaint was submitted under an unlisted location or category. Standard SLA countdown timers and technician assignment do not apply until an Administrator reviews the information and assigns a department.
-                  </p>
+                <div className="px-2.5 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-700 dark:text-amber-400 flex items-center gap-1.5 font-medium">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  <span>Under admin review (unlisted category or location)</span>
                 </div>
               )}
             </div>

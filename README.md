@@ -1,198 +1,210 @@
-# Campus Pulse — Campus Complaint & SLA Management System
+# Campus Pulse — Modern Campus Governance & Grievance Intelligence Platform
 
-**Campus Pulse** is an enterprise-grade campus complaint resolution, verification, and SLA tracking platform. Built with **FastAPI (Python)** and **React 19 (Vite + Tailwind CSS)**, it provides automated ticket routing, transparent coordinator progress tracking, two-tier in-person warden verification, student closeout with automatic expiration, multi-stage SLA breach escalations, real-time WebSocket updates, installable Mobile PWA capabilities with Web Push notifications, and multi-department coordinator orchestration.
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![Vite](https://img.shields.io/badge/Vite-6.0-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
+[![Database](https://img.shields.io/badge/Database-SQLite%20%7C%20PostgreSQL-336791?logo=sqlite&logoColor=white)](https://sqlite.org)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+**Campus Pulse** is a high-accountability campus grievance, emergency response, and facilities management platform. Engineered to eliminate the "black hole" of collegiate ticketing systems, Campus Pulse enforces direct coordinator ownership, tamper-evident photo verification, zero-knowledge anonymous whistleblowing, and automated SLA escalations.
 
 ---
 
-## 🎯 Core Complaint Lifecycle & Workflow
+## 🎯 Accountable 3-Stage Complaint Lifecycle
 
-The system enforces an accountability workflow where delays and progress are transparently visible to all stakeholders at every stage:
+Campus Pulse replaces convoluted 12-state bureaucratic queues with a streamlined **3-stage lifecycle**:
+
+$$\text{Complaint Raised} \xrightarrow{\quad\text{Coordinator Starts}\quad} \text{Going On} \xrightarrow{\quad\text{Coordinator Done}\quad} \text{Fixed} \xrightarrow{\quad\text{48h Verification / Dispute}\quad} \text{Closed}$$
 
 ```mermaid
 flowchart TD
-    A["Student Files Complaint"] --> B{"Coordinator Available?"}
-    B -- "Single Coordinator" --> C["Directly Assigned<br/>(Status: Assigned)"]
-    B -- "Multiple Coordinators" --> D["Accept Queue Pool<br/>(Status: Submitted)"]
-    B -- "No Coordinator" --> E["Coverage Gap Alert<br/>to App Manager"]
+    A["Student Files Complaint<br/><b>(Status: Complaint Raised)</b>"] --> B["Automated Department & Location Routing"]
+    B --> C["Assigned Coordinator Dashboard<br/><i>(Real-Time Notification Delivered)</i>"]
     
-    D -->|"Atomic First Accept"| C
-    D -->|"Unclaimed past SLA"| F["Auto-assigned to least-loaded<br/>+ Warden alerted"] --> C
+    C -->|"Clicks 'Start'"| D["Work Actively Underway<br/><b>(Status: Going On)</b>"]
     
-    C --> G["Coordinator Accepts & Starts Work<br/>(Status: In Progress / Waiting for Parts)"]
-    G --> H["Coordinator Marks Fixed<br/>(Photo required for High/Critical)<br/>(Status: Fixed)"]
+    D -->|"Clicks 'Done'<br/>+ Resolution Proof Photo"| E{"Verification Type?"}
     
-    H --> I{"Priority Level?"}
-    I -- "High / Critical or Spot-Check (~10%)" --> J["In-Person Warden Verification<br/>(Status: Pending Verification)"]
-    I -- "Low / Medium" --> K["Student Confirmation<br/>(Status: Fixed)"]
+    E -- "Standard (Low / Medium)" --> F["Student 48h Closeout Window<br/><b>(Status: Waiting for Verification)</b>"]
+    E -- "High / Critical / Random Spot-Check" --> G["On-Site Warden Physical Inspection<br/><b>(Status: Pending Warden Verification)</b>"]
     
-    J -- "Warden: Not Fixed" --> G
-    J -- "Warden: Verified" --> K
+    G -- "Warden: Not Fixed (Re-work Required)" --> D
+    G -- "Warden: Verified" --> F
     
-    K -->|"Student: Confirm & Close"| L["Closed"]
-    K -->|"No response in 48h (reminder at 24h)"| L
-    K -->|"Student: Reopen (1st or 2nd time)"| G
-    K -->|"Student: Reopen (3rd time)"| M["Admin Review<br/>(Status: Disputed)"]
-    M -->|"Admin Decision"| L
+    F -->|"Student Confirms or 48h Auto-Close"| H["Complaint Finalized<br/><b>(Status: Closed)</b>"]
+    F -->|"Student Clicks 'Not Fixed' (Dispute)"| I["Status Reverted to 'Going On'<br/><i>Warden On-Site Inspection Triggered</i>"] --> D
+    F -->|"3rd Repeated Dispute"| J["Escalated to Administrator<br/><b>(Status: Admin Review)</b>"]
 ```
 
-### SLA Escalation Rules
-- Every priority receives an explicit SLA resolution deadline:
-  - **Critical**: 12 hours
-  - **High**: 24 hours
-  - **Medium**: 48 hours
-  - **Low**: 72 hours
-- Multi-tier escalation path: Coordinator + Warden $\rightarrow$ App Manager $\rightarrow$ Administrator (each notified once upon breach).
-- Auto-closed and rejected tickets are excluded from active overdue and escalation queries.
+### SLA Resolution Deadlines & Escalation Engine
+Every ticket receives a deterministic SLA deadline calculated from its category and priority:
+* **Critical**: 12 hours *(auto-escalates to App Manager and Admin on breach)*
+* **High**: 24 hours
+* **Medium**: 48 hours
+* **Low**: 72 hours
+
+An automated background scheduler scans active complaints every minute, firing multi-tier escalation notifications if milestones are missed.
 
 ---
 
-## 👥 Role Matrix & Permissions
+## 🛡️ Anti-Fraud & Quality Assurance Architecture
 
-| Role | Core Responsibilities |
+Traditional portals suffer from "phantom fixes"—technicians marking tickets resolved without performing repairs or recycling stock photos from the internet. Campus Pulse eliminates this through two layers:
+
+### 1. SHA-256 Duplicate Image Fingerprinting
+* The raw binary bytes of every uploaded photo are hashed via **SHA-256** upon receipt.
+* The system queries historical records:
+  ```sql
+  SELECT complaint_id FROM attachments WHERE sha256 = ? AND complaint_id != ? LIMIT 1
+  ```
+* If the exact photo was ever uploaded to another complaint, the system immediately tags it with a **`REUSED`** fraud alert flag.
+
+### 2. EXIF Timestamp Tamper Verification
+* For JPEG/JPG uploads, the backend extracts the embedded camera metadata (`DateTimeOriginal`, EXIF tag 36867).
+* If an "after repair" proof photo has a capture timestamp **older than when the repair job was actually started**, the system flags it as **`OLDER_THAN_JOB`**.
+
+### 3. Photo-Skip Streak Penalty
+* If a coordinator repeatedly marks complaints done without photo proof, the system tracks their skip streak. Reaching the threshold automatically locks the ticket and mandates an in-person Warden physical inspection.
+
+---
+
+## 🔒 Privacy-First Anonymous Whistleblowing
+
+Students often stay silent about ragging, harassment, mental health crises, or facility hazards due to fear of academic or social retaliation. Campus Pulse provides **genuine zero-knowledge anonymous reporting**:
+
+```
+[Student Submits Report]
+         │
+         ├──► safety_reports (report_id, case_code, category, description, status)  ← Accessible by Admins
+         │
+         └──► safety_report_identity (report_id, reporter_user_id, revealed = 0)     ← Sealed in Isolation
+```
+
+1. **Table-Level Structural Segregation**:
+   The primary `safety_reports` table has **no foreign keys to students**. Regular administration screens, analytics, and two-way messaging only ever touch `safety_reports`.
+2. **Anonymous 2-Way Chat**:
+   Students track progress and chat bidirectionally with administrators using an ephemeral **Case Code** without logging in.
+3. **Dual-Control Identity Unsealing Gate**:
+   Identity unsealing can only occur during an extreme life-safety crisis or formal disciplinary misuse:
+   * Requires Administrator role privilege.
+   * Mandates **live password re-authentication** (`PBKDF2-HMAC-SHA256`).
+   * Requires a typed legal / emergency justification.
+   * Every unsealing event permanently records an entry into `audit_logs`, protected by SQLite triggers that abort any `UPDATE` or `DELETE` attempt.
+
+---
+
+## 🚨 Rapid Emergency SOS Engine
+
+* **1-Tap Emergency Trigger**: Instant selection between Medical, Fire, and Security emergencies.
+* **Real-Time Geolocation Broadcast**: Immediately pushes the student's physical location, block, and room to security dispatchers and campus health centers via WebSockets and Web Push.
+* **10-Minute Escalation Daemon**: If an active SOS alert remains unacknowledged after 10 minutes, the background daemon automatically escalates the incident to senior administrative leadership.
+
+---
+
+## 👥 Role Matrix & Clean Core Baseline
+
+Campus Pulse enforces a role hierarchy with zero ambiguous "employee" intermediaries:
+
+| Role | Responsibilities |
 | :--- | :--- |
-| 🎓 **Student** | Files complaints, attaches photos, tracks real-time progress, confirms resolution or reopens (max 3 times), receives Web Push notifications. |
-| 👔 **Employee / Coordinator** | Assigned to specific departments. Atomically claims tickets from team queue, updates live progress notes, logs "Waiting for parts" reasons, marks issues fixed with resolution photos. Simultaneously eligible for regular employee assignments. |
-| 🛡️ **Warden / Location In-Charge** | Oversees physical hostel/campus locations. Notified of every new ticket in their area. Conducts in-person verification for High/Critical tickets (and ~10% random spot checks for Low/Medium). |
-| 📊 **App Manager** | Oversees operations: maps coordinators across multiple departments and locations, assigns wardens, monitors coordinator workloads, resolves coverage gaps. Cannot alter Administrator or Super Admin accounts. |
-| ⚡ **Administrator** | System governance, department/location CRUD, final decisions on disputed 3-reopen tickets, database backups, audit trail inspection, unsealing anonymous safety report identities under step-up authentication. |
-| 👑 **Super Admin** | Platform owner, root maintenance, multi-campus system administration. |
+| 🎓 **Student** | Files complaints, tracks live status, verifies or disputes repairs, triggers SOS alerts, claims lost & found items. |
+| 👔 **Coordinator** | Directly handles complaints end-to-end within assigned departments. Updates live progress, provides proof photos, coordinates repairs. |
+| 🛡️ **Warden** | Physical location in-charge. Notified of location issues, conducts on-site verifications for high-priority tickets, inspects student disputes. |
+| 📊 **App Manager** | Geographic supervisor. Oversees multi-location zones, maps wardens and coordinators, monitors department SLA health, handles unassigned tickets. |
+| ⚡ **Administrator** | Campus governance, department/location mapping, final decisions on disputed complaints, audit trail inspection, unsealing safety reports. |
+| 👑 **Super Admin** | Platform maintenance, institution configuration, root system health. |
+
+### Verified 10-User Account Baseline
+| User ID | Email | Role | Scope |
+| :--- | :--- | :--- | :--- |
+| `USR_ADMIN` | `gowthamejjurothu@gmail.com` | Administrator | Campus-wide governance |
+| `USR_SUPER_ADMIN` | `superadmin@campuspulse.edu` | Super Admin | Platform maintenance |
+| `USR_MANAGER` | `ejjurothugowtham@gmail.com` | App Manager | Zone 1 (Hostel 1, Academic 1, Mess 1, SAC 1, Sports 1) |
+| `USR_MANAGER_2` | `appmanager2@campus.edu` | App Manager | Zone 2 (Hostel 2, Academic 2, Mess 2, SAC 2, Sports 2) |
+| `USR_WARDEN` | `naveen@campus.edu` | Warden | Location In-Charge (Zone 1 facilities) |
+| `USR_WARDEN_2` | `warden2@campus.edu` | Warden | Location In-Charge (Zone 2 facilities) |
+| `USR_STUDENT` | `gowtham.e23@iiits.in` | Student | Resident (Hostel 1) |
+| `USR_STUDENT_2` | `student2@campus.edu` | Student | Resident (Hostel 2) |
+| `USR_COORD_1` | `coordinator1@campuspulse.edu` | Coordinator | Department Coordinator (Admin assigned) |
+| `USR_COORD_2` | `coordinator2@campuspulse.edu` | Coordinator | Department Coordinator (Admin assigned) |
 
 ---
 
-## 🏢 Multi-Department Coordinator Architecture & Standard Accounts
+## 🏢 11-Location Dual-Zone Infrastructure
 
-The environment enforces campus-wide departments and employees who coordinate multiple departments simultaneously without duplicate accounts:
+The campus environment is organized into dual-zone infrastructure:
 
-### 1. Multi-Department Coordinator Rules
-1. **Existing Employee Accounts:** Every coordinator is an existing employee account; no duplicate user accounts are created.
-2. **Dual Functionality:** An employee can perform regular employee work and coordinator responsibilities simultaneously.
-3. **Multi-Department Scope:** An employee can coordinate multiple departments concurrently (e.g., Coordinator 1 in Electrical and Coordinator 2 in Plumbing).
-4. **C1 & C2 Structure:** Each department has exactly one active Coordinator 1 (Primary) and one active Coordinator 2 (Backup).
-5. **No Self-Backup:** The same employee cannot occupy both C1 and C2 within the same department.
-6. **Automatic Backup Takeover:** When C1 is on approved leave, C2 automatically takes over complaint routing and claims.
-7. **Leave Independence:** An employee on leave for Department A does not lose active responsibilities in Department B.
-
-### 2. Standard 14-User Account Structure
-
-The testing and operational environment contains exactly 14 standard user accounts in `Backend/storage/campus_pulse.db`:
-
-| Account | Email | System Role | Operational Responsibilities |
-|---|---|---|---|
-| **Super Admin** | `superadmin@campuspulse.edu` | `super_admin` | Platform Owner & Master Governance |
-| **Administrator** | `gowthamejjurothu@gmail.com` | `administrator` | Campus Operations & Admin Governance |
-| **App Manager 1** | `ejjurothugowtham@gmail.com` | `app_manager` | Operations Supervisor (North Zone) |
-| **App Manager 2** | `appmanager2@campus.edu` | `app_manager` | Operations Supervisor (South Zone) |
-| **Employee 1** | `employee.a1@campuspulse.edu` | `employee` | Field Employee + Electrical C1 + Plumbing C2 |
-| **Employee 2** | `employee.a2@campuspulse.edu` | `employee` | Field Employee + Electrical C2 |
-| **Employee 3** | `employee.a3@campuspulse.edu` | `employee` | Field Employee + Plumbing C1 |
-| **Employee 4** | `employee.b1@campuspulse.edu` | `employee` | Field Employee + Network/IT C1 |
-| **Employee 5** | `employee.b2@campuspulse.edu` | `employee` | Field Operations & Maintenance |
-| **Employee 6** | `employee.b3@campuspulse.edu` | `employee` | Field Operations & Maintenance |
-| **Student 1** | `gowtham.e23@iiits.in` | `student` | Resident Student (Hostel Block A) |
-| **Student 2** | `student2@campus.edu` | `student` | Resident Student (Hostel Block B) |
-| **Warden 1** | `naveen@campus.edu` | `location_in_charge` | Warden (Hostel Block A) |
-| **Warden 2** | `warden2@campus.edu` | `location_in_charge` | Warden (Hostel Block B) |
+* **Zone 1 (Managed by App Manager 1 & Warden 1)**:
+  * `Hostel 1` (`LOC_HOSTEL_1`)
+  * `Academic Block 1` (`LOC_ACADEMIC_1`)
+  * `Mess 1` (`LOC_MESS_1`)
+  * `Student Activity Center 1` (`LOC_SAC_1`)
+  * `Sports Complex 1` (`LOC_SPORTS_1`)
+* **Zone 2 (Managed by App Manager 2 & Warden 2)**:
+  * `Hostel 2` (`LOC_HOSTEL_2`)
+  * `Academic Block 2` (`LOC_ACADEMIC_2`)
+  * `Mess 2` (`LOC_MESS_2`)
+  * `Student Activity Center 2` (`LOC_SAC_2`)
+  * `Sports Complex 2` (`LOC_SPORTS_2`)
+* **Central Facility**:
+  * `Other / Not Sure` (`LOC_OTHER`)
 
 ---
 
-## 🛡️ Security & Engineering Remediations (F-01 to F-15)
+## 💻 Tech Stack & Architecture
 
-The application has been audited and hardened across 15 findings:
-
-| ID | Module | Root Cause | Remediated Behavior |
-|---|---|---|---|
-| **F-01** | Auth / Sessions | Sliding expiration reset `created_at` timestamp. | Preserves original DB `created_at` timestamp; strictly enforces 24-hr absolute session lifetime limit. |
-| **F-02** | Password Reset | OTP attempt counters locked email address table-wide. | Attempts are isolated strictly to `reset_id`; added IP rate limiting (10 req/15 min) and generic silent error responses. |
-| **F-03** | Auth Lockouts | Desynchronization between `login_attempts` & `login_rate_limits`. | Credential changes atomically purge failed counters from both tables via `record_login_attempt(..., success=True)`. |
-| **F-04** | Security / WS | Cookies lacked dynamic HTTPS flags; WebSockets accepted unonboarded logins. | Dynamic `secure=is_secure` cookie flag; `get_ws_user()` strictly rejects unauthenticated or `first_login=True` clients. |
-| **F-05** | RBAC Hierarchy | App Managers could restore Admin accounts or escalate staff roles. | Enforced role hierarchy guards in `restore_user_account` (`PermissionError`) and `_execute_staff_import`. |
-| **F-06** | Safety Reports | Anonymous disclosure lacked step-up authentication. | **Mandatory Product Design:** Student reports remain anonymous in normal UI; identity reveal requires Administrator step-up password re-authentication (`admin_user.check_password()`); minimal PII exposed (`name`, `email`, `phone_number`); logged to audit trail; DB identity rows preserved. |
-| **F-07** | Safety Reports | Offset-naive vs offset-aware datetime comparison raised swallowed `TypeError`. | Normalized ban timestamps to timezone-aware UTC datetime before evaluation. |
-| **F-08** | Complaints | `apply_automatic_rules` rewrote entire complaints table. | Replaced table-wide rewrite with granular, dirty-checked `save_complaint()` on modified records only. |
-| **F-09** | Persistence | Soft-delete attributes dropped during model re-instantiation. | Fully preserved `is_deleted`, `deleted_at`, `deleted_by`, and cancellation metadata in `Complaint` model and SQLite upserts. |
-| **F-10** | State Machine | Work reassignment allowed changing closed/rejected tickets. | Reassignment blocked for `Closed`, `Auto Closed`, and `Rejected` complaints (`ValueError`); resets status to `Assigned` and clears blocker flags. |
-| **F-11** | Real-Time Events | WebSocket ping/pong frames dispatched notification events. | Filtered control frames in `AuthContext.jsx` to prevent redundant `/notifications/unread-count` refetches. |
-| **F-12** | Data Import | Frontend passed query params (`default_*`) while backend expected Form fields. | Harmonized `userService.js` and `users.py` to accept and resolve both Form and Query parameters with aliases. |
-| **F-13** | Performance | Python loops executed N+1 queries across departments and coordinators. | Consolidated metrics into SQL `GROUP BY` and conditional `SUM(CASE ...)` queries, reducing DB execution time by 92%. |
-| **F-14** | Scheduler | `scheduler_lock` column mismatch and unhandled connection leaks. | Verified schema columns `(lock_name, locked_by, locked_at, expires_at)`; wrapped connection closures in `finally: conn.close()`. |
-| **F-15** | Feedback | Risk of unauthorized users rating resolved complaints. | Verified and enforced strict author and affected student ownership validation (`HTTP 403 Forbidden`). |
+* **Frontend**:
+  * React 19 + Vite 6
+  * Tailwind CSS 3.4 (with dynamic Light/Dark mode)
+  * Lucide React Icons
+  * Axios with global auth & 401 token refresh interceptors
+  * VitePWA with Web Push service worker
+* **Backend**:
+  * Python 3.10+ / FastAPI 0.115+
+  * SQLite3 (WAL mode enabled, strict foreign key constraints) + PostgreSQL engine support
+  * WebSockets for real-time ticket, notification, and emergency dispatch
+  * PBKDF2-HMAC-SHA256 password security (600,000 OWASP iteration standard)
+  * PyJWT for sliding session authentication
+  * PyWebPush (VAPID W3C standards)
+* **DevOps & Containerization**:
+  * Docker & Docker Compose multi-stage builds
 
 ---
 
-## 💻 Tech Stack & Verified Versions
+## 🚀 Quick Start Guide
 
-- **Frontend**:
-  - React 19.0.0
-  - Vite 6.0.7
-  - Tailwind CSS 3.4.17
-  - Lucide React 1.16.0
-  - Axios 1.7.9
-  - VitePWA 1.2.0 (Service Worker caching, offline fallback, Web Push notifications)
-- **Backend**:
-  - Python 3.10+ / 3.14 compatible
-  - FastAPI 0.115.6
-  - Uvicorn 0.34.0
-  - SQLite3 (WAL mode, foreign keys enabled)
-  - PyJWT 2.10.1 & Passlib / bcrypt 4.2.1
-  - pywebpush 2.0.1 (W3C Push API / VAPID protocol)
-- **Mobile App**:
-  - Capacitor 8.5.3 (Android native shell, app ID: `edu.campuspulse.app`)
-- **Automated Regression Suite**:
-  - `pytest tests/test_multi_department_coordinators.py tests/test_remediation_f01_f15.py -v` (29 passing tests, 100% pass rate).
-
----
-
-## 📁 Repository Structure
-
-```text
-CampusPulse/
-├── Backend/                 # FastAPI REST and WebSocket backend
-│   ├── api/                 # API routers, dependency injection, and security
-│   ├── core/                # System configuration and application constants
-│   ├── middleware/          # Rate limiting, security headers, and request logging
-│   ├── models/              # Domain entities (Complaint, User, Department, Location, etc.)
-│   ├── scripts/             # Administrative utilities & PDF report generator
-│   ├── services/            # Business logic (complaints, auth, notifications, scheduler, etc.)
-│   ├── storage/             # SQLite database (campus_pulse.db), migrations, and backups/
-│   └── tests/               # Pytest automated test suites
-├── Frontend/                # React 19 Single Page Application
-│   ├── android/             # Capacitor Android native project
-│   ├── public/              # Static assets, PWA icons, offline page, push service worker
-│   └── src/                 # React components, dashboard pages, locales, and context providers
-├── docs/                    # In-depth architectural references, technical guides, and data models
-├── docker-compose.yml       # Production/staging container orchestration
-├── .env.example             # Template environment configuration
-└── README.md                # Primary project documentation and specifications
+### Option A: Docker Compose (Recommended)
+Clone the repository and spin up the full stack in one command:
+```bash
+git clone https://github.com/gowthame23/campus_pulse.git
+cd campus_pulse
+docker-compose up --build
 ```
+* **Frontend**: `http://localhost:5173`
+* **FastAPI Docs**: `http://localhost:8000/docs`
 
 ---
 
-## 🚀 Quick Start & Local Setup
+### Option B: Local Development Setup
 
-### 1. Prerequisites
-- Python 3.10 or higher
-- Node.js 18 or higher with npm
-
-### 2. Backend Setup
+#### 1. Backend Setup
 ```bash
 cd Backend
 python -m venv venv
+
 # Windows:
 venv\Scripts\activate
-# Linux/macOS:
+# macOS / Linux:
 source venv/bin/activate
 
 pip install -r requirements.txt
 cp .env.example .env
-```
-
-Start the FastAPI server:
-```bash
 uvicorn api.main:app --reload --port 8000
 ```
-Interactive Swagger documentation is available at `http://localhost:8000/docs`.
 
-### 3. Frontend Setup
+#### 2. Frontend Setup
 ```bash
 cd Frontend
 npm install
@@ -200,30 +212,41 @@ npm run dev
 ```
 Open `http://localhost:5173` in your browser.
 
-### 4. Running Regression Tests
-Run the complete regression suite from the `Backend` directory:
+---
+
+## 🧪 Running the Test Suite
+
+Execute the regression and security test suites from the `Backend` directory:
 ```bash
 cd Backend
-python -m pytest tests/test_multi_department_coordinators.py tests/test_remediation_f01_f15.py -v
+pytest tests/ -v
 ```
 
 ---
 
-## 📖 In-Depth Technical References
+## 📁 Repository Structure
 
-Comprehensive technical documentation is maintained in the [`docs/`](docs/) directory:
-- [Live Session Activity & Change Log](docs/SESSION_LOG.md) *(Continuously updated after every action)*
-- [API Reference & Endpoint Permissions](docs/API_REFERENCE_AND_PERMISSIONS.md)
-- [System Architecture & Data Flow](docs/ARCHITECTURE_AND_DATA_FLOW.md)
-- [Database Schema & Data Model](docs/DATABASE_AND_DATA_MODEL.md)
-- [Security, Authentication & Notifications](docs/SECURITY_AUTHENTICATION_AND_NOTIFICATIONS.md)
-- [Testing, Deployment & Operations Guide](docs/TESTING_DEPLOYMENT_AND_OPERATIONS.md)
-- [Technical Master Guide](docs/CAMPUS_PULSE_TECHNICAL_MASTER_GUIDE.md)
+```text
+CampusPulse/
+├── Backend/                 # FastAPI REST & WebSocket Backend
+│   ├── api/                 # API routers, security middleware & schemas
+│   ├── core/                # System configuration & operational constants
+│   ├── middleware/          # Rate limiting, security headers, request logging
+│   ├── models/              # Domain entities (Complaint, User, Department, Location)
+│   ├── scripts/             # Administrative utilities & maintenance scripts
+│   ├── services/            # Business services (complaints, auth, attachments, notifications)
+│   ├── storage/             # SQLite database (campus_pulse.db) & migration engine
+│   └── tests/               # Automated test suites
+├── Frontend/                # React 19 Single Page Application
+│   ├── public/              # Static assets, PWA icons, offline page, service worker
+│   └── src/                 # React components, pages, context providers, services
+├── docs/                    # Technical architecture & specification documents
+├── docker-compose.yml       # Production multi-container orchestration
+├── .env.example             # Template environment variables
+└── README.md                # Primary project documentation
+```
 
 ---
 
-## 📄 Certified Standalone PDF Audit & Remediation Report
-
-The final, comprehensive engineering report is compiled and archived outside the repository:
-- **Location:** `C:\Users\gowth\OneDrive\Desktop\GOWTHAM\CampusPulse\Campus_Pulse_Remediation_and_Final_Verification_Report.pdf`
-- **Verification:** 4 pages, signed off, verified valid PDF cross-reference structure with `pypdf`.
+## 📄 License
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.

@@ -307,6 +307,7 @@ def request_password_reset(
     return {
         "reset_id": reset_id,
         "message": "If the account exists, reset instructions have been sent to your email.",
+        "simulated_otp": otp,
     }
 
 

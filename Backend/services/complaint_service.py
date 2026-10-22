@@ -362,24 +362,32 @@ class ComplaintService:
                         "Duplicate complaint detected. You have already submitted this issue recently."
                     )
 
-        # 6. Compute initial SLA deadline
-        sla_hours = get_sla_hours(final_priority, category=category)
-        if hasattr(self.repository, "get_department_sla_config"):
-            try:
-                sla_cfg = self.repository.get_department_sla_config(department_id)
-                if sla_cfg:
-                    p_norm = (normalize_priority(final_priority) or "").lower()
-                    if p_norm == "critical":
-                        sla_hours = int(sla_cfg.get("critical_duration_hours", sla_hours))
-                    elif p_norm == "high":
-                        sla_hours = int(sla_cfg.get("high_duration_hours", sla_hours))
-                    elif p_norm == "medium":
-                        sla_hours = int(sla_cfg.get("medium_duration_hours", sla_hours))
-                    elif p_norm in ("normal", "low"):
-                        sla_hours = int(sla_cfg.get("normal_duration_hours", sla_hours))
-            except Exception:
-                pass
-        sla_deadline = (current_time + timedelta(hours=sla_hours)).isoformat()
+        # 6. Compute initial SLA deadline (Bypassed for Other / Not Sure)
+        is_other_submission = (
+            location_id == "LOC_OTHER"
+            or department_id in ("DEPT_OTHER", "DEPT_OTHER_GENERAL", "DEPT_HOSTEL_OTHER")
+            or (department and (department.name or "").lower() in ("other", "other / not sure"))
+        )
+        if is_other_submission:
+            sla_deadline = None
+        else:
+            sla_hours = get_sla_hours(final_priority, category=category)
+            if hasattr(self.repository, "get_department_sla_config"):
+                try:
+                    sla_cfg = self.repository.get_department_sla_config(department_id)
+                    if sla_cfg:
+                        p_norm = (normalize_priority(final_priority) or "").lower()
+                        if p_norm == "critical":
+                            sla_hours = int(sla_cfg.get("critical_duration_hours", sla_hours))
+                        elif p_norm == "high":
+                            sla_hours = int(sla_cfg.get("high_duration_hours", sla_hours))
+                        elif p_norm == "medium":
+                            sla_hours = int(sla_cfg.get("medium_duration_hours", sla_hours))
+                        elif p_norm in ("normal", "low"):
+                            sla_hours = int(sla_cfg.get("normal_duration_hours", sla_hours))
+                except Exception:
+                    pass
+            sla_deadline = (current_time + timedelta(hours=sla_hours)).isoformat()
 
         # 7. Create Complaint instance
         complaint = Complaint(
@@ -469,7 +477,22 @@ class ComplaintService:
         loc_label = loc_obj.name if loc_obj else location_id
         dept_label = dept_obj.name if dept_obj else department_id
 
-        if acting_coord:
+        if is_other_submission:
+            complaint.status = "Under Review"
+            complaint.sla_status = "Under Review"
+            complaint.due_date = None
+            complaint.sla_deadline = None
+            complaint.team_id = None
+            complaint.add_history("Thank you! Submission received under Other / Not Sure. Routed directly to Administration for triage and review.")
+            for admin_u in self.auth_service.list_users(role="administrator"):
+                if admin_u.active and not getattr(admin_u, "is_deleted", False):
+                    self.notification_service.notify(
+                        admin_u.user_id,
+                        f"New submission under Other / Not Sure: {complaint.title or complaint.category}",
+                        complaint_id=complaint.complaint_id,
+                        title="New Admin Triage Submission",
+                    )
+        elif acting_coord:
             complaint.add_history(f"Awaiting assignment by coordinator {acting_coord.name}.")
             self.notification_service.notify(
                 acting_coord.user_id,

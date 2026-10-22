@@ -743,6 +743,7 @@ def _migrate_teams_and_leaves(conn: sqlite3.Connection):
         FROM team_members tm
         JOIN teams t ON tm.team_id = t.team_id
         JOIN team_locations tl ON t.team_id = tl.team_id
+        JOIN users u ON tm.user_id = u.user_id
         WHERE t.active = 1;
     """)
 

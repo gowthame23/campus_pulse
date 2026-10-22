@@ -176,28 +176,30 @@ class TeamService:
                 """,
                 (leave_id, user_id, from_date, to_date, reason or "", set_by, now_str, department_id or None),
             )
-            # Flag open jobs of this user as assignee on leave
-            if department_id and department_id != "ALL":
-                conn.execute(
-                    """
-                    UPDATE complaints
-                    SET assignee_on_leave_flag = 1
-                    WHERE assigned_to = ?
-                      AND department_id = ?
-                      AND status IN ('Assigned', 'In Progress', 'Waiting for Parts')
-                    """,
-                    (user_id, department_id),
-                )
-            else:
-                conn.execute(
-                    """
-                    UPDATE complaints
-                    SET assignee_on_leave_flag = 1
-                    WHERE assigned_to = ?
-                      AND status IN ('Assigned', 'In Progress', 'Waiting for Parts')
-                    """,
-                    (user_id,),
-                )
+            # Flag open jobs of this user as assignee on leave only if leave is active today
+            today_iso = date.today().isoformat()
+            if from_date <= today_iso <= to_date:
+                if department_id and department_id != "ALL":
+                    conn.execute(
+                        """
+                        UPDATE complaints
+                        SET assignee_on_leave_flag = 1
+                        WHERE assigned_to = ?
+                          AND department_id = ?
+                          AND status IN ('Assigned', 'In Progress', 'Waiting for Parts')
+                        """,
+                        (user_id, department_id),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        UPDATE complaints
+                        SET assignee_on_leave_flag = 1
+                        WHERE assigned_to = ?
+                          AND status IN ('Assigned', 'In Progress', 'Waiting for Parts')
+                        """,
+                        (user_id,),
+                    )
 
         # Notify backup coordinator if this user is a coordinator of any matching team
         user_obj = self.auth_service.get_user(user_id) if self.auth_service else None
@@ -371,6 +373,25 @@ class TeamService:
             mem_rows = conn.execute("SELECT user_id FROM team_members WHERE team_id = ?", (team["team_id"],)).fetchall()
             team["member_ids"] = [r[0] for r in mem_rows]
             return team
+
+
+    def sync_expired_leaves(self):
+        """Clears assignee_on_leave_flag on complaints whose assignees are no longer on active leave."""
+        today_iso = date.today().isoformat()
+        with self._connect() as conn:
+            conn.execute("""
+                UPDATE complaints
+                SET assignee_on_leave_flag = 0
+                WHERE assignee_on_leave_flag = 1
+                  AND (
+                      assigned_to IS NULL
+                      OR assigned_to NOT IN (
+                          SELECT user_id FROM user_leaves
+                          WHERE date(from_date) <= date(?)
+                            AND date(?) <= date(to_date)
+                      )
+                  )
+            """, (today_iso, today_iso))
 
     def get_acting_coordinator(self, team: Dict[str, Any]) -> Optional[Any]:
         """Rule B4:

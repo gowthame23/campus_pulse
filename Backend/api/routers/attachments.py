@@ -27,6 +27,23 @@ def _ensure_attachment_access(complaint, current_user, complaint_service):
     elif role in ("coordinator", "employee"):
         if complaint.assigned_to == current_user.user_id:
             return
+        dept = complaint_service.auth_service.get_department(complaint.department_id)
+        if dept and current_user.user_id in (getattr(dept, "coordinator_id", None), getattr(dept, "coordinator_2_id", None)):
+            return
+        if getattr(complaint, "team_id", None) and hasattr(complaint_service, "team_service"):
+            team = complaint_service.team_service.get_team(complaint.team_id)
+            if team and (current_user.user_id in (team.get("coordinator_id"), team.get("backup_coordinator_id")) or complaint_service.team_service.is_user_in_team(team["team_id"], current_user.user_id)):
+                return
+        try:
+            with complaint_service.auth_service._connect() as conn:
+                is_mem = conn.execute(
+                    "SELECT 1 FROM employee_work_memberships WHERE user_id = ? AND department_id = ? AND location_id = ?",
+                    (current_user.user_id, complaint.department_id, complaint.location_id)
+                ).fetchone()
+                if is_mem:
+                    return
+        except Exception:
+            pass
         coord_assignments = complaint_service.auth_service.list_coordinator_assignments(coordinator_id=current_user.user_id) or []
         for asgn in coord_assignments:
             a_loc = asgn.get("location_id")
@@ -36,6 +53,8 @@ def _ensure_attachment_access(complaint, current_user, complaint_service):
             if loc_match and dept_match:
                 return
     elif role == "location_in_charge":
+        if getattr(current_user, "location_id", None) == complaint.location_id:
+            return
         locs = complaint_service.auth_service.list_locations()
         assigned_locs = {l.location_id for l in locs if l.in_charge_id == current_user.user_id}
         if complaint.location_id in assigned_locs or complaint.created_by == current_user.user_id or complaint.assigned_to == current_user.user_id:
@@ -109,10 +128,15 @@ def upload_attachments(
             )
 
     elif u_role in ("coordinator", "employee"):
-        if complaint.assigned_to != current_user.user_id:
+        dept = complaint_service.auth_service.get_department(complaint.department_id)
+        is_dept_coord = dept and current_user.user_id in (
+            getattr(dept, "coordinator_id", None),
+            getattr(dept, "coordinator_2_id", None),
+        )
+        if complaint.assigned_to != current_user.user_id and not is_dept_coord:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Staff can only upload to complaints assigned to them.",
+                detail="Staff can only upload to complaints assigned to them or their department.",
             )
 
         if category not in ("Before Repair", "After Repair"):

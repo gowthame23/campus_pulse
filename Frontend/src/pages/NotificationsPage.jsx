@@ -142,13 +142,15 @@ export default function NotificationsPage() {
 
   const openDetails = (notif) => {
     setSelectedNotif(notif);
-    deleteSingle(notif.notification_id);
+    if (!notif.is_read) {
+      markRead(notif.notification_id);
+    }
   };
 
   const navigateToRelated = (notif) => {
     const refId = notif.reference_id || notif.complaint_id;
     const refType = (notif.reference_type || "complaint").toLowerCase();
-    notificationService.delete(notif.notification_id).catch(() => {});
+    notificationService.markRead(notif.notification_id).catch(() => {});
     if (refType === "complaint" && refId) {
       navigate(`/complaints/${refId}`);
     }
