@@ -20,6 +20,9 @@ from api.schemas import (
     user_to_response,
 )
 from api.security import bearer_scheme, create_session, delete_session, get_current_user, hash_token
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 _reset_requests = {}
@@ -286,6 +289,10 @@ def request_password_reset(
     exp_ts = now_ts + (15 * 60)
 
     user = auth_service.get_user_by_email(clean_email)
+    if not user:
+        user = auth_service._resolve_user_identity(payload.email.strip())
+
+    delivery_email = (user.email.strip().lower() if user and getattr(user, "email", None) else clean_email)
 
     with _get_db() as conn:
         conn.execute(
@@ -293,14 +300,17 @@ def request_password_reset(
             INSERT INTO password_resets (reset_id, user_id, email, otp, attempts, expires_at, used, created_at)
             VALUES (?, ?, ?, ?, 0, ?, 0, ?)
             """,
-            (reset_id, user.user_id if user else None, clean_email, hash_token(otp), exp_ts, now_ts),
+            (reset_id, user.user_id if user else None, delivery_email, hash_token(otp), exp_ts, now_ts),
         )
         conn.commit()
 
     # Account Enumeration Protection: send email if user exists, but always return identical generic success
-    if user:
+    if user and delivery_email:
         from utils.email import send_otp_email
-        send_otp_email(clean_email, otp)
+        send_otp_email(delivery_email, otp)
+        logger.info(f"Password reset OTP initiated for user {user.user_id} ({delivery_email})")
+    else:
+        logger.warning(f"Password reset requested for unrecognized user/email: {clean_email}")
 
     return {
         "reset_id": reset_id,

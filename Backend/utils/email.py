@@ -11,6 +11,8 @@ import concurrent.futures
 import os
 import smtplib
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import formatdate, make_msgid
 
 from utils.logger import get_logger
 
@@ -81,24 +83,48 @@ def _send_otp_email_sync(to_email, otp) -> bool:
     smtp_password = os.environ.get("SMTP_PASSWORD")
     smtp_from = os.environ.get("SMTP_FROM", smtp_username)
 
-    body = f"Your Campus Pulse password reset OTP is: {otp}\nThis code will expire in 15 minutes."
-    msg = MIMEText(body)
-    msg["Subject"] = "Campus Pulse - Password Reset OTP"
-    msg["From"] = smtp_from if smtp_from else "noreply@campus.edu"
-    msg["To"] = to_email
-
     if not smtp_server or not smtp_username or not smtp_password:
         logger.warning("OTP email not sent: SMTP is not configured")
         return False
 
+    plain_text = f"Your Campus Pulse password reset OTP is: {otp}\nThis code will expire in 15 minutes."
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px;">
+  <div style="max-width: 480px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+    <div style="text-align: center; margin-bottom: 24px;">
+      <h2 style="color: #0f172a; margin: 0; font-size: 22px;">Campus Pulse</h2>
+      <p style="color: #64748b; font-size: 13px; margin-top: 4px;">Password Reset Verification Code</p>
+    </div>
+    <p style="color: #334155; font-size: 14px; line-height: 1.5;">You requested a password reset for your Campus Pulse account. Use the verification code below to complete the reset:</p>
+    <div style="text-align: center; margin: 28px 0;">
+      <span style="display: inline-block; font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #0284c7; background: #f0f9ff; border: 1px dashed #0284c7; border-radius: 8px; padding: 12px 24px;">{otp}</span>
+    </div>
+    <p style="color: #64748b; font-size: 12px; line-height: 1.5; text-align: center;">This code will expire in 15 minutes. If you did not request this code, you can safely ignore this email.</p>
+  </div>
+</body>
+</html>"""
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "Campus Pulse - Password Reset OTP"
+    from_header = f"Campus Pulse <{smtp_from}>" if "<" not in smtp_from else smtp_from
+    msg["From"] = from_header
+    msg["To"] = to_email
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain="campuspulse.edu")
+
+    msg.attach(MIMEText(plain_text, "plain", "utf-8"))
+    msg.attach(MIMEText(html_content, "html", "utf-8"))
+
     try:
         port = int(smtp_port) if smtp_port else 587
-        server = smtplib.SMTP(smtp_server, port)
+        server = smtplib.SMTP(smtp_server, port, timeout=15)
         server.starttls()
         server.login(smtp_username, smtp_password)
-        server.sendmail(msg["From"], [to_email], msg.as_string())
+        server.sendmail(smtp_from, [to_email], msg.as_string())
         server.quit()
-        logger.info("Reset OTP email sent", extra={"recipient": to_email})
+        logger.info(f"Reset OTP email successfully delivered to {to_email}")
         return True
     except Exception as e:
         logger.exception("Reset OTP email delivery failed", extra={"recipient": to_email})
