@@ -783,4 +783,17 @@
 
 ---
 
+### Entry 50 — Universal Auth Shell Parity (ActivateAccountPage & Full Auth Suite)
+* **User Directive:** "did you chnaged that for every version"
+* **Issues Addressed & Actions Taken:**
+  1. **Universal Auth UI Parity Across All Standalone Auth Screens:**
+     - Verified that the compact language pill (`fixed top-4 right-4 z-30`) and in-card single theme toggle (`absolute top-3.5 right-3.5 z-20`) are active across all 4 steps of `ForgotPasswordPage.jsx` and across all viewports (mobile, tablet, desktop).
+     - Extended the exact identical styling to `ActivateAccountPage.jsx` (`/activate`), so that all unauthenticated user-facing auth entry screens (`/login`, `/forgot-password`, `/activate`) share 100% visual consistency.
+  2. **Build & Quality Assurance:**
+     - Executed production build (`npm run build`): passed cleanly in 1.56s.
+     - Database confirmed at baseline: **0 complaints, 0 attachments, 0 notifications, 0 FK errors**.
+     - Changes committed and pushed to remote `main`.
+
+---
+
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
