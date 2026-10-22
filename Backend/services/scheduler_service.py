@@ -148,6 +148,11 @@ def create_scheduler(complaint_service, config_service):
                     f"Cleanup: purged {cursor.rowcount} old deleted notifications."
                 )
             conn.commit()
+            if hasattr(complaint_service, "team_service") and complaint_service.team_service:
+                try:
+                    complaint_service.team_service.sync_expired_leaves()
+                except Exception as ex:
+                    logger.warning(f"Leave flag sync failed: {ex}")
         except Exception as e:
             logger.error(f"Cleanup failed: {e}")
         finally:

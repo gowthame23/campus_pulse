@@ -41,3 +41,7 @@ scratch/
 .DS_Store
 Thumbs.db
 full_prompt_dump.txt
+
+# Local private credentials reference (never committed)
+CREDENTIALS.local.md
+*.local.md

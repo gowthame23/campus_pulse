@@ -192,9 +192,21 @@ def _get_critical_emergency_contacts(
             cid = team["coordinator_id"]
             coord_u = user_cache.get(cid) if user_cache is not None else auth_service.get_user(cid)
 
-    if not coord_u and dept and getattr(dept, "coordinator_id", None):
-        cid = dept.coordinator_id
-        coord_u = user_cache.get(cid) if user_cache is not None else auth_service.get_user(cid)
+    if not coord_u and dept:
+        c1 = getattr(dept, "coordinator_id", None)
+        c2 = getattr(dept, "coordinator_2_id", None)
+        active_cid = None
+        if c1 and hasattr(complaint_service, "team_service") and complaint_service.team_service:
+            if not complaint_service.team_service.is_user_on_leave(c1, department_id=dept.department_id):
+                active_cid = c1
+            elif c2 and not complaint_service.team_service.is_user_on_leave(c2, department_id=dept.department_id):
+                active_cid = c2
+        elif c1:
+            active_cid = c1
+        elif c2:
+            active_cid = c2
+        if active_cid:
+            coord_u = user_cache.get(active_cid) if user_cache is not None else auth_service.get_user(active_cid)
 
     if coord_u:
         phone = getattr(coord_u, "phone_number", None) or getattr(coord_u, "phone", None)
@@ -267,9 +279,22 @@ def _format_complaint(
     if dept:
         data["department_id"] = dept.department_id
         data["department_name"] = dept.name
-        if getattr(dept, "coordinator_id", None):
-            data["assigned_coordinator_id"] = dept.coordinator_id
-            coord = user_cache.get(dept.coordinator_id) if user_cache is not None else complaint_service.auth_service.get_user(dept.coordinator_id)
+        active_coord_id = None
+        c1 = getattr(dept, "coordinator_id", None)
+        c2 = getattr(dept, "coordinator_2_id", None)
+        if c1 and hasattr(complaint_service, "team_service") and complaint_service.team_service:
+            if not complaint_service.team_service.is_user_on_leave(c1, department_id=dept.department_id):
+                active_coord_id = c1
+            elif c2 and not complaint_service.team_service.is_user_on_leave(c2, department_id=dept.department_id):
+                active_coord_id = c2
+        elif c1:
+            active_coord_id = c1
+        elif c2:
+            active_coord_id = c2
+
+        if active_coord_id:
+            data["assigned_coordinator_id"] = active_coord_id
+            coord = user_cache.get(active_coord_id) if user_cache is not None else complaint_service.auth_service.get_user(active_coord_id)
             if coord:
                 data["assigned_coordinator_name"] = coord.name
 

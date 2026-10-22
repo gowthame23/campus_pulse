@@ -81,8 +81,8 @@ class AttachmentService:
         elif file_sha256 and complaint_id:
             with self._connect() as conn:
                 dup_row = conn.execute(
-                    "SELECT complaint_id FROM attachments WHERE sha256 = ? AND complaint_id != ? AND (is_deleted = 0 OR is_deleted IS NULL) LIMIT 1",
-                    (file_sha256, complaint_id),
+                    "SELECT complaint_id FROM attachments WHERE sha256 = ? AND (is_deleted = 0 OR is_deleted IS NULL) LIMIT 1",
+                    (file_sha256,),
                 ).fetchone()
                 if dup_row:
                     flags.append("REUSED")

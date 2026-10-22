@@ -162,7 +162,7 @@ def test_sec_005_certificate_endpoint_security():
 
     # 3. Authenticated request with valid month returns 200 HTML with all inputs escaped
     res_valid = client.get(
-        "/recognitions/certificate?coordinator_id=USR_EMP_A1&month=2026-08",
+        "/recognitions/certificate?coordinator_id=USR_COORD_1&month=2026-08",
         headers=headers_adm,
     )
     assert res_valid.status_code == 200
