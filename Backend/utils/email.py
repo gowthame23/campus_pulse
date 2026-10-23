@@ -1,11 +1,14 @@
 from pathlib import Path
-from dotenv import load_dotenv
 
-_env_path = Path(__file__).resolve().parent.parent / '.env'
-if _env_path.exists():
-    load_dotenv(dotenv_path=_env_path)
-else:
-    load_dotenv()
+try:
+    from dotenv import load_dotenv
+    _env_path = Path(__file__).resolve().parent.parent / '.env'
+    if _env_path.exists():
+        load_dotenv(dotenv_path=_env_path)
+    else:
+        load_dotenv()
+except ImportError:
+    pass
 
 import concurrent.futures
 import os
