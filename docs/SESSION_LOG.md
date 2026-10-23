@@ -959,4 +959,23 @@
 
 ---
 
+### Entry 60 — Resolution of Cloud SMTP `OSError: [Errno 101] Network is unreachable` via IPv4 Routing
+* **User Directive:** "ui changed back as last time the themen was not in box and i am not getting and otp for reset password it is just displaying that it sent the mail but it is not sending anything in local thing is doing good but when ti comes to the live it is not doing well can you check that ... countinue"
+* **Issues Addressed & Actions Taken:**
+  1. **Root Cause Analysis of Live Email Failure:**
+     - Live testing to Railway returned `HTTPError: 502 {"detail":"Unable to dispatch email: SMTP error (OSError: [Errno 101] Network is unreachable)"}`.
+     - In Python, `smtplib.SMTP("smtp.gmail.com", 587)` performs standard DNS resolution, which returns Google's IPv6 addresses first.
+     - Linux container environments on Railway lack outbound IPv6 routing. When the Python socket attempts to connect to `[2607:f8b0:400e:c06::6c]:587`, the kernel fails immediately with `OSError: [Errno 101] Network is unreachable`.
+     - In local environments (Windows dual-stack), Python fell back to IPv4 transparently, which is why local sending worked while live sending silently failed.
+  2. **Dedicated IPv4 SMTP Clients (`IPv4SMTP` & `IPv4SMTP_SSL`):**
+     - Implemented `IPv4SMTP` and `IPv4SMTP_SSL` in [`Backend/utils/email.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/utils/email.py) subclassing `smtplib.SMTP` and `smtplib.SMTP_SSL`.
+     - Custom `_get_socket()` explicitly resolves and binds to IPv4 (`socket.AF_INET`) stream sockets before initializing TLS/SSL handshakes.
+     - Sanitized `SMTP_PASSWORD` across all email dispatchers to strip accidental formatting spaces and quotes.
+  3. **Verification & Testing:**
+     - Tested live IPv4 socket resolution and TLS handshake to `smtp.gmail.com`: connected in 1.2s.
+     - Ran full test suite (`pytest tests/test_workflow1_auth.py tests/test_phase3_security.py`): **22 of 22 tests passing**.
+     - Database baseline state confirmed pristine: **0 complaints, 0 attachments, 0 notifications, 0 resets, 0 FK errors**.
+
+---
+
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*

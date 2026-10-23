@@ -13,6 +13,52 @@ except ImportError:
 import concurrent.futures
 import os
 import smtplib
+import socket
+import ssl
+
+class IPv4SMTP(smtplib.SMTP):
+    """SMTP client that strictly resolves IPv4 (AF_INET) to prevent [Errno 101] Network is unreachable in cloud containers lacking IPv6."""
+    def _get_socket(self, host, port, timeout):
+        err = None
+        for res in socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM):
+            af, socktype, proto, canonname, sa = res
+            sock = None
+            try:
+                sock = socket.socket(af, socktype, proto)
+                if timeout is not None:
+                    sock.settimeout(timeout)
+                sock.connect(sa)
+                return sock
+            except OSError as e:
+                err = e
+                if sock is not None:
+                    sock.close()
+        if err is not None:
+            raise err
+        raise OSError(f"Failed to resolve IPv4 address for {host}")
+
+class IPv4SMTP_SSL(smtplib.SMTP_SSL):
+    """SMTP_SSL client that strictly resolves IPv4 (AF_INET) to prevent [Errno 101] Network is unreachable in cloud containers lacking IPv6."""
+    def _get_socket(self, host, port, timeout):
+        err = None
+        for res in socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM):
+            af, socktype, proto, canonname, sa = res
+            sock = None
+            try:
+                sock = socket.socket(af, socktype, proto)
+                if timeout is not None:
+                    sock.settimeout(timeout)
+                sock.connect(sa)
+                ctx = self.context if self.context else ssl.create_default_context()
+                return ctx.wrap_socket(sock, server_hostname=host)
+            except OSError as e:
+                err = e
+                if sock is not None:
+                    sock.close()
+        if err is not None:
+            raise err
+        raise OSError(f"Failed to resolve IPv4 address for {host}")
+
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formatdate, make_msgid
@@ -132,9 +178,9 @@ def _send_otp_email_sync(to_email, otp) -> bool:
     try:
         port = int(smtp_port) if smtp_port else 587
         if port == 465:
-            server = smtplib.SMTP_SSL(smtp_server, port, timeout=15)
+            server = IPv4SMTP_SSL(smtp_server, port, timeout=15)
         else:
-            server = smtplib.SMTP(smtp_server, port, timeout=15)
+            server = IPv4SMTP(smtp_server, port, timeout=15)
             server.starttls()
         server.login(smtp_username, smtp_password)
         server.sendmail(smtp_from, [to_email], msg.as_string())
@@ -290,9 +336,13 @@ def _send_activation_email_sync(to_email, activation_link, user_name="Student") 
 
     try:
         port = int(smtp_port) if smtp_port else 587
-        server = smtplib.SMTP(smtp_server, port, timeout=15)
-        server.starttls()
-        server.login(smtp_username, smtp_password)
+        if port == 465:
+            server = IPv4SMTP_SSL(smtp_server, port, timeout=15)
+        else:
+            server = IPv4SMTP(smtp_server, port, timeout=15)
+            server.starttls()
+        clean_pwd = smtp_password.strip().replace(" ", "").strip('"').strip("'")
+        server.login(smtp_username, clean_pwd)
         server.sendmail(smtp_from, [to_email], msg.as_string())
         server.quit()
         logger.info("Activation email sent successfully", extra={"recipient": to_email})
