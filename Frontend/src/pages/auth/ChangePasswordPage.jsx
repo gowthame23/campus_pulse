@@ -13,7 +13,7 @@ import { authService } from "../../services/authService.js";
 export default function ChangePasswordPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const {
     register,
@@ -45,13 +45,19 @@ export default function ChangePasswordPage() {
     <div className="grid gap-6 max-w-md">
       {/* Page Header */}
       <div>
-        <Link
-          to="/profile"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Back to profile
-        </Link>
+        {user?.first_login ? (
+          <div className="mb-3 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/40 p-3.5 text-xs text-amber-800 dark:text-amber-200 leading-normal shadow-sm">
+            <span className="font-bold">&#9888;&#65039; First Login Security Notice:</span> You must change your temporary password before accessing your account dashboard.
+          </div>
+        ) : (
+          <Link
+            to="/profile"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to profile
+          </Link>
+        )}
         <PageHeader
           title="Change Password"
           description="Update your current password to keep your Campus Pulse account secure."
