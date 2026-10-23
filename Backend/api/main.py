@@ -79,18 +79,14 @@ if not cors_origins:
         "http://127.0.0.1:5173",
         "http://localhost:5173",
         "https://campuspulse-rho.vercel.app",
+        "https://campuspulse.vercel.app",
     ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    # Only ever matches localhost/127.0.0.1 dev ports. Any other allowed origin
-    # (including the production Vercel domain) must be listed explicitly in
-    # cors_origins / CORS_ORIGINS -- do NOT widen this to a wildcard TLD like
-    # `*.vercel.app`: with allow_credentials=True that would let anyone who
-    # registers a free subdomain on that host send credentialed requests
-    # (cookies included) to this API from attacker-controlled JS.
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?",
+    # Matches localhost dev ports and all legitimate CampusPulse Vercel domains and branch previews
+    allow_origin_regex=r"^(http://(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?|https://campuspulse[a-zA-Z0-9_\-]*\.vercel\.app)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
