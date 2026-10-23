@@ -921,4 +921,21 @@
 
 ---
 
+### Entry 58 — Live Cloud CORS Harmonization for Vercel & Railway Deployment
+* **User Directive:** "i am not testing the local one i am testing the live one i need the live one to work good in the live one i am getting network error what should i do now"
+* **Issues Addressed & Actions Taken:**
+  1. **Deployment Architecture Verification:**
+     - Verified active live infrastructure: Frontend deployed on Vercel (`https://campuspulse-rho.vercel.app`), Backend deployed on Railway (`https://campuspulse-production-4ad2.up.railway.app`).
+     - Tested live Railway endpoints: `/` (200), `/docs` (200), `/auth/password-reset/request` (200 for registered email `gowtham.e23@iiits.in`, 404 for non-existent accounts).
+  2. **CORS Regex Expansion for CampusPulse Vercel Domains:**
+     - Previously, `allow_origins` strictly matched only `https://campuspulse-rho.vercel.app`, and `allow_origin_regex` only permitted localhost.
+     - Any user visit via alternate project domains (e.g. `https://campuspulse.vercel.app`, Vercel branch preview URLs, or mobile PWAs) was rejected by CORS with HTTP 400 without `Access-Control-Allow-Origin`, resulting in browser "Network Error".
+     - Updated `Backend/api/main.py` with scoped regex `r"^(http://(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?|https://campuspulse[a-zA-Z0-9_\-]*\.vercel\.app)$"`.
+     - Explicitly included both `https://campuspulse-rho.vercel.app` and `https://campuspulse.vercel.app` in `cors_origins`.
+  3. **Verification:**
+     - Tested regex against `campuspulse-rho.vercel.app`, `campuspulse.vercel.app`, branch previews, and unauthorized domains.
+     - Confirmed clean database state: **0 complaints, 0 attachments, 0 notifications, 0 resets, 0 FK errors**.
+
+---
+
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
