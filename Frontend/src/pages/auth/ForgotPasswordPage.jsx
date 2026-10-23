@@ -18,6 +18,7 @@ import Button from "../../components/Button.jsx";
 import Input from "../../components/Input.jsx";
 import Toast from "../../components/Toast.jsx";
 import { authService } from "../../services/authService.js";
+import { getApiError } from "../../api/axios.js";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import { useLanguage } from "../../context/LanguageContext.jsx";
 
@@ -68,7 +69,7 @@ export default function ForgotPasswordPage() {
       setMessage(response.data.message || "OTP sent to your email. Enter the verification code below.");
       setStep(2);
     } catch (err) {
-      setError(err?.response?.data?.detail || "Email verification failed.");
+      setError(getApiError(err, "Failed to send verification code. Please check your email or network connection."));
     }
   };
 
@@ -84,7 +85,7 @@ export default function ForgotPasswordPage() {
       setMessage("OTP verified. Please set your new password.");
       setStep(3);
     } catch (err) {
-      setError(err?.response?.data?.detail || "Invalid or expired OTP.");
+      setError(getApiError(err, "Invalid or expired OTP."));
     }
   };
 
@@ -100,7 +101,7 @@ export default function ForgotPasswordPage() {
       setMessage("Password reset successful.");
       setStep(4);
     } catch (err) {
-      setError(err?.response?.data?.detail || "Unable to reset password.");
+      setError(getApiError(err, "Unable to reset password."));
     }
   };
 

@@ -228,8 +228,8 @@ import sqlite3
 import time
 
 def _get_db():
-    conn = sqlite3.connect(get_db_path())
-    conn.row_factory = sqlite3.Row
+    from utils.db import get_db_connection
+    conn = get_db_connection()
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS password_resets (
@@ -244,6 +244,8 @@ def _get_db():
         )
         """
     )
+    if hasattr(conn, "commit"):
+        conn.commit()
     return conn
 
 
@@ -290,7 +292,7 @@ def request_password_reset(
 
     user = auth_service.get_user_by_email(clean_email)
     if not user:
-        user = auth_service._resolve_user_identity(payload.email.strip())
+        user = auth_service.get_user_by_identity(payload.email.strip())
 
     if not user or not getattr(user, "email", None):
         logger.warning(f"Password reset requested for unrecognized user/email: {clean_email}")

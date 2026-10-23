@@ -901,4 +901,24 @@
 
 ---
 
+### Entry 57 — Resolution of "Email Verification Failed" & Identity Resolution in Password Reset
+* **User Directive:** "now i am getting email verfication failed for my mails"
+* **Issues Addressed & Actions Taken:**
+  1. **Root Cause Analysis:**
+     - In `Backend/api/routers/auth.py`, line 293 attempted to call `auth_service._resolve_user_identity(payload.email.strip())`.
+     - `AuthService` implemented `get_user_by_identity` but did not have an attribute `_resolve_user_identity`, causing an unhandled `AttributeError: 'AuthService' object has no attribute '_resolve_user_identity'` (HTTP 500) whenever an identity lookup was triggered.
+     - In `Frontend/src/pages/auth/ForgotPasswordPage.jsx`, the catch block previously used a hardcoded fallback: `setError(err?.response?.data?.detail || "Email verification failed.");`. When a 500 or network error occurred where `detail` was unpopulated, the UI defaulted to the misleading banner `"Email verification failed."`.
+     - In `Backend/api/routers/auth.py`, `_get_db()` opened raw SQLite connections directly (`sqlite3.connect(get_db_path())`) rather than using the pooled, multi-engine connection wrapper `get_db_connection()`.
+  2. **Resolution & Hardening:**
+     - **Identity Resolution:** Updated `Backend/api/routers/auth.py` to invoke `auth_service.get_user_by_identity(payload.email.strip())` and added `_resolve_user_identity` as an alias on `AuthService` for backward compatibility.
+     - **Unified DB Connection:** Refactored `_get_db()` in `auth.py` to use `get_db_connection()`, ensuring full compatibility across both SQLite and PostgreSQL.
+     - **Robust Frontend Error Handling:** Integrated `getApiError` in `ForgotPasswordPage.jsx` across `startReset`, `verifyOtp`, and `completeReset` to surface exact server details, network errors, and descriptive messages instead of cryptic fallback strings.
+  3. **Verification & Testing:**
+     - Verified with `fastapi.testclient.TestClient`: registered emails (`gowtham.e23@iiits.in`) deliver OTP (200), unrecognized emails return descriptive 404 with exact account advice.
+     - Built frontend bundle with Vite in 1.36s (0 errors).
+     - Executed pytest test suite: **22 of 22 tests passing**.
+     - Baseline DB purity confirmed: **0 complaints, 0 attachments, 0 notifications, 0 resets, 0 FK errors**.
+
+---
+
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
