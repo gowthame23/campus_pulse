@@ -11,7 +11,7 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: CORS_ORIGINS
-        value: https://campuspulse-rho.vercel.app
+        value: https://campuspulse-rho.vercel.app,https://campuspulse.vercel.app
       - key: RUN_SCHEDULER
         value: "true"
       - key: FRONTEND_URL
