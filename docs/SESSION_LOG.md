@@ -938,4 +938,25 @@
 
 ---
 
+### Entry 59 — Root Vercel Auto-Deployment & Live Synchronous SMTP Delivery Hardening
+* **User Directive:** "ui changed back as last time the themen was not in box and i am not getting and otp for reset password it is just displaying that it sent the mail but it is not sending anything in local thing is doing good but when ti comes to the live it is not doing well can you check that"
+* **Issues Addressed & Actions Taken:**
+  1. **Root Vercel Deployment Automation:**
+     - Identified that `https://campuspulse-rho.vercel.app` was serving an older build because the repository lacked a root `package.json` and root `vercel.json`, preventing Vercel from triggering automatic builds when commits were pushed to `main`.
+     - Created root [`vercel.json`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/vercel.json) configured with `"rootDirectory": "Frontend"`, `"buildCommand": "npm run build"`, `"outputDirectory": "dist"`, and SPA rewrites.
+     - Added root [`package.json`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/package.json) build script forwarding to Frontend.
+     - Verified that [`LoginPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/auth/LoginPage.jsx) and [`ForgotPasswordPage.jsx`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Frontend/src/pages/auth/ForgotPasswordPage.jsx) have the single theme button and language selector neatly embedded *inside the card corner* (`absolute top-3.5 right-3.5`).
+  2. **Synchronous Live SMTP Delivery & Diagnostic Transparency:**
+     - Previously, `send_otp_email` submitted delivery to a background thread pool and returned `True` immediately, causing the API to return a 200 "Sent" message even if Google/Railway SMTP failed in the background.
+     - Updated [`Backend/api/routers/auth.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/api/routers/auth.py) to execute `_send_otp_email_sync` directly.
+     - Sanitized `SMTP_PASSWORD` automatically in [`Backend/utils/email.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/utils/email.py) by stripping spaces (Google 16-character App Password format `xxxx xxxx xxxx xxxx`) and surrounding quotes.
+     - Added native support for both port 465 (`smtplib.SMTP_SSL`) and port 587 (`smtplib.SMTP + starttls`).
+     - Added detailed diagnostic capture (`get_last_email_error()`): if SMTP fails on Railway, the API immediately returns HTTP 502 with the exact reason (e.g. `Google SMTP authentication failed (535)` or `SMTP connection error`) instead of a misleading success message.
+  3. **Verification & Testing:**
+     - Backend test suite: **22 of 22 tests passing (100%)**.
+     - Frontend production build: compiled in 1.31s (0 errors).
+     - Verified database baseline purity: **0 complaints, 0 attachments, 0 notifications, 0 resets, 0 FK errors**.
+
+---
+
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*

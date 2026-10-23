@@ -321,12 +321,14 @@ def request_password_reset(
         )
         conn.commit()
 
-    email_sent = send_otp_email(delivery_email, otp)
+    from utils.email import _send_otp_email_sync, get_last_email_error
+    email_sent = _send_otp_email_sync(delivery_email, otp)
     if not email_sent:
-        logger.error(f"Failed to submit OTP email to delivery queue for {delivery_email}")
+        err_msg = get_last_email_error()
+        logger.error(f"Failed to deliver OTP email to {delivery_email}: {err_msg}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to dispatch OTP email. Please try again in a few moments.",
+            detail=f"Unable to dispatch email: {err_msg}",
         )
 
     logger.info(f"Password reset OTP initiated for user {user.user_id} ({delivery_email})")

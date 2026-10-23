@@ -21,6 +21,13 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+_last_email_error = None
+
+def get_last_email_error() -> str:
+    global _last_email_error
+    return _last_email_error or "Unknown SMTP error"
+
+
 # Small background worker pool so SMTP network latency never blocks the event loop
 _email_executor = concurrent.futures.ThreadPoolExecutor(max_workers=3, thread_name_prefix="email-dispatcher")
 
@@ -80,14 +87,16 @@ def send_notification_email(to_email, title, message) -> bool:
 
 
 def _send_otp_email_sync(to_email, otp) -> bool:
-    smtp_server = os.environ.get("SMTP_SERVER")
-    smtp_port = os.environ.get("SMTP_PORT")
-    smtp_username = os.environ.get("SMTP_USERNAME")
-    smtp_password = os.environ.get("SMTP_PASSWORD")
-    smtp_from = os.environ.get("SMTP_FROM", smtp_username)
+    global _last_email_error
+    smtp_server = (os.environ.get("SMTP_SERVER") or "").strip()
+    smtp_port = (os.environ.get("SMTP_PORT") or "").strip()
+    smtp_username = (os.environ.get("SMTP_USERNAME") or "").strip()
+    smtp_password = (os.environ.get("SMTP_PASSWORD") or "").strip().replace(" ", "").strip('"').strip("'")
+    smtp_from = (os.environ.get("SMTP_FROM") or smtp_username).strip()
 
     if not smtp_server or not smtp_username or not smtp_password:
-        logger.warning("OTP email not sent: SMTP is not configured")
+        _last_email_error = "SMTP credentials are not configured on the server."
+        logger.warning(f"OTP email not sent: {_last_email_error}")
         return False
 
     plain_text = f"Your Campus Pulse password reset OTP is: {otp}\r\nThis code will expire in 15 minutes."
@@ -122,15 +131,24 @@ def _send_otp_email_sync(to_email, otp) -> bool:
 
     try:
         port = int(smtp_port) if smtp_port else 587
-        server = smtplib.SMTP(smtp_server, port, timeout=15)
-        server.starttls()
+        if port == 465:
+            server = smtplib.SMTP_SSL(smtp_server, port, timeout=15)
+        else:
+            server = smtplib.SMTP(smtp_server, port, timeout=15)
+            server.starttls()
         server.login(smtp_username, smtp_password)
         server.sendmail(smtp_from, [to_email], msg.as_string())
         server.quit()
+        _last_email_error = None
         logger.info(f"Reset OTP email successfully delivered to {to_email}")
         return True
+    except smtplib.SMTPAuthenticationError as e:
+        _last_email_error = "Google SMTP authentication failed (535): App Password rejected. Check for typos or re-generate 16-character App Password."
+        logger.exception(_last_email_error)
+        return False
     except Exception as e:
-        logger.exception("Reset OTP email delivery failed", extra={"recipient": to_email})
+        _last_email_error = f"SMTP error ({type(e).__name__}: {str(e)})"
+        logger.exception(_last_email_error)
         return False
 
 
