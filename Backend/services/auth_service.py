@@ -1210,6 +1210,9 @@ class AuthService:
             return self.get_user(alias_target)
         return None
 
+    def _resolve_user_identity(self, identity):
+        return self.get_user_by_identity(identity)
+
     # Per-account brute-force protection. Tracked by normalized identity (not
     # user_id) so a nonexistent account behaves identically to a real one —
     # an attacker can't tell the two apart by whether a lockout appears.
