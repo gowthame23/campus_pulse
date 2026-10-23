@@ -883,4 +883,22 @@
 
 ---
 
+### Entry 56 — Production Render Deployment Crash Fix: Missing `dotenv` Dependency & Safe Fallback
+* **User Directive:** "Starting Campus Pulse API on 0.0.0.0:8000 (reload=False)... ModuleNotFoundError: No module named 'dotenv' ... it got crased check it out"
+* **Issues Addressed & Actions Taken:**
+  1. **Root Cause Analysis:**
+     - In production Render deployment, Render executes `buildCommand: pip install -r requirements.txt` followed by `startCommand: python run_api.py`.
+     - When `run_api.py` loaded `api.main:app` via Uvicorn, line 3 of `Backend/api/main.py` directly executed `from dotenv import load_dotenv`.
+     - Neither `Backend/requirements.txt` nor root `requirements.txt` included `python-dotenv`.
+     - Because `python-dotenv` was absent from the Render build environment, Python raised `ModuleNotFoundError: No module named 'dotenv'` and crashed the container on startup.
+  2. **Resolution & Dual Resilience:**
+     - **Explicit Dependency Declaration:** Added `python-dotenv>=1.0.0` and `pillow>=10.0.0` to both [`Backend/requirements.txt`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/requirements.txt) and [`requirements.txt`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/requirements.txt).
+     - **Graceful Import Fallback:** Wrapped `from dotenv import load_dotenv` in a `try...except ImportError: pass` block in both [`Backend/api/main.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/api/main.py) and [`Backend/utils/email.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/utils/email.py). In containerized production environments like Render, environment variables are already injected directly into `os.environ` by the host, so the application will run seamlessly without crashing even in minimal environments where `dotenv` is not installed.
+  3. **Verification & Baseline Purity:**
+     - Simulated missing `dotenv` via `sys.modules['dotenv'] = None`: confirmed `api.main` and `utils.email` import without error.
+     - Ran full test suite (`test_workflow1_auth.py`, `test_phase3_security.py`): **22 of 22 tests passed**.
+     - Verified database baseline state: **0 complaints, 0 attachments, 0 notifications, 0 resets, 0 FK errors**.
+
+---
+
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*

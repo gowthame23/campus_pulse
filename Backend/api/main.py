@@ -1,13 +1,15 @@
 import os
 from pathlib import Path
-from dotenv import load_dotenv
-
-# Ensure environment variables from Backend/.env are loaded immediately
-_env_path = Path(__file__).resolve().parent.parent / '.env'
-if _env_path.exists():
-    load_dotenv(dotenv_path=_env_path)
-else:
-    load_dotenv()
+# Ensure environment variables from Backend/.env are loaded immediately if dotenv is available
+try:
+    from dotenv import load_dotenv
+    _env_path = Path(__file__).resolve().parent.parent / '.env'
+    if _env_path.exists():
+        load_dotenv(dotenv_path=_env_path)
+    else:
+        load_dotenv()
+except ImportError:
+    pass
 
 import asyncio
 import time
