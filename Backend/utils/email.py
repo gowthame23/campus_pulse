@@ -87,7 +87,7 @@ def _send_otp_email_sync(to_email, otp) -> bool:
         logger.warning("OTP email not sent: SMTP is not configured")
         return False
 
-    plain_text = f"Your Campus Pulse password reset OTP is: {otp}\nThis code will expire in 15 minutes."
+    plain_text = f"Your Campus Pulse password reset OTP is: {otp}\r\nThis code will expire in 15 minutes."
     html_content = f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
@@ -152,7 +152,7 @@ def _send_password_changed_email_sync(to_email, user_name) -> bool:
     smtp_password = os.environ.get("SMTP_PASSWORD")
     smtp_from = os.environ.get("SMTP_FROM", smtp_username)
 
-    body = f"Hello {user_name},\n\nYour Campus Pulse password was successfully updated.\nIf you did not perform this change, please contact an Admin immediately."
+    body = f"Hello {user_name},\r\n\r\nYour Campus Pulse password was successfully updated.\r\nIf you did not perform this change, please contact an Admin immediately."
     msg = MIMEText(body)
     msg["Subject"] = "Campus Pulse - Password Security Notification"
     msg["From"] = smtp_from if smtp_from else "noreply@campus.edu"
@@ -202,24 +202,6 @@ def _send_activation_email_sync(to_email, activation_link, user_name="Student") 
     else:
         full_activation_url = activation_link
 
-    msg_body = (
-        f"Hello {user_name},\n\n"
-        f"Welcome to Campus Pulse! An account has been created for you.\n\n"
-        f"Please click the following link to activate your account and set your permanent password:\n"
-        f"{full_activation_url}\n\n"
-        f"Security Notice:\n"
-        f"- This activation link is unique to you and will expire in 7 days.\n"
-        f"- Do not share this link with anyone.\n"
-        f"- If you did not request this account, please contact your Campus Admin immediately.\n\n"
-        f"Regards,\n"
-        f"Campus Pulse Team"
-    )
-
-    msg = MIMEText(msg_body)
-    msg["Subject"] = "Campus Pulse - Account Activation & Password Setup"
-    msg["From"] = smtp_from if smtp_from else "noreply@campus.edu"
-    msg["To"] = to_email
-
     if not smtp_server or not smtp_username or not smtp_password:
         logger.warning(
             "Activation email simulated (SMTP not configured)",
@@ -227,12 +209,71 @@ def _send_activation_email_sync(to_email, activation_link, user_name="Student") 
         )
         return False
 
+    plain_text = (
+        f"Hello {user_name},\r\n\r\n"
+        f"Welcome to Campus Pulse! An account has been created for you.\r\n\r\n"
+        f"Please click the link below to activate your account and choose your password:\r\n"
+        f"{full_activation_url}\r\n\r\n"
+        f"Security Notice:\r\n"
+        f"- This activation link is unique to you and will expire in 7 days.\r\n"
+        f"- If you did not request this, please contact your administrator.\r\n\r\n"
+        f"Regards,\r\nCampus Pulse Team"
+    )
+
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px;">
+  <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+    <div style="text-align: center; margin-bottom: 24px;">
+      <h2 style="color: #0f172a; margin: 0; font-size: 24px; font-weight: 700;">Campus Pulse</h2>
+      <p style="color: #64748b; font-size: 13px; margin-top: 4px;">Campus Complaint & Operations System</p>
+    </div>
+    <div style="border-top: 1px solid #f1f5f9; padding-top: 20px;">
+      <p style="color: #1e293b; font-size: 15px; line-height: 1.5; margin: 0 0 16px 0;">Hello <strong>{user_name}</strong>,</p>
+      <p style="color: #334155; font-size: 14px; line-height: 1.6; margin: 0 0 24px 0;">
+        Welcome to Campus Pulse! An institutional student account has been created for you. Click the button below to set up your password and activate your account:
+      </p>
+      <div style="text-align: center; margin: 28px 0;">
+        <a href="{full_activation_url}" style="display: inline-block; background-color: #0284c7; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 12px 32px; border-radius: 8px; box-shadow: 0 2px 4px rgba(2,132,199,0.25);">
+          Activate My Account &rarr;
+        </a>
+      </div>
+      <p style="color: #64748b; font-size: 12px; line-height: 1.5; margin: 0 0 8px 0;">
+        Or copy and paste this link in your browser:
+      </p>
+      <p style="word-break: break-all; color: #0284c7; font-size: 12px; background: #f0f9ff; padding: 8px 12px; border-radius: 6px; margin: 0 0 24px 0;">
+        {full_activation_url}
+      </p>
+      <div style="border-top: 1px solid #f1f5f9; padding-top: 16px;">
+        <p style="color: #94a3b8; font-size: 11px; line-height: 1.5; margin: 0;">
+          &#8226; This link is unique to your account and will expire in 7 days.<br/>
+          &#8226; After setting your password, you will be redirected to the Campus Pulse login page.
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>"""
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "Campus Pulse - Account Activation & Password Setup"
+    from_header = f"Campus Pulse <{smtp_from}>" if "<" not in smtp_from else smtp_from
+    msg["From"] = from_header
+    msg["To"] = to_email
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain="campuspulse.edu")
+
+    msg.attach(MIMEText(plain_text, "plain", "utf-8"))
+    msg.attach(MIMEText(html_content, "html", "utf-8"))
+
     try:
         port = int(smtp_port) if smtp_port else 587
-        with smtplib.SMTP(smtp_server, port) as server:
-            server.starttls()
-            server.login(smtp_username, smtp_password)
-            server.sendmail(msg["From"], [to_email], msg.as_string())
+        server = smtplib.SMTP(smtp_server, port, timeout=15)
+        server.starttls()
+        server.login(smtp_username, smtp_password)
+        server.sendmail(smtp_from, [to_email], msg.as_string())
+        server.quit()
         logger.info("Activation email sent successfully", extra={"recipient": to_email})
         return True
     except Exception as e:

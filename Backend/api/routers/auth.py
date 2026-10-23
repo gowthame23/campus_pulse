@@ -292,7 +292,22 @@ def request_password_reset(
     if not user:
         user = auth_service._resolve_user_identity(payload.email.strip())
 
-    delivery_email = (user.email.strip().lower() if user and getattr(user, "email", None) else clean_email)
+    if not user or not getattr(user, "email", None):
+        logger.warning(f"Password reset requested for unrecognized user/email: {clean_email}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No account found matching '{payload.email}'. Please verify your registered email address.",
+        )
+
+    delivery_email = user.email.strip().lower()
+
+    from utils.email import send_otp_email, _smtp_configured
+    if not _smtp_configured():
+        logger.error("Password reset failed: SMTP is not configured on server")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Email service is temporarily unavailable on the server. Please contact an Administrator.",
+        )
 
     with _get_db() as conn:
         conn.execute(
@@ -304,17 +319,19 @@ def request_password_reset(
         )
         conn.commit()
 
-    # Account Enumeration Protection: send email if user exists, but always return identical generic success
-    if user and delivery_email:
-        from utils.email import send_otp_email
-        send_otp_email(delivery_email, otp)
-        logger.info(f"Password reset OTP initiated for user {user.user_id} ({delivery_email})")
-    else:
-        logger.warning(f"Password reset requested for unrecognized user/email: {clean_email}")
+    email_sent = send_otp_email(delivery_email, otp)
+    if not email_sent:
+        logger.error(f"Failed to submit OTP email to delivery queue for {delivery_email}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to dispatch OTP email. Please try again in a few moments.",
+        )
+
+    logger.info(f"Password reset OTP initiated for user {user.user_id} ({delivery_email})")
 
     return {
         "reset_id": reset_id,
-        "message": "If the account exists, reset instructions have been sent to your email.",
+        "message": f"Verification code sent to {delivery_email}. Please check your inbox and Spam folder.",
     }
 
 

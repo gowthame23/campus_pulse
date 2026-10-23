@@ -45,6 +45,7 @@ export default function ForgotPasswordPage() {
   const [step, setStep] = useState(1);
   const [resetId, setResetId] = useState("");
   const [resetToken, setResetToken] = useState("");
+  const [recipientEmail, setRecipientEmail] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const {
@@ -63,7 +64,8 @@ export default function ForgotPasswordPage() {
         email: values.email,
       });
       setResetId(response.data.reset_id);
-      setMessage("OTP sent to your email. Enter the verification code below.");
+      setRecipientEmail(values.email);
+      setMessage(response.data.message || "OTP sent to your email. Enter the verification code below.");
       setStep(2);
     } catch (err) {
       setError(err?.response?.data?.detail || "Email verification failed.");
@@ -246,8 +248,16 @@ export default function ForgotPasswordPage() {
         {step === 2 && (
           <form className="mt-4 grid gap-4" onSubmit={handleSubmit(verifyOtp)}>
             {/* Verification OTP Box with email confirmation */}
-            <div className="rounded-xl border border-blue-100 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/30 p-4 text-xs text-blue-800 dark:text-blue-200 leading-normal">
-              <span className="font-bold">Email Sent:</span> Please check your email inbox (and Spam folder) for your 6-digit verification code.
+            <div className="rounded-xl border border-blue-100 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/30 p-4 text-xs text-blue-800 dark:text-blue-200 leading-normal space-y-1">
+              <div className="font-semibold text-blue-900 dark:text-blue-100 flex items-center gap-1.5">
+                <span>&#10003; Verification Code Sent</span>
+              </div>
+              <p className="text-blue-700 dark:text-blue-300">
+                Code sent to <span className="font-bold text-blue-900 dark:text-blue-100">{recipientEmail}</span>. Please check your inbox.
+              </p>
+              <p className="text-amber-700 dark:text-amber-300 font-medium pt-1 border-t border-blue-200/50 dark:border-blue-800/50">
+                &#9888;&#65039; Check your <strong>Spam / Junk</strong> folder if it does not appear in your Primary inbox within 30 seconds.
+              </p>
             </div>
 
             <Input
