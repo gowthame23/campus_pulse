@@ -593,9 +593,9 @@ class AuthService:
             ).fetchone()
             if not row:
                 if user_id in ("USR_COORDINATOR", "USR_COORDINATOR_1"):
-                    return self.get_user("USR_EMP_A1")
+                    return self.get_user("USR_COORD_1") or self.get_user("USR_EMP_A1")
                 if user_id == "USR_COORDINATOR_2":
-                    return self.get_user("USR_EMP_A2")
+                    return self.get_user("USR_COORD_2") or self.get_user("USR_EMP_A2")
                 return None
             return self._user_from_joined_row(row)
 
