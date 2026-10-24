@@ -45,3 +45,6 @@ full_prompt_dump.txt
 # Local private credentials reference (never committed)
 CREDENTIALS.local.md
 *.local.md
+
+# Personal resume files (not project source)
+/resume/
