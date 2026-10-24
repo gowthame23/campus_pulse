@@ -175,6 +175,7 @@ class TestAccessAssignmentEmergencySLA(unittest.TestCase):
             role="location_in_charge",
             phone_number=phone_num,
         )
+        orig_in_charge = loc.in_charge_id
         self.location_service.update_location(loc.location_id, in_charge_id=warden.user_id)
 
         # Non-critical complaint -> emergency_contacts should be empty
@@ -206,6 +207,9 @@ class TestAccessAssignmentEmergencySLA(unittest.TestCase):
         self.assertEqual(warden_contact["name"], "Chief Warden Smith")
         self.assertEqual(warden_contact["phone"], phone_num)
         self.assertTrue(warden_contact["phone_available"])
+
+        # Restore original location in charge
+        self.location_service.update_location(loc.location_id, in_charge_id=orig_in_charge)
 
     def test_04_department_sla_config_and_escalation_ordering_rule(self):
         """Test SLA configuration and mandatory escalation ordering rule: App Manager < Admin strictly."""
