@@ -324,6 +324,9 @@ def request_password_reset(
     from utils.email import _send_otp_email_sync, get_last_email_error
     email_sent = _send_otp_email_sync(delivery_email, otp)
     if not email_sent:
+        with _get_db() as conn:
+            conn.execute("DELETE FROM password_resets WHERE reset_id = ?", (reset_id,))
+            conn.commit()
         err_msg = get_last_email_error()
         logger.error(f"Failed to deliver OTP email to {delivery_email}: {err_msg}")
         raise HTTPException(
