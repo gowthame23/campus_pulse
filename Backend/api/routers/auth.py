@@ -257,6 +257,13 @@ def request_password_reset(
     now_ts = time.time()
     client_ip = request.client.host if request.client else "unknown"
 
+    user = auth_service.get_user_by_email(clean_email)
+    if not user:
+        user = auth_service.get_user_by_identity(payload.email.strip())
+
+    delivery_email = user.email.strip().lower() if (user and getattr(user, "email", None)) else clean_email
+    user_id = user.user_id if user else None
+
     # 1. IP Rate Limiting: Max 10 reset requests per IP in 15 minutes to prevent network DoS
     with _get_db() as conn:
         ip_cnt = conn.execute(
@@ -264,10 +271,14 @@ def request_password_reset(
             (f"%@{client_ip}%", now_ts - 900),
         ).fetchone()[0]
 
-        # Check failed attempts across active resets for this email
+        # Check failed attempts across active resets for this email or user
         failed_attempts = conn.execute(
-            "SELECT SUM(attempts) FROM password_resets WHERE email = ? AND expires_at > ?",
-            (clean_email, now_ts),
+            """
+            SELECT SUM(attempts) FROM password_resets
+            WHERE (email = ? OR email = ? OR (user_id IS NOT NULL AND user_id = ?))
+              AND expires_at > ?
+            """,
+            (clean_email, delivery_email, user_id, now_ts),
         ).fetchone()[0] or 0
         if failed_attempts >= 5:
             raise HTTPException(
@@ -277,8 +288,13 @@ def request_password_reset(
 
         # 2. Account Rate Limiting: Check unverified requests initiated in the last 15 minutes
         recent_requests = conn.execute(
-            "SELECT COUNT(*) FROM password_resets WHERE email = ? AND otp != 'VERIFIED' AND expires_at > ?",
-            (clean_email, now_ts),
+            """
+            SELECT COUNT(*) FROM password_resets
+            WHERE (email = ? OR email = ? OR (user_id IS NOT NULL AND user_id = ?))
+              AND otp != 'VERIFIED'
+              AND expires_at > ?
+            """,
+            (clean_email, delivery_email, user_id, now_ts),
         ).fetchone()[0]
         if recent_requests >= 5:
             raise HTTPException(
@@ -287,24 +303,20 @@ def request_password_reset(
             )
 
     reset_id = token_urlsafe(16)
-    otp = str(100000 + randbelow(900000))
-    exp_ts = now_ts + (15 * 60)
-
-    user = auth_service.get_user_by_email(clean_email)
-    if not user:
-        user = auth_service.get_user_by_identity(payload.email.strip())
+    generic_success = {
+        "reset_id": reset_id,
+        "message": "If the account exists, a password reset verification code has been sent.",
+    }
 
     if not user or not getattr(user, "email", None):
         logger.warning(f"Password reset requested for unrecognized user/email: {clean_email}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No account found matching '{payload.email}'. Please verify your registered email address.",
-        )
+        return generic_success
 
-    delivery_email = user.email.strip().lower()
+    otp = str(100000 + randbelow(900000))
+    exp_ts = now_ts + (15 * 60)
 
-    from utils.email import send_otp_email, _smtp_configured
-    if not _smtp_configured():
+    from utils import email as email_utils
+    if not email_utils._smtp_configured():
         logger.error("Password reset failed: SMTP is not configured on server")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -317,17 +329,16 @@ def request_password_reset(
             INSERT INTO password_resets (reset_id, user_id, email, otp, attempts, expires_at, used, created_at)
             VALUES (?, ?, ?, ?, 0, ?, 0, ?)
             """,
-            (reset_id, user.user_id if user else None, delivery_email, hash_token(otp), exp_ts, now_ts),
+            (reset_id, user_id, delivery_email, hash_token(otp), exp_ts, now_ts),
         )
         conn.commit()
 
-    from utils.email import _send_otp_email_sync, get_last_email_error
-    email_sent = _send_otp_email_sync(delivery_email, otp)
-    if not email_sent:
+    email_sent = email_utils.send_otp_email(delivery_email, otp)
+    if email_sent is False:
         with _get_db() as conn:
             conn.execute("DELETE FROM password_resets WHERE reset_id = ?", (reset_id,))
             conn.commit()
-        err_msg = get_last_email_error()
+        err_msg = email_utils.get_last_email_error() or "Unable to dispatch email"
         logger.error(f"Failed to deliver OTP email to {delivery_email}: {err_msg}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -335,11 +346,7 @@ def request_password_reset(
         )
 
     logger.info(f"Password reset OTP initiated for user {user.user_id} ({delivery_email})")
-
-    return {
-        "reset_id": reset_id,
-        "message": f"Verification code sent to {delivery_email}. Please check your inbox and Spam folder.",
-    }
+    return generic_success
 
 
 @router.post("/password-reset/verify", response_model=PasswordResetVerifyResponse)

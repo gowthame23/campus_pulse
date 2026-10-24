@@ -62,8 +62,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-import os
-
 env_type = os.getenv("ENVIRONMENT", "development").lower()
 cors_env = os.getenv("CORS_ORIGINS")
 reload_env = os.getenv("RELOAD", "false").lower()
@@ -118,26 +116,15 @@ app.middleware("http")(rate_limit_middleware)
 async def log_request_middleware(request: Request, call_next):
     start_time = time.time()
 
-    # Try to extract user info from token
-    user_id = "anonymous"
-    user_role = "anonymous"
-
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-        from api.security import _lookup_session
-
-        session = _lookup_session(token)
-        if session:
-            from api.dependencies import get_auth_service
-
-            auth_svc = get_auth_service()
-            user = auth_svc.get_user(session["user_id"])
-            if user:
-                user_id = user.user_id
-                user_role = user.role
-
     response = await call_next(request)
+
+    # Routes that authenticate via get_current_user() already looked up the
+    # session and user for their own auth check; it stashes the result on
+    # request.state.user so we can reuse it here for the log line instead of
+    # re-querying the session/user tables a second time on every request.
+    user = getattr(request.state, "user", None)
+    user_id = user.user_id if user else "anonymous"
+    user_role = user.role if user else "anonymous"
 
     process_time = (time.time() - start_time) * 1000
 
