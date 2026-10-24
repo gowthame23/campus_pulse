@@ -109,8 +109,8 @@ def test_accept_complaint_transitions_to_in_progress(admin_headers, coord_header
     assign_res = client.post(f"/complaints/{complaint_id}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=coord_headers)
     assert assign_res.status_code == 200, assign_res.text
     acc_data = assign_res.json()
-    assert acc_data["status"] == "Assigned"
-    assert acc_data["assigned_to"] == "USR_COORDINATOR"
+    assert acc_data["status"] == STATUS_IN_PROGRESS
+    assert acc_data["assigned_to"] == "USR_COORD_1"  # legacy "USR_COORDINATOR" alias resolves to the real account id
 
 
 def test_accept_unmapped_coordinator_forbidden(admin_headers):
@@ -163,7 +163,7 @@ def test_accept_conflict_409_when_already_accepted(admin_headers):
     # First assigner assigns (e.g. admin or coordinator)
     res1 = client.post(f"/complaints/{cid}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=admin_headers)
     assert res1.status_code == 200
-    assert res1.json()["status"] == "Assigned"
+    assert res1.json()["status"] == STATUS_IN_PROGRESS
 
     # Second assigner tries to assign -> 409 Conflict
     seed_coord_headers = _login("coordinator@example.com", "Coordinator@123")

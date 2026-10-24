@@ -754,6 +754,14 @@ class ComplaintService:
         if not target_user.active or getattr(target_user, "is_deleted", False) or getattr(target_user, "status", "Active") != "Active":
             raise ValueError("Assignee is inactive.")
 
+        # get_user() resolves legacy aliases (e.g. "USR_COORDINATOR") to the
+        # real account's own id. Every eligibility check below must use that
+        # real id, not whatever id string the caller originally sent in --
+        # otherwise a membership/team lookup keyed by the real id never
+        # matches the still-unresolved alias and incorrectly rejects a
+        # legitimately-assigned coordinator.
+        coordinator_id = target_user.user_id
+
         # Check if target user is on leave today
         if self.team_service.is_user_on_leave(coordinator_id):
             leaves = self.team_service.get_user_leaves(coordinator_id, active_only=True)

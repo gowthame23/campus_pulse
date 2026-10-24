@@ -11,7 +11,7 @@ if ROOT not in sys.path:
 from fastapi.testclient import TestClient
 from api.main import app
 from middleware.rate_limiter import auth_limiter
-from core.constants import SLA_HOURS, ACCEPT_DEADLINE_HOURS, INACTIVE_STATUSES
+from core.constants import SLA_HOURS, ACCEPT_DEADLINE_HOURS, INACTIVE_STATUSES, STATUS_IN_PROGRESS
 
 client = TestClient(app)
 
@@ -152,7 +152,7 @@ def test_coordinator_lifecycle_start_progress_block_unblock(admin_headers, coord
     # Start work
     start_res = client.post(f"/complaints/{cid}/start-work", headers=coord_headers)
     assert start_res.status_code == 200
-    assert start_res.json()["status"] == "In Progress"
+    assert start_res.json()["status"] == STATUS_IN_PROGRESS
 
     # Progress update
     prog_res = client.post(f"/complaints/{cid}/progress", json={
@@ -172,7 +172,7 @@ def test_coordinator_lifecycle_start_progress_block_unblock(admin_headers, coord
     # Unblock work
     unblock_res = client.post(f"/complaints/{cid}/unblock", headers=coord_headers)
     assert unblock_res.status_code == 200
-    assert unblock_res.json()["status"] == "In Progress"
+    assert unblock_res.json()["status"] == STATUS_IN_PROGRESS
 
 
 def test_coverage_gaps_endpoint(admin_headers):

@@ -79,6 +79,21 @@ def _get_services_for_db(path: str = None):
         notif_svc = NotificationService(db_path=path)
         auth_svc = AuthService(db_path=path, notification_service=notif_svc)
         tm_svc = TeamService(db_path=path, auth_service=auth_svc, notification_service=notif_svc)
+
+        # Seed Coordinator 1 / Coordinator 2 as working members of their home
+        # teams. Without this, the two generic demo coordinator accounts can
+        # log in but the complaint-assignment code correctly refuses to let
+        # them act on complaints outside any team they're not actually a
+        # member of -- which is correct behavior, but left them unable to do
+        # anything useful out of the box. assign_work_membership() is the
+        # same call the real "add team member" UI makes, and it's a no-op if
+        # the membership already exists, so this is safe to run every boot.
+        try:
+            tm_svc.assign_work_membership("USR_COORD_1", "DEPT_HOSTEL_ELECTRICAL", "LOC_HOSTEL_1", created_by="system")
+            tm_svc.assign_work_membership("USR_COORD_2", "DEPT_HOSTEL_PLUMBING", "LOC_HOSTEL_2", created_by="system")
+        except Exception as err:
+            import logging
+            logging.getLogger(__name__).warning(f"Could not seed default coordinator work memberships: {err}")
         cmpl_svc = ComplaintService(auth_svc, notif_svc, db_path=path, team_service=tm_svc)
         anal_svc = AnalyticsService(db_path=path)
         aud_svc = AuditService(db_path=path)
