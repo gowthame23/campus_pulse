@@ -118,6 +118,8 @@ class TestAccessAssignmentEmergencySLA(unittest.TestCase):
         loc = self.auth_service.get_location(loc_id)
         dept = self.auth_service.get_department(dept_id)
         student = self.auth_service.list_users(role="student")[0]
+        student.hostel = loc.name
+        student.assigned_locations = [loc.name, loc.location_id]
 
         # Create a submitted complaint
         c = self.complaint_service.create_complaint(
@@ -160,6 +162,8 @@ class TestAccessAssignmentEmergencySLA(unittest.TestCase):
         loc = self.auth_service.get_location(loc_id)
         dept = self.auth_service.get_department(dept_id)
         student = self.auth_service.list_users(role="student")[0]
+        student.hostel = loc.name
+        student.assigned_locations = [loc.name, loc.location_id]
 
         import random
         phone_num = f"98{random.randint(10000000, 99999999)}"

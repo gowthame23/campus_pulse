@@ -10,16 +10,18 @@ export function getStatusTone(status) {
     "Fixed": "success",
     "Starred": "warning",
     "Done": "success",
-    "Submitted": "warning",
+    "Submitted": "info",
     "Pending": "warning",
     "Assigned": "info",
     "In Progress": "info",
     "Waiting for Parts": "amber",
+    "Pending Warden Verification": "purple",
     "Waiting for Verification": "success",
     "Closed": "success",
     "Closed (Auto Closed)": "success",
     "Cancelled": "default",
     "Rejected": "danger",
+    "Admin Review": "danger",
   };
   if (tones[status]) return tones[status];
   const s = String(status || "").toLowerCase();
