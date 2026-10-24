@@ -32,9 +32,15 @@ logger = get_logger(__name__)
 class AuthService:
     EMAIL_REGEX = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
 
-    def __init__(self, db_path="storage/campus_pulse.db", notification_service=None):
+    def __init__(self, db_path=None, notification_service=None):
+        if db_path is None:
+            from utils.db import get_db_path
+            db_path = get_db_path()
+        elif not Path(db_path).is_absolute():
+            from utils.db import BACKEND_DIR
+            db_path = str((BACKEND_DIR / db_path).resolve())
         self.db_path = Path(db_path)
-        self.repository = SQLiteRepository(db_path, self._default_data())
+        self.repository = SQLiteRepository(str(self.db_path), self._default_data())
         if not notification_service:
             from services.notification_service import NotificationService
 
@@ -236,6 +242,46 @@ class AuthService:
                 "kwargs": {},
             },
             {
+                "id": "USR_EMP_A1",
+                "class": Coordinator,
+                "name": "Employee A1",
+                "email": "employee.a1@campuspulse.edu",
+                "password_env": None,
+                "default_password": "Coord@123",
+                "first_login": False,
+                "kwargs": {"employee_id": "EMP_A1"},
+            },
+            {
+                "id": "USR_EMP_A2",
+                "class": Coordinator,
+                "name": "Employee A2",
+                "email": "employee.a2@campuspulse.edu",
+                "password_env": None,
+                "default_password": "Coord@123",
+                "first_login": False,
+                "kwargs": {"employee_id": "EMP_A2"},
+            },
+            {
+                "id": "USR_EMP_B1",
+                "class": Coordinator,
+                "name": "Employee B1",
+                "email": "employee.b1@campuspulse.edu",
+                "password_env": None,
+                "default_password": "Coord@123",
+                "first_login": False,
+                "kwargs": {"employee_id": "EMP_B1"},
+            },
+            {
+                "id": "USR_EMP_B2",
+                "class": Coordinator,
+                "name": "Employee B2",
+                "email": "employee.b2@campuspulse.edu",
+                "password_env": None,
+                "default_password": "Coord@123",
+                "first_login": False,
+                "kwargs": {"employee_id": "EMP_B2"},
+            },
+            {
                 "id": "USR_STUDENT",
                 "class": Student,
                 "name": "Student 1",
@@ -360,6 +406,13 @@ class AuthService:
 
         if changed:
             self.repository.save(data)
+
+        # Sync all users to SQLite users table so foreign keys and lookups are consistently satisfied
+        for u_dict in existing_users:
+            try:
+                self.save_user(self._user_from_dict(u_dict))
+            except Exception:
+                pass
 
         # Ensure seed profiles and assignments in SQLite
         with self._connect() as conn:

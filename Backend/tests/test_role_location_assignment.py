@@ -278,10 +278,12 @@ def test_analytics_multi_location_aggregation(analytics_service, auth_service, c
 
 def test_app_manager_deactivation_safety(auth_service):
     """Verify deactivating an App Manager unassigns their locations safely without deletion."""
+    import uuid
+    uid = uuid.uuid4().hex[:6]
     # Create temporary manager
     tmp_mgr = auth_service.create_user(
         name="Temp Manager",
-        email="temp_mgr_test@campus.edu",
+        email=f"temp_mgr_{uid}@campus.edu",
         password="TempPassword@123",
         role="app_manager",
     )
