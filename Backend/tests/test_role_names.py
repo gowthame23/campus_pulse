@@ -34,7 +34,7 @@ def test_canonical_display_names():
     assert get_role_display_name(ROLE_APP_MANAGER) == "App Manager"
     assert get_role_display_name("manager") == "App Manager"
     assert get_role_display_name(ROLE_COORDINATOR) == "Coordinator"
-    assert get_role_display_name(ROLE_EMPLOYEE) == "Employee"
+    assert get_role_display_name(ROLE_EMPLOYEE) == "Coordinator"  # Deprecated employee role maps to Coordinator
     assert get_role_display_name(ROLE_WARDEN) == "Warden"
     assert get_role_display_name("warden") == "Warden"
     assert get_role_display_name(ROLE_STUDENT) == "Student"

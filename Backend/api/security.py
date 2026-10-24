@@ -288,6 +288,9 @@ def get_current_user(
             detail="Temporary password detected. You must change your password to continue.",
         )
 
+    # Stash on request.state so the request-logging middleware can read it
+    # instead of re-doing this same session/user lookup a second time.
+    request.state.user = user
     return user
 
 
