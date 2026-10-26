@@ -351,14 +351,14 @@ class AuthService:
             explicit_password = os.environ.get(spec["password_env"]) if spec.get("password_env") else None
             force_first_login = False
 
-            if is_production:
+            if allow_demo_passwords:
+                spec["password"] = explicit_password or spec["default_password"]
+            elif is_production:
                 spec["password"] = os.environ.get(f"SEED_{spec['id']}_PASSWORD")
                 if not spec["password"]:
                     continue
             elif explicit_password:
                 spec["password"] = explicit_password
-            elif allow_demo_passwords:
-                spec["password"] = spec["default_password"]
             else:
                 spec["password"] = generate_temp_password()
                 force_first_login = True
