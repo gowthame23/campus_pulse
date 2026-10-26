@@ -1,4 +1,7 @@
 services:
+  # -------------------------------------------------------------
+  # 1. Backend Web Service (FastAPI Python)
+  # -------------------------------------------------------------
   - type: web
     name: campuspulse-backend
     runtime: python
@@ -10,20 +13,14 @@ services:
     envVars:
       - key: ENVIRONMENT
         value: production
-      - key: CORS_ORIGINS
-        value: https://campuspulse-rho.vercel.app,https://campuspulse.vercel.app
       - key: RUN_SCHEDULER
         value: "true"
-      - key: FRONTEND_URL
-        value: https://campuspulse-rho.vercel.app
-      # SMTP is required for password-reset OTP, account activation, and
-      # password-changed emails to actually deliver. Without these set,
-      # the backend silently treats email as "not configured" and never
-      # attempts to send -- the API still returns a generic success message
-      # either way (by design, to avoid leaking which emails have accounts),
-      # so a missing SMTP config looks like nothing happened, not an error.
-      # sync: false -- Render prompts for these in the dashboard instead of
-      # reading a value from this file, so no secret is committed to git.
+      - key: CORS_ORIGINS
+        value: "https://campuspulse-frontend.onrender.com,http://localhost:5173"
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER_EMAIL
+        sync: false
       - key: SMTP_SERVER
         sync: false
       - key: SMTP_PORT
@@ -33,4 +30,23 @@ services:
       - key: SMTP_PASSWORD
         sync: false
       - key: SMTP_FROM
+        sync: false
+
+  # -------------------------------------------------------------
+  # 2. Frontend Static Site (React + Vite SPA)
+  # -------------------------------------------------------------
+  - type: web
+    name: campuspulse-frontend
+    runtime: static
+    region: singapore
+    plan: free
+    rootDir: Frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
         sync: false
