@@ -66,7 +66,7 @@ class AuthService:
         existing_loc_names = {l["name"].strip().lower(): l for l in data["locations"] if l.get("name")}
 
         template_locations = [
-            Location("Other / Not Sure", location_id="LOC_OTHER", location_type="Other / Not Sure").to_dict(),
+            Location("Other / Not Sure", location_id="LOC_OTHER", location_type="Other / Not Sure", in_charge_id="USR_ADMIN", app_manager_id="USR_ADMIN").to_dict(),
         ]
         for tloc in template_locations:
             if tloc["location_id"] not in existing_loc_ids and tloc["name"].strip().lower() not in existing_loc_names:

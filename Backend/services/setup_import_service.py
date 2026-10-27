@@ -934,11 +934,11 @@ class SetupImportService:
             and not (t.get("backup_coordinator_id") if isinstance(t, dict) else getattr(t, "backup_coordinator_id", None))
         ]
 
-        # 5. Locations with no Warden (Hostels and locations lacking in_charge_id)
+        # 5. Locations with no Warden (Hostels and physical locations lacking in_charge_id; excluding system-level Admin-managed locations like LOC_OTHER)
         locations_no_warden = [
             {"location_id": l.location_id, "name": l.name, "type": getattr(l, "location_type", "")}
             for l in active_locations
-            if not getattr(l, "in_charge_id", None)
+            if not getattr(l, "in_charge_id", None) and l.location_id != "LOC_OTHER" and not (getattr(l, "name", "") or "").strip().lower().startswith("other")
         ]
 
         # 6. Coordinators / Wardens without phone number
