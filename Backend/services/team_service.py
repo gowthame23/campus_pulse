@@ -753,7 +753,7 @@ class TeamService:
             # 4. Locations with no warden
             missing_wardens = []
             for l in locs:
-                if not l["in_charge_id"]:
+                if not l["in_charge_id"] and l["location_id"] != "LOC_OTHER" and not (l["name"] or "").strip().lower().startswith("other"):
                     missing_wardens.append({"location_id": l["location_id"], "location_name": l["name"]})
 
             return {
