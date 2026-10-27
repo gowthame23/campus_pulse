@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   FileText,
   ArrowRight,
@@ -218,34 +219,32 @@ export default function StudentDashboard() {
 
 
       {/* Main Action Pills Block (Max 4) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-        <ActionPill
-          icon={Plus}
-          label={t("pills.report_problem", "Report a problem")}
-          to="/complaints/create"
-          tone="blue"
-        />
-        <ActionPill
-          icon={Search}
-          label={t("pills.lost_found", "Lost & Found")}
-          to="/lost-found"
-          tone="amber"
-        />
-        <ActionPill
-          icon={FileText}
-          label={t("pills.my_complaints", "My complaints")}
-          count={complaintsLoading ? undefined : activeComplaints.length}
-          to="/complaints"
-          tone="indigo"
-        />
-        <ActionPill
-          icon={Megaphone}
-          label={t("pills.notices", "Notices")}
-          count={announcementsLoading ? undefined : unreadAnnouncementsCount}
-          to="/announcements"
-          tone="emerald"
-        />
-      </div>
+      <motion.div
+        className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3"
+        initial="hidden"
+        animate="show"
+        variants={{
+          hidden: {},
+          show: { transition: { staggerChildren: 0.06 } },
+        }}
+      >
+        {[
+          { icon: Plus, label: t("pills.report_problem", "Report a problem"), to: "/complaints/create", tone: "blue" },
+          { icon: Search, label: t("pills.lost_found", "Lost & Found"), to: "/lost-found", tone: "amber" },
+          { icon: FileText, label: t("pills.my_complaints", "My complaints"), count: complaintsLoading ? undefined : activeComplaints.length, to: "/complaints", tone: "indigo" },
+          { icon: Megaphone, label: t("pills.notices", "Notices"), count: announcementsLoading ? undefined : unreadAnnouncementsCount, to: "/announcements", tone: "emerald" },
+        ].map((pill) => (
+          <motion.div
+            key={pill.to}
+            variants={{
+              hidden: { opacity: 0, y: 10 },
+              show: { opacity: 1, y: 0 },
+            }}
+          >
+            <ActionPill icon={pill.icon} label={pill.label} count={pill.count} to={pill.to} tone={pill.tone} />
+          </motion.div>
+        ))}
+      </motion.div>
 
       {/* 2 Key Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5">
@@ -465,11 +464,18 @@ export default function StudentDashboard() {
           }
 
           return (
-            <div className="space-y-3">
+            <motion.div
+              className="space-y-3"
+              initial="hidden"
+              animate="show"
+              variants={{ hidden: {}, show: { transition: { staggerChildren: 0.05 } } }}
+            >
               {listToDisplay.map((c) => (
-                <div
+                <motion.div
                   key={c.complaint_id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+                  variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
+                  whileHover={{ y: -2 }}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md transition-colors"
                 >
                   <div className="space-y-1.5 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -523,9 +529,9 @@ export default function StudentDashboard() {
                       <ChevronRight className="h-3.5 w-3.5 ml-1" />
                     </Button>
                   </div>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           );
         })()}
       </Card>

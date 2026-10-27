@@ -338,11 +338,17 @@ def request_password_reset(
         with _get_db() as conn:
             conn.execute("DELETE FROM password_resets WHERE reset_id = ?", (reset_id,))
             conn.commit()
+        # Log the real reason (which can contain raw SMTP/provider errors --
+        # e.g. Gmail auth failures or a Brevo/Resend API response body) only
+        # server-side. The client gets a generic message: returning err_msg
+        # in the response handed an anonymous caller a readout of our email
+        # provider and auth method, which they don't need and we don't want
+        # printed into an anonymous browser toast.
         err_msg = email_utils.get_last_email_error() or "Unable to dispatch email"
         logger.error(f"Failed to deliver OTP email to {delivery_email}: {err_msg}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Unable to dispatch email: {err_msg}",
+            detail="We couldn't send the email right now. Please try again shortly.",
         )
 
     logger.info(f"Password reset OTP initiated for user {user.user_id} ({delivery_email})")

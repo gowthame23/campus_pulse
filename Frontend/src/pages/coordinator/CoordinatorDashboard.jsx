@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Wrench,
   Clock,
@@ -498,26 +499,22 @@ export default function CoordinatorDashboard() {
       </div>
 
       {/* Quick Action Navigation Pills */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-        <ActionPill
-          icon={Users}
-          label={t("nav.workload", "Team Workload")}
-          to="/workload"
-          tone="indigo"
-        />
-        <ActionPill
-          icon={TrendingUp}
-          label={t("coordinator.performance_btn", "Coordinator Stats")}
-          to="/coordinators/performance"
-          tone="emerald"
-        />
-        <ActionPill
-          icon={CheckCircle2}
-          label={t("nav.resolved", "Resolved Archive")}
-          to="/resolved"
-          tone="blue"
-        />
-      </div>
+      <motion.div
+        className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3"
+        initial="hidden"
+        animate="show"
+        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06 } } }}
+      >
+        {[
+          { icon: Users, label: t("nav.workload", "Team Workload"), to: "/workload", tone: "indigo" },
+          { icon: TrendingUp, label: t("coordinator.performance_btn", "Coordinator Stats"), to: "/coordinators/performance", tone: "emerald" },
+          { icon: CheckCircle2, label: t("nav.resolved", "Resolved Archive"), to: "/resolved", tone: "blue" },
+        ].map((pill) => (
+          <motion.div key={pill.to} variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}>
+            <ActionPill icon={pill.icon} label={pill.label} to={pill.to} tone={pill.tone} />
+          </motion.div>
+        ))}
+      </motion.div>
 
       {/* 4 Summary Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -636,9 +633,10 @@ export default function CoordinatorDashboard() {
           </button>
         </div>
 
+        <AnimatePresence>
         {/* TAB 1: TO ASSIGN (Queue) */}
         {activeTab === "to_assign" && (
-          <div className="p-5 space-y-4">
+          <motion.div key="to_assign" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} className="p-5 space-y-4">
             <div className="flex items-center justify-between pb-2">
               <span className="text-xs text-slate-500 font-medium">
                 {t("coordinator.to_assign_subtitle", "Complaints waiting for assignment, sorted by deadline (soonest first).")}
@@ -654,10 +652,16 @@ export default function CoordinatorDashboard() {
                 description={t("coordinator.all_assigned_desc", "Your team's intake queue is completely clear! No complaints are currently waiting to be assigned.")}
               />
             ) : (
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              <motion.div
+                className="divide-y divide-slate-100 dark:divide-slate-800"
+                initial="hidden"
+                animate="show"
+                variants={{ hidden: {}, show: { transition: { staggerChildren: 0.04 } } }}
+              >
                 {toAssignComplaints.map((c) => (
-                  <div
+                  <motion.div
                     key={c.complaint_id}
+                    variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}
                     className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-3 rounded-xl hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors"
                   >
                     <div className="space-y-1.5 min-w-0">
@@ -716,16 +720,16 @@ export default function CoordinatorDashboard() {
                         {t("coordinator.details", "Details")}
                       </Button>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             )}
-          </div>
+          </motion.div>
         )}
 
         {/* TAB 2: TEAM BOARD (Active Jobs) */}
         {activeTab === "team_board" && (
-          <div className="p-5 space-y-4">
+          <motion.div key="team_board" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} className="p-5 space-y-4">
             <div className="flex items-center justify-between pb-2">
               <span className="text-xs text-slate-500 font-medium">
                 {t("coordinator.team_board_subtitle", "Active jobs across the team with assigned worker and status.")}
@@ -741,10 +745,16 @@ export default function CoordinatorDashboard() {
                 description={t("coordinator.no_active_jobs_desc", "No open jobs currently assigned across the team.")}
               />
             ) : (
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              <motion.div
+                className="divide-y divide-slate-100 dark:divide-slate-800"
+                initial="hidden"
+                animate="show"
+                variants={{ hidden: {}, show: { transition: { staggerChildren: 0.04 } } }}
+              >
                 {teamBoardComplaints.map((c) => (
-                  <div
+                  <motion.div
                     key={c.complaint_id}
+                    variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}
                     className="py-4 first:pt-0 last:pb-0 flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-3 rounded-xl hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors"
                   >
                     <div className="space-y-1.5 min-w-0">
@@ -821,16 +831,16 @@ export default function CoordinatorDashboard() {
                         {t("coordinator.details", "Details")}
                       </Button>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             )}
-          </div>
+          </motion.div>
         )}
 
         {/* TAB 3: MY JOBS (Self-assigned) */}
         {activeTab === "my_jobs" && (
-          <div className="p-5 space-y-4">
+          <motion.div key="my_jobs" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} className="p-5 space-y-4">
             <div className="flex items-center justify-between pb-2">
               <span className="text-xs text-slate-500 font-medium">
                 {t("coordinator.my_jobs_subtitle", "Jobs assigned to you directly. Fast execution with big Mark Done button.")}
@@ -846,12 +856,18 @@ export default function CoordinatorDashboard() {
                 description={t("coordinator.no_personal_jobs_desc", "You currently have no jobs assigned to yourself. You can assign complaints to yourself from the 'To assign' queue.")}
               />
             ) : (
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              <motion.div
+                className="divide-y divide-slate-100 dark:divide-slate-800"
+                initial="hidden"
+                animate="show"
+                variants={{ hidden: {}, show: { transition: { staggerChildren: 0.04 } } }}
+              >
                 {myJobs.map((c) => {
                   const isMenuOpen = openMenuComplaintId === c.complaint_id;
                   return (
-                    <div
+                    <motion.div
                       key={c.complaint_id}
+                      variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}
                       className="py-4 first:pt-0 last:pb-0 flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-3 rounded-xl hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors"
                     >
                       <div className="space-y-1.5 min-w-0">
@@ -983,17 +999,17 @@ export default function CoordinatorDashboard() {
                           )}
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 })}
-              </div>
+              </motion.div>
             )}
-          </div>
+          </motion.div>
         )}
 
         {/* TAB 4: STATS & PERFORMANCE (Rule J1 & J2) */}
         {activeTab === "stats" && (
-          <div className="p-5 space-y-6">
+          <motion.div key="stats" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} className="p-5 space-y-6">
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-3">
                 {t("coordinator.team_stats_title", "Team Stats (This Month)")}
@@ -1057,12 +1073,12 @@ export default function CoordinatorDashboard() {
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* TAB 5: TEAM WORKFORCE (Members & Worker Passwords, Part 3.5e) */}
         {activeTab === "team_members" && (
-          <div className="p-5 space-y-4">
+          <motion.div key="team_members" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} className="p-5 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
@@ -1139,8 +1155,9 @@ export default function CoordinatorDashboard() {
                 </table>
               </div>
             )}
-          </div>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
 
       {/* ASSIGN MODAL (Rule K3) */}

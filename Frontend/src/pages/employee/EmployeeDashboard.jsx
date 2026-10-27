@@ -1,4 +1,8 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+
+const listStagger = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
+const listItem = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } };
 import {
   Wrench,
   Clock,
@@ -359,14 +363,17 @@ export default function EmployeeDashboard() {
               </div>
             </div>
           ) : (
-            complaints.map((job) => {
+            <motion.div className="space-y-4" initial="hidden" animate="show" variants={listStagger}>
+            {complaints.map((job) => {
               const loc = locations.find((l) => l.location_id === job.location_id);
               const locName = loc ? loc.name : job.location_id;
               const isMenuOpen = openMenuJobId === job.complaint_id;
 
               return (
-                <div
+                <motion.div
                   key={job.complaint_id}
+                  variants={listItem}
+                  whileHover={{ y: -2 }}
                   className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm relative transition-all"
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -521,9 +528,10 @@ export default function EmployeeDashboard() {
                       {t("employee.mark_done", "Mark Done")}
                     </Button>
                   </div>
-                </div>
+                </motion.div>
               );
-            })
+            })}
+            </motion.div>
           )}
         </div>
       )}

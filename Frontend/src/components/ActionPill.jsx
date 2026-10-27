@@ -1,5 +1,8 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+
+const MotionLink = motion.create(Link);
 
 /**
  * ActionPill Component
@@ -86,7 +89,7 @@ export default function ActionPill({
     <>
       <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 mr-1">
         {Icon && (
-          <span className={`inline-flex shrink-0 ${selectedTone.icon}`}>
+          <span className={`inline-flex shrink-0 transition-transform duration-150 group-hover:scale-110 ${selectedTone.icon}`}>
             <Icon className="h-5 w-5" aria-hidden="true" />
           </span>
         )}
@@ -107,29 +110,37 @@ export default function ActionPill({
     </>
   );
 
+  const motionProps = {
+    whileHover: { scale: 1.03, y: -1 },
+    whileTap: { scale: 0.96 },
+    transition: { type: "spring", stiffness: 500, damping: 30 },
+  };
+
   if (to) {
     return (
-      <Link
+      <MotionLink
         to={to}
         className={baseClasses}
         aria-label={accessibleLabel}
+        {...motionProps}
         {...props}
       >
         {innerContent}
-      </Link>
+      </MotionLink>
     );
   }
 
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
       className={baseClasses}
       aria-label={accessibleLabel}
+      {...motionProps}
       {...props}
     >
       {innerContent}
-    </button>
+    </motion.button>
   );
 }
 
