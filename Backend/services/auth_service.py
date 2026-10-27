@@ -131,7 +131,7 @@ class AuthService:
                     "Room Cleaning Required", "Washroom / Bathroom Cleaning", "Dustbin / Waste Removal",
                     "Corridor / Common Area Cleaning", "Classroom / Lab Cleaning Required", "Other / Not Sure"
                 ]).to_dict(),
-                Department("Furniture & Fixtures", 5, department_id="DEPT_HOSTEL_FURNITURE", complaint_types=[
+                Department("Furniture & Carpentry", 5, department_id="DEPT_HOSTEL_FURNITURE", complaint_types=[
                     "Cot / Bed Frame Issue", "Study Table / Chair Damaged", "Cupboard / Wardrobe Lock/Door Issue",
                     "Door / Window Latch Problem", "Desk / Bench Damaged", "Missing Furniture / Item", "Other / Not Sure"
                 ]).to_dict(),
