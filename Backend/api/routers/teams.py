@@ -16,7 +16,6 @@ from api.security import require_roles, get_current_user
 from models.administrator import Administrator
 from models.app_manager import AppManager
 from models.coordinator import Coordinator
-from models.employee import Employee
 from models.location_in_charge import LocationInCharge
 from services.team_service import TeamService
 
@@ -32,7 +31,6 @@ def list_teams(
             AppManager.ROLE,
             Coordinator.ROLE,
             LocationInCharge.ROLE,
-            Employee.ROLE,
         )
     ),
     team_service: TeamService = Depends(get_team_service),
@@ -80,7 +78,6 @@ def list_work_memberships(
             AppManager.ROLE,
             Coordinator.ROLE,
             LocationInCharge.ROLE,
-            Employee.ROLE,
         )
     ),
     team_service: TeamService = Depends(get_team_service),
@@ -165,7 +162,6 @@ def get_team(
             AppManager.ROLE,
             Coordinator.ROLE,
             LocationInCharge.ROLE,
-            Employee.ROLE,
         )
     ),
     team_service: TeamService = Depends(get_team_service),
@@ -187,7 +183,6 @@ def get_team_members(
             AppManager.ROLE,
             Coordinator.ROLE,
             LocationInCharge.ROLE,
-            Employee.ROLE,
         )
     ),
     team_service: TeamService = Depends(get_team_service),

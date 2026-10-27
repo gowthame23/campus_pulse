@@ -9,7 +9,6 @@ from models.administrator import Administrator
 from models.app_manager import AppManager
 from models.coordinator import Coordinator
 from models.department import Department
-from models.employee import Employee
 from models.location import Location
 from models.location_in_charge import LocationInCharge
 from models.student import Student
@@ -122,12 +121,12 @@ class AuthService:
                 Department("Electrical", 2, department_id="DEPT_HOSTEL_ELECTRICAL", complaint_types=[
                     "Power Failure", "Fan Not Working", "Light Not Working", "Switch Problem", "Socket Problem",
                     "Projector Not Working / No Display", "Audio / Speaker / Mic Issue", "AC / Air Conditioning Issue", "Other / Not Sure"
-                ], coordinator_id="USR_EMP_A1", coordinator_2_id="USR_EMP_A2").to_dict(),
+                ], coordinator_id="USR_COORD_1", coordinator_2_id="USR_COORD_2").to_dict(),
                 Department("Plumbing", 3, department_id="DEPT_HOSTEL_PLUMBING", complaint_types=[
                     "Water Leakage", "Tap Not Working / Tap Leakage", "No Water Supply", "Low Water Pressure",
                     "Toilet Flush Not Working", "Toilet Blockage", "Wash Basin / Sink Blockage", "Drainage Blockage",
                     "Shower Not Working", "Water Cooler / Dispenser Issue", "Other / Not Sure"
-                ], coordinator_id="USR_EMP_B1", coordinator_2_id="USR_EMP_B2").to_dict(),
+                ], coordinator_id="USR_COORD_1", coordinator_2_id="USR_COORD_2").to_dict(),
                 Department("Housekeeping", 1, department_id="DEPT_HOSTEL_HOUSEKEEPING", complaint_types=[
                     "Room Cleaning Required", "Washroom / Bathroom Cleaning", "Dustbin / Waste Removal",
                     "Corridor / Common Area Cleaning", "Classroom / Lab Cleaning Required", "Other / Not Sure"
@@ -240,46 +239,6 @@ class AuthService:
                 "default_password": "Coord@123",
                 "first_login": False,
                 "kwargs": {},
-            },
-            {
-                "id": "USR_EMP_A1",
-                "class": Coordinator,
-                "name": "Employee A1",
-                "email": "employee.a1@campuspulse.edu",
-                "password_env": None,
-                "default_password": "Coord@123",
-                "first_login": False,
-                "kwargs": {"employee_id": "EMP_A1"},
-            },
-            {
-                "id": "USR_EMP_A2",
-                "class": Coordinator,
-                "name": "Employee A2",
-                "email": "employee.a2@campuspulse.edu",
-                "password_env": None,
-                "default_password": "Coord@123",
-                "first_login": False,
-                "kwargs": {"employee_id": "EMP_A2"},
-            },
-            {
-                "id": "USR_EMP_B1",
-                "class": Coordinator,
-                "name": "Employee B1",
-                "email": "employee.b1@campuspulse.edu",
-                "password_env": None,
-                "default_password": "Coord@123",
-                "first_login": False,
-                "kwargs": {"employee_id": "EMP_B1"},
-            },
-            {
-                "id": "USR_EMP_B2",
-                "class": Coordinator,
-                "name": "Employee B2",
-                "email": "employee.b2@campuspulse.edu",
-                "password_env": None,
-                "default_password": "Coord@123",
-                "first_login": False,
-                "kwargs": {"employee_id": "EMP_B2"},
             },
             {
                 "id": "USR_STUDENT",
@@ -478,7 +437,7 @@ class AuthService:
             conn.execute("UPDATE users SET location_id = 'LOC_HOSTEL_2' WHERE user_id = 'USR_STUDENT_2' AND (location_id IS NULL OR location_id = '')")
 
             # Staff profiles for the coordinators (clean setup)
-            conn.execute("DELETE FROM users WHERE role = 'employee'")
+            conn.execute("DELETE FROM users WHERE role = 'employee' OR user_id LIKE 'USR_EMP_%'")
             conn.execute("DELETE FROM staff_profiles WHERE user_id LIKE 'USR_EMP_%'")
             coordinator_profiles = [
                 ('USR_COORD_1', 'EMP_COORD_1', 'Coordinator', None, '[]'),
@@ -523,12 +482,12 @@ class AuthService:
                 VALUES ('USR_ADMIN', 'EMP000', 'Chief Administrator', 'IT')
                 """)
 
-            # Coordinator initial department-based assignments for the 4 designated employees
+            # Coordinator initial department-based assignments
             init_coord_assignments = [
-                ("ASGN_COORD_A1", "USR_EMP_A1", "DEPT_HOSTEL_ELECTRICAL", "LOC_HOSTEL_1"),
-                ("ASGN_COORD_A2", "USR_EMP_A2", "DEPT_HOSTEL_ELECTRICAL", "LOC_HOSTEL_1"),
-                ("ASGN_COORD_B1", "USR_EMP_B1", "DEPT_HOSTEL_PLUMBING", "LOC_HOSTEL_2"),
-                ("ASGN_COORD_B2", "USR_EMP_B2", "DEPT_HOSTEL_PLUMBING", "LOC_HOSTEL_2"),
+                ("ASGN_COORD_1_ELEC", "USR_COORD_1", "DEPT_HOSTEL_ELECTRICAL", "LOC_HOSTEL_1"),
+                ("ASGN_COORD_2_ELEC", "USR_COORD_2", "DEPT_HOSTEL_ELECTRICAL", "LOC_HOSTEL_1"),
+                ("ASGN_COORD_1_PLUMB", "USR_COORD_1", "DEPT_HOSTEL_PLUMBING", "LOC_HOSTEL_2"),
+                ("ASGN_COORD_2_PLUMB", "USR_COORD_2", "DEPT_HOSTEL_PLUMBING", "LOC_HOSTEL_2"),
             ]
             for asgn_id, cid, did, lid in init_coord_assignments:
                 conn.execute("""
@@ -594,7 +553,7 @@ class AuthService:
             Administrator.ROLE: Administrator,
             AppManager.ROLE: AppManager,
             LocationInCharge.ROLE: LocationInCharge,
-            Employee.ROLE: Employee,
+            "employee": Coordinator,
         }
 
         role_str = data.get("role")
@@ -606,7 +565,6 @@ class AuthService:
             Administrator,
             AppManager,
             LocationInCharge,
-            Employee,
         ):
             u = user_cls(
                 data["user_id"],
@@ -646,9 +604,9 @@ class AuthService:
             ).fetchone()
             if not row:
                 if user_id in ("USR_COORDINATOR", "USR_COORDINATOR_1"):
-                    return self.get_user("USR_COORD_1") or self.get_user("USR_EMP_A1")
+                    return self.get_user("USR_COORD_1")
                 if user_id == "USR_COORDINATOR_2":
-                    return self.get_user("USR_COORD_2") or self.get_user("USR_EMP_A2")
+                    return self.get_user("USR_COORD_2")
                 return None
             return self._user_from_joined_row(row)
 
@@ -1150,7 +1108,7 @@ class AuthService:
                 temp_password = generate_temp_password()
 
         # Auto-generate employee_id or roll_number if not provided for staff/student roles
-        if role in (Coordinator.ROLE, LocationInCharge.ROLE, AppManager.ROLE, Administrator.ROLE, Employee.ROLE) and not employee_id:
+        if role in (Coordinator.ROLE, LocationInCharge.ROLE, AppManager.ROLE, Administrator.ROLE) and not employee_id:
             import secrets, string
             for _ in range(50):
                 cand = f"EMP{''.join(secrets.choice(string.digits) for _ in range(6))}"
@@ -1182,7 +1140,7 @@ class AuthService:
             Administrator.ROLE: Administrator,
             AppManager.ROLE: AppManager,
             LocationInCharge.ROLE: LocationInCharge,
-            Employee.ROLE: Employee,
+            "employee": Coordinator,
         }
         user_cls = role_classes.get(role, User)
 
@@ -2894,7 +2852,7 @@ class AuthService:
             raise ValueError("User not found.")
         role = (user.role or "").lower()
         if role not in ("employee", "coordinator"):
-            raise ValueError("Department eligibility can only be assigned to Employees and Coordinators.")
+            raise ValueError("Department eligibility can only be assigned to Coordinators.")
 
         # App manager location scoping check: verify employee shares authorized location
         if caller_user and (caller_user.role or "").lower() == "app_manager":
@@ -2990,7 +2948,7 @@ class AuthService:
             raise ValueError("User not found.")
         role = (user.role or "").lower()
         if role not in ("employee", "coordinator"):
-            raise ValueError("Work assignments can only be configured for Employees and Coordinators.")
+            raise ValueError("Work assignments can only be configured for Coordinators.")
 
         # App manager location scoping check: verify employee shares authorized location
         if caller_user and (caller_user.role or "").lower() == "app_manager":

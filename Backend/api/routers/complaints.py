@@ -53,7 +53,6 @@ from models.administrator import Administrator
 from models.app_manager import AppManager
 from models.complaint import Complaint
 from models.coordinator import Coordinator
-from models.employee import Employee
 from models.location_in_charge import LocationInCharge
 from models.student import Student
 from services.complaint_service import ComplaintConflictError
@@ -1358,7 +1357,7 @@ class ComplaintBlockRequest(BaseModel):
 def accept_complaint(
     complaint_id: str,
     current_user=Depends(
-        require_roles(Coordinator.ROLE, Administrator.ROLE, Employee.ROLE)
+        require_roles(Coordinator.ROLE, Administrator.ROLE)
     ),
     complaint_service=Depends(get_complaint_service),
 ):
@@ -1417,7 +1416,7 @@ def accept_complaint(
 def start_work_on_complaint(
     complaint_id: str,
     current_user=Depends(
-        require_roles(Coordinator.ROLE, Administrator.ROLE, Employee.ROLE)
+        require_roles(Coordinator.ROLE, Administrator.ROLE)
     ),
     complaint_service=Depends(get_complaint_service),
 ):
@@ -1441,7 +1440,7 @@ def record_complaint_progress(
     complaint_id: str,
     payload: ComplaintProgressRequest,
     current_user=Depends(
-        require_roles(Coordinator.ROLE, Administrator.ROLE, Employee.ROLE)
+        require_roles(Coordinator.ROLE, Administrator.ROLE)
     ),
     complaint_service=Depends(get_complaint_service),
 ):
@@ -1471,7 +1470,7 @@ def block_complaint(
     complaint_id: str,
     payload: ComplaintBlockRequest,
     current_user=Depends(
-        require_roles(Coordinator.ROLE, Administrator.ROLE, Employee.ROLE)
+        require_roles(Coordinator.ROLE, Administrator.ROLE)
     ),
     complaint_service=Depends(get_complaint_service),
 ):
@@ -1496,7 +1495,7 @@ def block_complaint(
 def unblock_complaint(
     complaint_id: str,
     current_user=Depends(
-        require_roles(Coordinator.ROLE, Administrator.ROLE, Employee.ROLE)
+        require_roles(Coordinator.ROLE, Administrator.ROLE)
     ),
     complaint_service=Depends(get_complaint_service),
 ):
@@ -1556,7 +1555,7 @@ def assign_complaint(
 
     complaint_id: str,
     payload: ComplaintAssignRequest,
-    current_user=Depends(require_roles(Administrator.ROLE, Coordinator.ROLE, Employee.ROLE, AppManager.ROLE)),
+    current_user=Depends(require_roles(Administrator.ROLE, Coordinator.ROLE, AppManager.ROLE)),
     complaint_service=Depends(get_complaint_service),
     audit_service=Depends(get_audit_service),
 ):
@@ -1603,7 +1602,7 @@ def assign_complaint(
 def reroute_complaint(
     complaint_id: str,
     payload: ComplaintRerouteRequest,
-    current_user=Depends(require_roles(Administrator.ROLE, Coordinator.ROLE, Employee.ROLE, AppManager.ROLE)),
+    current_user=Depends(require_roles(Administrator.ROLE, Coordinator.ROLE, AppManager.ROLE)),
     complaint_service=Depends(get_complaint_service),
     audit_service=Depends(get_audit_service),
 ):
@@ -1739,7 +1738,7 @@ def update_status(
     complaint_id: str,
     payload: ComplaintStatusRequest,
     current_user=Depends(
-        require_roles(Coordinator.ROLE, Administrator.ROLE, Employee.ROLE)
+        require_roles(Coordinator.ROLE, Administrator.ROLE)
     ),
     complaint_service=Depends(get_complaint_service),
 ):
@@ -1824,7 +1823,7 @@ def resolve_complaint(
     complaint_id: str,
     payload: ComplaintResolveRequest,
     current_user=Depends(
-        require_roles(Coordinator.ROLE, Administrator.ROLE, Employee.ROLE)
+        require_roles(Coordinator.ROLE, Administrator.ROLE)
     ),
     complaint_service=Depends(get_complaint_service),
 ):
@@ -2384,7 +2383,7 @@ def request_cancellation(
 def approve_cancellation(
     complaint_id: str,
     payload: Optional[ComplaintCancellationReviewPayload] = None,
-    current_user=Depends(require_roles(Coordinator.ROLE, Administrator.ROLE, AppManager.ROLE, Employee.ROLE)),
+    current_user=Depends(require_roles(Coordinator.ROLE, Administrator.ROLE, AppManager.ROLE)),
     complaint_service=Depends(get_complaint_service),
     audit_service=Depends(get_audit_service),
 ):
@@ -2426,7 +2425,7 @@ def approve_cancellation(
 def reject_cancellation(
     complaint_id: str,
     payload: ComplaintCancellationRejectPayload,
-    current_user=Depends(require_roles(Coordinator.ROLE, Administrator.ROLE, AppManager.ROLE, Employee.ROLE)),
+    current_user=Depends(require_roles(Coordinator.ROLE, Administrator.ROLE, AppManager.ROLE)),
     complaint_service=Depends(get_complaint_service),
     audit_service=Depends(get_audit_service),
 ):
