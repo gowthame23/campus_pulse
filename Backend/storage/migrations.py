@@ -1048,43 +1048,98 @@ def _migrate_location_departments_table(conn):
     except Exception:
         pass
 
-    # 3. Seed baseline location_departments associations
+    # 3. Clean up deleted departments and ensure all 10 core departments exist
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    # Ensure Health & Medical and Fire & Safety departments exist
     try:
         import json
-        med_complaint_types = json.dumps([
-            'Medical Emergency', 'First Aid Assistance', 'Ambulance Request',
-            'Clinic Consultation', 'Health & Hygiene Concern', 'Other / Not Sure'
-        ])
-        conn.execute('''
-            INSERT OR IGNORE INTO departments (department_id, name, sla_days, complaint_types, active, archived, description, status)
-            VALUES ('DEPT_CAMPUS_MEDICAL', 'Health & Medical', 1, ?, 1, 0, 'Campus Health Center, medical clinic, first aid, ambulance, and student healthcare services.', 'Active')
-        ''', (med_complaint_types,))
+        conn.execute("DELETE FROM departments WHERE department_id IN ('DEPT_ACADEMIC_LIBRARY', 'DEPT_SPORTS_GROUNDS', 'DEPT_SPORTS_EQUIPMENT', 'DEPT_SAC_EQUIPMENT', 'DEPT_SAC_AV')")
+        conn.execute("DELETE FROM location_departments WHERE department_id IN ('DEPT_ACADEMIC_LIBRARY', 'DEPT_SPORTS_GROUNDS', 'DEPT_SPORTS_EQUIPMENT', 'DEPT_SAC_EQUIPMENT', 'DEPT_SAC_AV')")
+        conn.execute("DELETE FROM department_issues WHERE department_id IN ('DEPT_ACADEMIC_LIBRARY', 'DEPT_SPORTS_GROUNDS', 'DEPT_SPORTS_EQUIPMENT', 'DEPT_SAC_EQUIPMENT', 'DEPT_SAC_AV')")
+        conn.execute("DELETE FROM coordinator_assignments WHERE department_id IN ('DEPT_ACADEMIC_LIBRARY', 'DEPT_SPORTS_GROUNDS', 'DEPT_SPORTS_EQUIPMENT', 'DEPT_SAC_EQUIPMENT', 'DEPT_SAC_AV')")
 
-        fire_complaint_types = json.dumps([
-            'Fire Outbreak', 'Smoke Detected', 'Gas Leakage Hazard',
-            'Fire Extinguisher Inspection', 'Emergency Exit Blocked', 'Other / Not Sure'
-        ])
-        conn.execute('''
-            INSERT OR IGNORE INTO departments (department_id, name, sla_days, complaint_types, active, archived, description, status)
-            VALUES ('DEPT_CAMPUS_FIRE', 'Fire & Safety', 1, ?, 1, 0, 'Campus fire protection, smoke detection, fire extinguishers, emergency evacuation, and safety hazard control.', 'Active')
-        ''', (fire_complaint_types,))
+        core_departments = [
+            (
+                'DEPT_HOSTEL_ELECTRICAL', 'Electrical', 2,
+                json.dumps(['Power Failure', 'Fan Not Working', 'Light Not Working', 'Switch Problem', 'Socket Problem', 'Projector Not Working / No Display', 'Audio / Speaker / Mic Issue', 'AC / Air Conditioning Issue', 'Other / Not Sure']),
+                'Campus power supply, wiring, lighting, fans, switches, sockets, and AC systems.'
+            ),
+            (
+                'DEPT_HOSTEL_PLUMBING', 'Plumbing', 3,
+                json.dumps(['Water Leakage', 'Tap Not Working / Tap Leakage', 'No Water Supply', 'Low Water Pressure', 'Toilet Flush Not Working', 'Toilet Blockage', 'Wash Basin / Sink Blockage', 'Drainage Blockage', 'Shower Not Working', 'Water Cooler / Dispenser Issue', 'Other / Not Sure']),
+                'Water supply lines, taps, bathroom fixtures, drainage, sewer pipelines, and water dispensers.'
+            ),
+            (
+                'DEPT_HOSTEL_HOUSEKEEPING', 'Housekeeping', 1,
+                json.dumps(['Room Cleaning Required', 'Washroom / Bathroom Cleaning', 'Dustbin / Waste Removal', 'Corridor / Common Area Cleaning', 'Classroom / Lab Cleaning Required', 'Other / Not Sure']),
+                'Room cleanliness, common corridor sanitation, washroom hygiene, dustbins, and campus waste management.'
+            ),
+            (
+                'DEPT_HOSTEL_FURNITURE', 'Furniture & Fixtures', 5,
+                json.dumps(['Cot / Bed Frame Issue', 'Study Table / Chair Damaged', 'Cupboard / Wardrobe Lock/Door Issue', 'Door / Window Latch Problem', 'Desk / Bench Damaged', 'Carpenter Repair Work', 'Missing Furniture / Item', 'Other / Not Sure']),
+                'Carpentry repairs, cot/bed frames, study tables, chairs, cupboards, wardrobe locks, doors, and window latches.'
+            ),
+            (
+                'DEPT_HOSTEL_NETWORK', 'Network & IT', 3,
+                json.dumps(['Wi-Fi Not Working', 'Wi-Fi Connected but No Internet', 'Slow Internet', 'Frequent Wi-Fi Disconnection', 'Weak Wi-Fi Signal', 'Ethernet / LAN Port Not Working', 'Other / Not Sure']),
+                'Campus Wi-Fi connectivity, LAN ports, authentication routers, access points, and IT network infrastructure.'
+            ),
+            (
+                'DEPT_MESS_FOOD', 'Food Quality & Catering', 1,
+                json.dumps(['Food Quality / Taste Issue', 'Undercooked / Raw Food', 'Foreign Object in Food', 'Food / Utensil Shortage', 'Counter / Service Delay', 'Other / Not Sure']),
+                'Dining hall food preparation, taste, raw ingredients, catering hygiene, utensils, and food counters.'
+            ),
+            (
+                'DEPT_MESS_MAINTENANCE', 'Maintenance & Equipment', 3,
+                json.dumps(['Water Cooler / Dispenser Issue', 'Food Warmer / Bain-Marie Not Working', 'Exhaust Fan / Ventilation Issue', 'Lighting / Electrical Issue', 'Fly Catcher Machine Not Working', 'Other / Not Sure']),
+                'Mess appliances, bain-maries, food warmers, industrial water coolers, fly catchers, and exhaust fans.'
+            ),
+            (
+                'DEPT_CAMPUS_FIRE', 'Fire & Safety', 1,
+                json.dumps(['Fire Outbreak', 'Smoke Detected', 'Gas Leakage Hazard', 'Fire Extinguisher Inspection', 'Emergency Exit Blocked', 'Other / Not Sure']),
+                'Campus fire protection, smoke detection, fire extinguishers, emergency evacuation, and safety hazard control.'
+            ),
+            (
+                'DEPT_CAMPUS_MEDICAL', 'Health & Medical', 1,
+                json.dumps(['Medical Emergency', 'First Aid Assistance', 'Ambulance Request', 'Clinic Consultation', 'Health & Hygiene Concern', 'Other / Not Sure']),
+                'Campus Health Center, medical clinic, first aid, ambulance, and student healthcare services.'
+            ),
+            (
+                'DEPT_OTHER_GENERAL', 'Other / Not Sure', 2,
+                json.dumps(['Issue Not Listed / General Complaint', 'Urgent Safety or Security Issue', 'Infrastructure / Outdoor Maintenance', 'General Campus Cleanliness']),
+                'General campus infrastructure, unlisted requests, and administrative assistance.'
+            ),
+        ]
+
+        for dept_id, name, sla, types_json, desc in core_departments:
+            conn.execute('''
+                INSERT INTO departments (department_id, name, sla_days, complaint_types, coordinator_id, coordinator_2_id, active, archived, description, status)
+                VALUES (?, ?, ?, ?, 'USR_COORD_1', 'USR_COORD_2', 1, 0, ?, 'Active')
+                ON CONFLICT(department_id) DO UPDATE SET
+                    name = excluded.name,
+                    sla_days = excluded.sla_days,
+                    complaint_types = excluded.complaint_types,
+                    coordinator_id = 'USR_COORD_1',
+                    coordinator_2_id = 'USR_COORD_2',
+                    active = 1,
+                    archived = 0,
+                    description = excluded.description,
+                    status = 'Active'
+            ''', (dept_id, name, sla, types_json, desc))
 
         # Update emergency category mappings
         conn.execute("UPDATE emergency_categories SET department_id = 'DEPT_CAMPUS_MEDICAL' WHERE category_id = 'EM_CAT_05' AND (department_id IS NULL OR department_id = '')")
         conn.execute("UPDATE emergency_categories SET department_id = 'DEPT_CAMPUS_FIRE' WHERE category_id = 'EM_CAT_04' AND (department_id IS NULL OR department_id = '')")
         conn.execute("UPDATE emergency_categories SET department_id = 'DEPT_HOSTEL_PLUMBING' WHERE category_id = 'EM_CAT_02'")
     except Exception as e:
-        logger.warning(f"Note during medical and fire department verification: {e}")
+        logger.warning(f"Note during core departments migration: {e}")
 
-    common_hostel_depts = ['DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_HOSTEL_NETWORK', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
-    academic_depts = ['DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_HOSTEL_NETWORK', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
-    mess_depts = ['DEPT_MESS_FOOD', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_HOSTEL_PLUMBING', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
-    sac_depts = ['DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
+    common_hostel_depts = ['DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_HOSTEL_FURNITURE', 'DEPT_HOSTEL_NETWORK', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
+    academic_depts = ['DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_HOSTEL_FURNITURE', 'DEPT_HOSTEL_NETWORK', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
+    mess_depts = ['DEPT_MESS_FOOD', 'DEPT_MESS_MAINTENANCE', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_ELECTRICAL', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
+    sac_depts = ['DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_HOSTEL_FURNITURE', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
     sports_depts = ['DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE', 'DEPT_OTHER_GENERAL']
-    other_depts = ['DEPT_OTHER_GENERAL', 'DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE']
+    other_depts = ['DEPT_OTHER_GENERAL', 'DEPT_HOSTEL_ELECTRICAL', 'DEPT_HOSTEL_PLUMBING', 'DEPT_HOSTEL_HOUSEKEEPING', 'DEPT_HOSTEL_FURNITURE', 'DEPT_HOSTEL_NETWORK', 'DEPT_CAMPUS_MEDICAL', 'DEPT_CAMPUS_FIRE']
 
     loc_mappings = {
         'LOC_HOSTEL_1': common_hostel_depts,
