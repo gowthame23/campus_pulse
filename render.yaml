@@ -7,6 +7,7 @@ services:
     runtime: python
     region: singapore
     plan: free
+    autoDeploy: true
     rootDir: Backend
     buildCommand: pip install -r requirements.txt
     startCommand: python run_api.py
@@ -42,6 +43,7 @@ services:
     runtime: static
     region: singapore
     plan: free
+    autoDeploy: true
     rootDir: Frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
