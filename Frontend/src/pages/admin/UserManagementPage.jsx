@@ -263,7 +263,6 @@ export default function UserManagementPage() {
     }
     if (activeCategoryTab === "staff") {
       return [
-        { value: ROLES.EMPLOYEE, label: "Employee" },
         { value: ROLES.COORDINATOR, label: "Coordinator" },
       ];
     }
@@ -272,14 +271,12 @@ export default function UserManagementPage() {
       return [
         { value: ROLES.APP_MANAGER, label: "App Manager" },
         { value: ROLES.COORDINATOR, label: "Coordinator" },
-        { value: ROLES.EMPLOYEE, label: "Employee" },
         { value: ROLES.LOCATION_IN_CHARGE, label: "Warden" },
         { value: ROLES.STUDENT, label: "Student" },
       ];
     }
     return [
       { value: ROLES.COORDINATOR, label: "Coordinator" },
-      { value: ROLES.EMPLOYEE, label: "Employee" },
       { value: ROLES.LOCATION_IN_CHARGE, label: "Warden" },
       { value: ROLES.STUDENT, label: "Student" },
     ];
@@ -312,7 +309,6 @@ export default function UserManagementPage() {
     { id: ROLES.ADMINISTRATOR, label: "Admin", icon: Shield },
     { id: ROLES.APP_MANAGER, label: "App Manager", icon: UserCheck },
     { id: ROLES.COORDINATOR, label: "Coordinator", icon: Users },
-    { id: ROLES.EMPLOYEE, label: "Employee", icon: Wrench },
     { id: ROLES.LOCATION_IN_CHARGE, label: "Warden", icon: MapPin },
     { id: ROLES.STUDENT, label: "Student", icon: User },
   ], []);
@@ -1418,7 +1414,7 @@ export default function UserManagementPage() {
       ];
     }
 
-    // 3. STAFF TAB COLUMNS (Employees & Coordinators)
+    // 3. STAFF TAB COLUMNS (Coordinators)
     if (activeCategoryTab === "staff") {
       return [
         {
@@ -1512,7 +1508,7 @@ export default function UserManagementPage() {
                 size="sm"
                 onClick={() => navigate("/admin/employee-assignments")}
                 className="!h-8 px-2 text-xs font-bold text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-                title="Open Employee Assignments Page"
+                title="Open Department Coordinators Page"
               >
                 <Wrench className="h-3.5 w-3.5 mr-1" />
                 <span>Assignments</span>
@@ -1623,7 +1619,7 @@ export default function UserManagementPage() {
             );
           }
 
-          // 3. Employee: Multi-department & multi-location staff
+          // 3. Coordinator: Multi-department staff
           if (uRole === "employee") {
             const coordPos = row.coordinator_position;
             const membershipsCnt = row.work_memberships_count;
@@ -1829,7 +1825,7 @@ export default function UserManagementPage() {
               <User className="h-5 w-5 text-primary" />
               {activeCategoryTab === "students" && "Register Student Account"}
               {activeCategoryTab === "supervisors" && "Register App Manager or Warden"}
-              {activeCategoryTab === "staff" && "Register Employee or Coordinator"}
+              {activeCategoryTab === "staff" && "Register Coordinator"}
               {activeCategoryTab === "all" && "Register New Account"}
             </h2>
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
@@ -2444,9 +2440,9 @@ export default function UserManagementPage() {
                 size="sm"
                 onClick={() => navigate("/admin/employee-assignments")}
                 className="h-10 text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 shrink-0"
-                title="Open Employee Assignments Matrix"
+                title="Open Department Coordinators Matrix"
               >
-                <Wrench className="h-3.5 w-3.5" /> Employee Assignments
+                <Wrench className="h-3.5 w-3.5" /> Department Assignments
               </Button>
 
               <Button
@@ -3041,7 +3037,7 @@ export default function UserManagementPage() {
         );
       })()}
 
-      {/* Employee Department Eligibility Modal */}
+      {/* Coordinator Department Eligibility Modal */}
       {manageEmployeeUser && (() => {
         const coordDept = (data?.departments || []).find(
           (d) => d.coordinator_id === manageEmployeeUser.user_id || d.coordinator_2_id === manageEmployeeUser.user_id
@@ -3089,7 +3085,7 @@ export default function UserManagementPage() {
                 </div>
               )}
 
-              {/* Employee Summary Card */}
+              {/* Coordinator Summary Card */}
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs space-y-1.5 shrink-0">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -3494,7 +3490,7 @@ export default function UserManagementPage() {
                   type="text"
                   value={editNameValue}
                   onChange={(e) => setEditNameValue(e.target.value)}
-                  placeholder="e.g. Employee A1"
+                  placeholder="e.g. Coordinator 1"
                   className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
                 />
               </div>

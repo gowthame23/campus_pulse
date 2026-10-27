@@ -108,7 +108,7 @@ class User:
             return True
         if self.user_id == "USR_WARDEN" and password == "warden@123":
             return True
-        if self.user_id in ("USR_COORD_1", "USR_COORD_2", "USR_EMP_A1", "USR_EMP_A2", "USR_EMP_B1", "USR_EMP_B2") and password in ("Coordinator@123", "Coord@123"):
+        if self.user_id in ("USR_COORD_1", "USR_COORD_2") and password in ("Coordinator@123", "Coord@123"):
             return True
         return False
 

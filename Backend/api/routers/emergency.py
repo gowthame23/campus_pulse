@@ -15,7 +15,6 @@ from api.security import get_current_user, require_roles
 from models.administrator import Administrator
 from models.app_manager import AppManager
 from models.coordinator import Coordinator
-from models.employee import Employee
 from models.location_in_charge import LocationInCharge
 from models.student import Student
 from services.emergency_service import EmergencyService
@@ -256,7 +255,6 @@ def acknowledge_emergency(
             AppManager.ROLE,
             Coordinator.ROLE,
             LocationInCharge.ROLE,
-            Employee.ROLE,
         )
     ),
     emergency_service: EmergencyService = Depends(get_emergency_service),
@@ -310,7 +308,6 @@ def get_pinned_emergencies(
             AppManager.ROLE,
             Coordinator.ROLE,
             LocationInCharge.ROLE,
-            Employee.ROLE,
         )
     ),
     emergency_service: EmergencyService = Depends(get_emergency_service),

@@ -111,12 +111,6 @@ describe("ActionPill Component & Dashboard Action Specifications", () => {
       ]);
     });
 
-    it("verifies Employee dashboard defines exactly 1 listed action pill (max 4)", () => {
-      const employeePills = ["My jobs"];
-      expect(employeePills.length).toBeLessThanOrEqual(4);
-      expect(employeePills).toEqual(["My jobs"]);
-    });
-
     it("verifies Coordinator dashboard defines exactly 3 listed action pills (max 4)", () => {
       const coordinatorPills = ["To assign", "Team board", "My jobs"];
       expect(coordinatorPills.length).toBeLessThanOrEqual(4);

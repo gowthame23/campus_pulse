@@ -131,7 +131,7 @@ export default function AssignModal({ isOpen, onClose, complaint, onAssigned }) 
 
         <div>
           <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-            <span>{t("coordinator.available_members", "Eligible Employees & Workload")}</span>
+            <span>{t("coordinator.available_members", "Eligible Coordinators & Workload")}</span>
             <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400">
               Department & Location Filtered
             </span>

@@ -2317,7 +2317,7 @@ export default function DepartmentManagementPage() {
       >
         <div className="space-y-4">
           <div className="p-3 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-800 text-xs text-blue-900 dark:text-blue-200 leading-relaxed">
-            <strong>Department Workforce:</strong> Employees and coordinators eligible to resolve complaints in {viewWorkforceTarget?.name}.
+            <strong>Department Workforce:</strong> Coordinators eligible to resolve complaints in {viewWorkforceTarget?.name}.
           </div>
 
           {eligibleStaffLoading ? (
@@ -2428,7 +2428,7 @@ export default function DepartmentManagementPage() {
           <div className="p-3 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-800 text-xs text-blue-900 dark:text-blue-200 leading-relaxed">
             <strong>Campus-Wide Coordination Policy:</strong>
             <p className="mt-1">
-              Each department has exactly two coordinator positions: <strong>Coordinator 1</strong> (Primary) and <strong>Coordinator 2</strong> (Backup). Coordinators supervise department complaints campus-wide. Employees can coordinate multiple departments simultaneously, but cannot hold both positions within the same department.
+              Each department has exactly two coordinator positions: <strong>Coordinator 1</strong> (Primary) and <strong>Coordinator 2</strong> (Backup). Coordinators supervise department complaints campus-wide and can coordinate multiple departments simultaneously, but cannot hold both positions within the same department.
             </p>
           </div>
 
