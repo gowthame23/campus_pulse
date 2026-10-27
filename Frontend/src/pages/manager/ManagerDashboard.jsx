@@ -1,5 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+
+const listStagger = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } };
+const listItem = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } };
 import {
   FileText,
   Megaphone,
@@ -224,28 +228,17 @@ export default function ManagerDashboard() {
       </div>
 
       {/* Main Action Pills Block (Max 4) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-        <ActionPill
-          icon={FileText}
-          label={t("pills.all_complaints", "All complaints")}
-          count={activeProblems.length}
-          to="/complaints"
-          tone="blue"
-        />
-        <ActionPill
-          icon={Users}
-          label={t("pills.teams_setup", "Teams & setup")}
-          count={setupGapsCount}
-          to="/admin/teams"
-          tone="emerald"
-        />
-        <ActionPill
-          icon={TrendingUp}
-          label={t("pills.reports", "Reports")}
-          to="/reports"
-          tone="purple"
-        />
-      </div>
+      <motion.div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3" initial="hidden" animate="show" variants={listStagger}>
+        {[
+          { icon: FileText, label: t("pills.all_complaints", "All complaints"), count: activeProblems.length, to: "/complaints", tone: "blue" },
+          { icon: Users, label: t("pills.teams_setup", "Teams & setup"), count: setupGapsCount, to: "/admin/teams", tone: "emerald" },
+          { icon: TrendingUp, label: t("pills.reports", "Reports"), to: "/reports", tone: "purple" },
+        ].map((pill) => (
+          <motion.div key={pill.to} variants={listItem}>
+            <ActionPill icon={pill.icon} label={pill.label} count={pill.count} to={pill.to} tone={pill.tone} />
+          </motion.div>
+        ))}
+      </motion.div>
 
       {/* Setup Checklist (Part 3.4) */}
       <SetupChecklistWidget />
@@ -334,10 +327,12 @@ export default function ManagerDashboard() {
                 No active announcements today.
               </p>
             ) : (
-              <div className="space-y-2.5">
+              <motion.div className="space-y-2.5" initial="hidden" animate="show" variants={listStagger}>
                 {announcements.slice(0, 3).map((a) => (
-                  <div
+                  <motion.div
                     key={a.announcement_id || a.id}
+                    variants={listItem}
+                    whileHover={{ y: -2 }}
                     className="p-3 rounded-xl bg-white dark:bg-[#101726] border border-slate-200/80 dark:border-slate-800/80 text-xs shadow-2xs space-y-1"
                   >
                     <div className="flex items-center justify-between gap-2 font-medium text-slate-900 dark:text-slate-100">
@@ -353,9 +348,9 @@ export default function ManagerDashboard() {
                       <Clock className="h-3 w-3" />
                       {formatDate(a.created_at)}
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             )}
           </div>
 
@@ -379,10 +374,12 @@ export default function ManagerDashboard() {
                 No recent activity.
               </p>
             ) : (
-              <div className="space-y-2">
+              <motion.div className="space-y-2" initial="hidden" animate="show" variants={listStagger}>
                 {notifications.slice(0, 4).map((n) => (
-                  <div
+                  <motion.div
                     key={n.notification_id || n.id}
+                    variants={listItem}
+                    whileHover={{ y: -2 }}
                     onClick={() => {
                       if (n.reference_id && n.reference_type === "Complaint") {
                         navigate(`/complaints/${n.reference_id}`);
@@ -403,9 +400,9 @@ export default function ManagerDashboard() {
                     <span className="text-[10px] text-slate-400 shrink-0">
                       {formatDate(n.created_at)}
                     </span>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             )}
           </div>
         </div>
@@ -431,10 +428,12 @@ export default function ManagerDashboard() {
                 All campus complaints are resolved.
               </p>
             ) : (
-              <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+              <motion.div className="space-y-2 max-h-96 overflow-y-auto pr-1" initial="hidden" animate="show" variants={listStagger}>
                 {activeProblems.slice(0, 8).map((c) => (
-                  <div
+                  <motion.div
                     key={c.complaint_id}
+                    variants={listItem}
+                    whileHover={{ y: -2 }}
                     className="p-3 rounded-xl bg-white dark:bg-[#101726] border border-slate-200/70 dark:border-slate-800/80 text-xs flex items-center justify-between gap-3"
                   >
                     <div className="min-w-0 space-y-1">
@@ -471,9 +470,9 @@ export default function ManagerDashboard() {
                     >
                       Reassign
                     </Button>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             )}
           </div>
         </div>

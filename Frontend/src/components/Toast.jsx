@@ -1,3 +1,5 @@
+import { motion } from "framer-motion";
+
 export default function Toast({ message, tone, type, onClose }) {
   if (!message) return null;
 
@@ -11,9 +13,13 @@ export default function Toast({ message, tone, type, onClose }) {
   };
 
   return (
-    <div
+    <motion.div
       role="alert"
-      className={`flex items-center justify-between gap-3 rounded-xl border p-3.5 text-xs sm:text-sm font-medium transition-all duration-200 shadow-2xs ${tones[activeTone] || tones.info}`}
+      initial={{ opacity: 0, y: -10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ type: "spring", stiffness: 420, damping: 32 }}
+      className={`flex items-center justify-between gap-3 rounded-xl border p-3.5 text-xs sm:text-sm font-medium shadow-2xs ${tones[activeTone] || tones.info}`}
     >
       <span className="leading-snug">{message}</span>
       {onClose && (
@@ -25,6 +31,6 @@ export default function Toast({ message, tone, type, onClose }) {
           Dismiss
         </button>
       )}
-    </div>
+    </motion.div>
   );
 }

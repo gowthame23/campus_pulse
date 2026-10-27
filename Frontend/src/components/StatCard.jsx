@@ -1,4 +1,5 @@
 import { ArrowRight } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function StatCard({
   label,
@@ -12,12 +13,17 @@ export default function StatCard({
     : "border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#101726]";
 
   const interactiveClass = onClick
-    ? "cursor-pointer hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-xs transition-all duration-150 active:scale-[0.99]"
+    ? "cursor-pointer hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md transition-colors duration-150"
     : "";
 
   return (
-    <div
+    <motion.div
       onClick={onClick}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      whileHover={onClick ? { y: -2 } : undefined}
+      whileTap={onClick ? { scale: 0.98 } : undefined}
       className={`relative group rounded-xl border px-3.5 py-3 sm:px-4 sm:py-3.5 shadow-2xs ${accentClass} ${interactiveClass}`}
     >
       <div className="flex items-center justify-between gap-2.5">
@@ -25,11 +31,17 @@ export default function StatCard({
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
             {label}
           </span>
-          <span className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-slate-100 tabular-nums px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 shrink-0">
+          <motion.span
+            key={String(value)}
+            initial={{ scale: 1.15, opacity: 0.6 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 400, damping: 20 }}
+            className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-slate-100 tabular-nums px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 shrink-0"
+          >
             {value}
-          </span>
+          </motion.span>
           {accent && (
-            <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" title="Action required" />
+            <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0 animate-pulse" title="Action required" />
           )}
         </div>
         {onClick && (
@@ -41,6 +53,6 @@ export default function StatCard({
           {subtext}
         </p>
       )}
-    </div>
+    </motion.div>
   );
 }

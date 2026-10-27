@@ -1,5 +1,9 @@
 import { useMemo, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+
+const listStagger = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } };
+const listItem = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } };
 import {
   Building,
   Megaphone,
@@ -341,31 +345,37 @@ export default function LocationDashboard() {
       </div>
 
       {/* Main Action Pills Block */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-        <ActionPill
-          icon={UserCheck}
-          label={t("pills.needs_verification", "Needs verification")}
-          count={needsMyVerificationComplaints.length}
-          onClick={() => {
-            const el = document.getElementById("verification-section");
-            if (el) el.scrollIntoView({ behavior: "smooth" });
-          }}
-          tone="purple"
-        />
-        <ActionPill
-          icon={AlertTriangle}
-          label={t("pills.overdue", "Overdue")}
-          count={overdueComplaints.length}
-          onClick={() => navigate("/complaints", { state: { sla: "Overdue" } })}
-          tone="rose"
-        />
-        <ActionPill
-          icon={Megaphone}
-          label={t("pills.post_notice", "Post notice")}
-          to="/announcements"
-          tone="emerald"
-        />
-      </div>
+      <motion.div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3" initial="hidden" animate="show" variants={listStagger}>
+        <motion.div variants={listItem}>
+          <ActionPill
+            icon={UserCheck}
+            label={t("pills.needs_verification", "Needs verification")}
+            count={needsMyVerificationComplaints.length}
+            onClick={() => {
+              const el = document.getElementById("verification-section");
+              if (el) el.scrollIntoView({ behavior: "smooth" });
+            }}
+            tone="purple"
+          />
+        </motion.div>
+        <motion.div variants={listItem}>
+          <ActionPill
+            icon={AlertTriangle}
+            label={t("pills.overdue", "Overdue")}
+            count={overdueComplaints.length}
+            onClick={() => navigate("/complaints", { state: { sla: "Overdue" } })}
+            tone="rose"
+          />
+        </motion.div>
+        <motion.div variants={listItem}>
+          <ActionPill
+            icon={Megaphone}
+            label={t("pills.post_notice", "Post notice")}
+            to="/announcements"
+            tone="emerald"
+          />
+        </motion.div>
+      </motion.div>
 
       {/* Top Alerts Panel */}
       {(overdueComplaints.length > 0 || blockedTooLongComplaints.length > 0 || unclaimedComplaints.length > 0 || photoSkipComplaints.length > 0) && (
@@ -475,7 +485,7 @@ export default function LocationDashboard() {
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <motion.div className="space-y-4" initial="hidden" animate="show" variants={listStagger}>
               {needsMyVerificationComplaints.map((c) => {
                 const isSelfWork =
                   user?.user_id === c.assigned_to ||
@@ -483,8 +493,10 @@ export default function LocationDashboard() {
                   user?.user_id === c.created_by;
 
                 return (
-                  <div
+                  <motion.div
                     key={c.complaint_id}
+                    variants={listItem}
+                    whileHover={{ y: -2 }}
                     className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 space-y-3 hover:border-purple-300 dark:hover:border-purple-800 transition-colors"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
@@ -591,10 +603,10 @@ export default function LocationDashboard() {
                         </Button>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })}
-            </div>
+            </motion.div>
           )}
         </div>
       </div>
@@ -644,15 +656,17 @@ export default function LocationDashboard() {
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <motion.div className="space-y-3" initial="hidden" animate="show" variants={listStagger}>
               {watchListComplaints.map((c) => {
                 const team = teams.find((t) => t.team_id === c.team_id);
                 const canWardenAssign =
                   Number(c.assign_escalation_level || 0) >= 2 || !c.team_id || !c.assigned_to;
 
                 return (
-                  <div
+                  <motion.div
                     key={c.complaint_id}
+                    variants={listItem}
+                    whileHover={{ y: -2 }}
                     className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-300 dark:hover:border-slate-700 transition"
                   >
                     <div className="space-y-1 min-w-0">
@@ -711,10 +725,10 @@ export default function LocationDashboard() {
                         View
                       </Button>
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })}
-            </div>
+            </motion.div>
           )}
         </div>
       </div>

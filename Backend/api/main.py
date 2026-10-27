@@ -83,8 +83,17 @@ if not cors_origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    # Matches localhost dev ports and all legitimate CampusPulse Vercel domains and branch previews
-    allow_origin_regex=r"^(http://(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?|https://campuspulse[a-zA-Z0-9_\-]*\.vercel\.app)$",
+    # Only ever matches localhost/private-LAN dev ports. Any other allowed
+    # origin (production or preview deploys) must be listed explicitly in
+    # cors_origins / CORS_ORIGINS -- do NOT widen this to a wildcard like
+    # `campuspulse*.vercel.app`: Vercel project names aren't reserved to you,
+    # so anyone can register `campuspulse-anything.vercel.app` for free, and
+    # with allow_credentials=True that page could ride a logged-in user's
+    # session cookie straight into this API. (This exact wildcard was added
+    # back once already to work around an email-delivery bug that had
+    # nothing to do with CORS -- if a new preview/production domain needs
+    # access, add it to CORS_ORIGINS by name instead of widening this regex.)
+    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

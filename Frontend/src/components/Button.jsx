@@ -1,3 +1,5 @@
+import { motion } from "framer-motion";
+
 export default function Button({
   children,
   className = "",
@@ -6,11 +8,12 @@ export default function Button({
   size = "md",
   leftIcon,
   rightIcon,
+  disabled,
   ...props
 }) {
   const variants = {
     primary:
-      "bg-primary text-white hover:bg-primary-hover active:bg-primary-hover/90 shadow-2xs hover:shadow-xs",
+      "bg-primary text-white hover:bg-primary-hover active:bg-primary-hover/90 shadow-2xs hover:shadow-md",
     secondary:
       "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-700/80 active:bg-slate-300 dark:active:bg-slate-700 border border-slate-200/80 dark:border-slate-700/60 shadow-2xs",
     outline:
@@ -20,13 +23,13 @@ export default function Button({
     ghost:
       "bg-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-slate-100",
     success:
-      "bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800 shadow-2xs",
+      "bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800 shadow-2xs hover:shadow-md",
     warning:
-      "bg-amber-600 text-white hover:bg-amber-700 active:bg-amber-800 shadow-2xs",
+      "bg-amber-600 text-white hover:bg-amber-700 active:bg-amber-800 shadow-2xs hover:shadow-md",
     danger:
-      "bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 shadow-2xs",
+      "bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 shadow-2xs hover:shadow-md",
     destructive:
-      "bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 shadow-2xs",
+      "bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 shadow-2xs hover:shadow-md",
   };
 
   const sizes = {
@@ -37,14 +40,18 @@ export default function Button({
   };
 
   return (
-    <button
+    <motion.button
       type={type}
-      className={`inline-flex items-center justify-center font-medium rounded-xl transition-all duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 disabled:pointer-events-none select-none ${variants[variant] || variants.primary} ${sizes[size] || sizes.md} ${className}`}
+      disabled={disabled}
+      whileHover={disabled ? undefined : { y: -1 }}
+      whileTap={disabled ? undefined : { scale: 0.96 }}
+      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+      className={`inline-flex items-center justify-center font-medium rounded-xl transition-colors duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 disabled:pointer-events-none select-none ${variants[variant] || variants.primary} ${sizes[size] || sizes.md} ${className}`}
       {...props}
     >
       {leftIcon && <span className="inline-flex shrink-0">{leftIcon}</span>}
       {children}
       {rightIcon && <span className="inline-flex shrink-0">{rightIcon}</span>}
-    </button>
+    </motion.button>
   );
 }

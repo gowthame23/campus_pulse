@@ -1,5 +1,5 @@
-import sqlite3
 from pathlib import Path
+from utils.db import get_db_connection
 from utils.helper import now_string
 
 class MasterReferenceService:
@@ -28,9 +28,10 @@ class MasterReferenceService:
         self._ensure_seeds()
 
     def _connect(self):
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+        # get_db_connection() returns a real SQLite connection by default, or
+        # a Postgres-backed connection (with the same row/cursor interface)
+        # when DB_ENGINE=postgres is set -- same method body works for both.
+        return get_db_connection(str(self.db_path))
 
     def _ensure_seeds(self):
         now = now_string()
