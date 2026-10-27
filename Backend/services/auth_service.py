@@ -147,25 +147,6 @@ class AuthService:
                     "Water Cooler / Dispenser Issue", "Food Warmer / Bain-Marie Not Working", "Exhaust Fan / Ventilation Issue",
                     "Lighting / Electrical Issue", "Fly Catcher Machine Not Working", "Other / Not Sure"
                 ]).to_dict(),
-                Department("Library Facilities & Systems", 3, department_id="DEPT_ACADEMIC_LIBRARY", complaint_types=[
-                    "Wi-Fi / E-Library Desktop / OPAC System Issue", "RFID / Book Scanner / Printer Issue",
-                    "Reading Desk Power Socket / Lamp Issue", "AC / Ventilation Issue (Reading Area)",
-                    "Study Table / Chair / Bookshelf Damaged", "Noise Disturbance / Quiet Zone Violation", "Other / Not Sure"
-                ]).to_dict(),
-                Department("Grounds, Courts & Fields", 3, department_id="DEPT_SPORTS_GROUNDS", complaint_types=[
-                    "Court / Turf Surface Damaged", "Net / Post / Goalpost Damaged or Missing", "Field Marking / Fencing Issue", "Other / Not Sure"
-                ]).to_dict(),
-                Department("Sports Equipment & Gear", 3, department_id="DEPT_SPORTS_EQUIPMENT", complaint_types=[
-                    "Equipment Damaged / Broken", "Missing Sports Equipment / Item", "Locker / Storage Locker Lock Issue", "Other / Not Sure"
-                ]).to_dict(),
-                Department("Equipment & Sports Goods", 3, department_id="DEPT_SAC_EQUIPMENT", complaint_types=[
-                    "Indoor Games Equipment Damaged", "Gym Equipment Faulty / Broken", "Music Instrument / Studio Gear Damaged",
-                    "Missing Activity Equipment / Item", "Other / Not Sure"
-                ]).to_dict(),
-                Department("Sound, Lighting & Stage AV", 2, department_id="DEPT_SAC_AV", complaint_types=[
-                    "Speaker / Sound System Issue", "Microphone / Audio Mixer Problem", "Stage Lights / Spotlights Not Working",
-                    "Projector / Display Screen Issue", "HDMI / Cable / Adapter Missing or Damaged", "Other / Not Sure"
-                ]).to_dict(),
                 Department("Other / Not Sure", 2, department_id="DEPT_OTHER_GENERAL", complaint_types=[
                     "Issue Not Listed / General Complaint", "Urgent Safety or Security Issue",
                     "Infrastructure / Outdoor Maintenance", "General Campus Cleanliness"
