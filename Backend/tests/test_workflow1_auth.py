@@ -87,7 +87,7 @@ def test_workflow_1_edge_case_student_with_employee_id():
 def test_workflow_1_edge_case_coordinator_with_roll_number():
     _reset_limiter()
     # USR_COORDINATOR does not have a roll_number, so searching by Roll Number fails -> 401
-    response = client.post("/auth/login", json={"username": "S9999999", "password": "Coordinator@123"})
+    response = client.post("/auth/login", json={"username": "S9999999", "password": "Coord@123"})
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid credentials."
 

@@ -138,13 +138,13 @@ def test_sa_12_app_manager_cannot_access_super_admin_dashboard():
 
 
 def test_sa_13_warden_cannot_access_super_admin_dashboard():
-    warden_token = get_token("warden@example.com", "warden@123")
+    warden_token = get_token("warden@example.com", "Warden@123")
     res = client.get("/platform/dashboard", headers=get_auth_headers(warden_token))
     assert res.status_code == 403
 
 
 def test_sa_14_coordinator_cannot_access_super_admin_dashboard():
-    coord_token = get_token("coordinator@example.com", "Coordinator@123")
+    coord_token = get_token("coordinator@example.com", "Coord@123")
     res = client.get("/platform/dashboard", headers=get_auth_headers(coord_token))
     assert res.status_code == 403
 

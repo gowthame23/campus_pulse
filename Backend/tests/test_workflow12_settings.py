@@ -51,7 +51,7 @@ def test_workflow_12_admin_settings_access():
 
 def test_workflow_12_non_admin_forbidden():
     std_headers = _get_headers("student@example.com", "Student@123")
-    coord_headers = _get_headers("coordinator@example.com", "Coordinator@123")
+    coord_headers = _get_headers("coordinator@example.com", "Coord@123")
 
     # Student -> 403 Forbidden
     res_std = client.get("/settings", headers=std_headers)

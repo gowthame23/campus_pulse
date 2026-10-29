@@ -37,7 +37,7 @@ def test_workflow_9_student_dashboard():
     assert res_explicit.json()["role"] == "student"
 
 def test_workflow_9_coordinator_dashboard():
-    headers = _get_headers("coordinator@example.com", "Coordinator@123")
+    headers = _get_headers("coordinator@example.com", "Coord@123")
     res = client.get("/dashboard", headers=headers)
     assert res.status_code == 200
     data = res.json()
@@ -72,9 +72,9 @@ def test_workflow_9_unauthenticated():
 
 def test_workflow_9_cross_role_authorization_matrix():
     student_hdr = _get_headers("student@example.com", "Student@123")
-    coord_hdr = _get_headers("coordinator@example.com", "Coordinator@123")
+    coord_hdr = _get_headers("coordinator@example.com", "Coord@123")
     mgr_hdr = _get_headers("manager@example.com", "Manager@123")
-    warden_hdr = _get_headers("warden@example.com", "warden@123")
+    warden_hdr = _get_headers("warden@example.com", "Warden@123")
     admin_hdr = _get_headers("admin@example.com", "Admin@123")
 
     # 1. Student accessing admin dashboard -> REJECTED (403), no statistics in body

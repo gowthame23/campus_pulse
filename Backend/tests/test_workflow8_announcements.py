@@ -31,7 +31,7 @@ def _get_student_headers():
 
 def _get_coordinator_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "coordinator@example.com", "password": "Coordinator@123"})
+    login_res = client.post("/auth/login", json={"username": "coordinator@example.com", "password": "Coord@123"})
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
@@ -43,7 +43,7 @@ def _get_manager_headers():
 
 def _get_warden_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "warden@example.com", "password": "warden@123"})
+    login_res = client.post("/auth/login", json={"username": "warden@example.com", "password": "Warden@123"})
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 

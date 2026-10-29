@@ -68,7 +68,7 @@ def main():
     dev_users = [
         ("Administrator", "admin@example.com", "Admin@123"),
         ("Supervisor", "manager@example.com", "Manager@123"),
-        ("Coordinator", "coordinator@example.com", "Coordinator@123"),
+        ("Coordinator", "coordinator@example.com", "Coord@123"),
         ("Student", "student@example.com", "Student@123"),
     ]
 

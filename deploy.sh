@@ -120,19 +120,7 @@ server {
         try_files \$uri =404;
     }
 
-    # API Endpoints
-    location ~ ^/(auth|users|complaints|departments|locations|teams|leaves|safety-reports|emergency|lost-found|announcements|chat|notifications|push|analytics|reports|backups|settings|audit|search|api|docs|openapi.json) {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_buffering off;
-        proxy_read_timeout 120s;
-    }
-
-    # WebSocket Endpoints
+    # WebSocket Endpoints (must precede general API endpoints to handle upgrade headers)
     location ~ ^/(notifications/ws|chat/ws) {
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
@@ -144,6 +132,18 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_read_timeout 86400s;
         proxy_send_timeout 86400s;
+    }
+
+    # API Endpoints
+    location ~ ^/(auth|users|complaints|departments|locations|teams|leaves|safety-reports|emergency|lost-found|announcements|chat|notifications|push|analytics|reports|backups|settings|audit|search|api|docs|openapi.json) {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_buffering off;
+        proxy_read_timeout 120s;
     }
 
     # Single Page Application (SPA) routing fallback

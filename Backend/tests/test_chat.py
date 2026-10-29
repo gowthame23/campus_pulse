@@ -61,7 +61,7 @@ def test_chat_flow():
     assert claim_id
 
     # approve as coordinator
-    coord = login("coordinator@campuspulse.edu", "Coordinator@123")
+    coord = login("coordinator@campuspulse.edu", "Coord@123")
     assert coord
     r2 = requests.put(
         f"{BASE}/lost-found/claims/{claim_id}/approve",
