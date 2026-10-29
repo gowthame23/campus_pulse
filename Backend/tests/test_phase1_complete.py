@@ -47,12 +47,12 @@ def coord_headers():
     try:
         return _login("gowthamejjurothu15@gmail.com", "Coord@123")
     except Exception:
-        return _login("coordinator@example.com", "Coordinator@123")
+        return _login("coordinator@example.com", "Coord@123")
 
 
 @pytest.fixture(scope="module")
 def warden_headers():
-    return _login("warden@example.com", "warden@123")
+    return _login("warden@example.com", "Warden@123")
 
 
 def _create_user(admin_headers, role, email_prefix, location_id=None, department_id=None):
@@ -166,7 +166,7 @@ def test_accept_conflict_409_when_already_accepted(admin_headers):
     assert res1.json()["status"] == STATUS_IN_PROGRESS
 
     # Second assigner tries to assign -> 409 Conflict
-    seed_coord_headers = _login("coordinator@example.com", "Coordinator@123")
+    seed_coord_headers = _login("coordinator@example.com", "Coord@123")
     res2 = client.post(f"/complaints/{cid}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=seed_coord_headers)
     assert res2.status_code == 409
     assert "already assigned" in res2.json()["detail"].lower()

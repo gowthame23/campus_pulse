@@ -40,12 +40,12 @@ def app_mgr_headers():
 
 @pytest.fixture(scope="module")
 def coord_headers():
-    return _login("coordinator@example.com", "Coordinator@123")
+    return _login("coordinator@example.com", "Coord@123")
 
 
 @pytest.fixture(scope="module")
 def warden_headers():
-    return _login("warden@example.com", "warden@123")
+    return _login("warden@example.com", "Warden@123")
 
 
 def _create_user(admin_headers, role, email_prefix, location_id=None, department_id=None):

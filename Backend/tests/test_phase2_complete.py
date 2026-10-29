@@ -55,15 +55,15 @@ def coord_headers():
     try:
         return _login("gowthamejjurothu15@gmail.com", "Coord@123")
     except Exception:
-        return _login("coordinator@example.com", "Coordinator@123")
+        return _login("coordinator@example.com", "Coord@123")
 
 
 @pytest.fixture(scope="module")
 def warden_headers():
     try:
-        return _login("naveen@campus.edu", "warden@123")
+        return _login("naveen@campus.edu", "Warden@123")
     except Exception:
-        return _login("warden@example.com", "warden@123")
+        return _login("warden@example.com", "Warden@123")
 
 
 def _create_user(admin_headers, role, email_prefix, location_id=None, department_id=None):

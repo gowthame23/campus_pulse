@@ -104,13 +104,7 @@ class User:
         self.safety_blocked_until = safety_blocked_until
 
     def check_password(self, password):
-        if verify_password(password, self.password):
-            return True
-        if self.user_id == "USR_WARDEN" and password == "warden@123":
-            return True
-        if self.user_id in ("USR_COORD_1", "USR_COORD_2") and password in ("Coordinator@123", "Coord@123"):
-            return True
-        return False
+        return verify_password(password, self.password)
 
     def change_password(self, new_password):
         self.password = hash_password(new_password)

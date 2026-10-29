@@ -56,7 +56,7 @@ def _get_student_headers():
 
 def _get_coordinator_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "coordinator@example.com", "password": "Coordinator@123"})
+    login_res = client.post("/auth/login", json={"username": "coordinator@example.com", "password": "Coord@123"})
     assert login_res.status_code == 200
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}

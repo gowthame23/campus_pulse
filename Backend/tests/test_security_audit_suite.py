@@ -289,11 +289,11 @@ def test_security_metadata_endpoints_require_authentication():
 def test_security_analytics_authorization_matrix():
     std_headers, _ = _get_student_headers()
     _reset_limiter()
-    coord_login = client.post("/auth/login", json={"username": "coordinator@example.com", "password": "Coordinator@123"})
+    coord_login = client.post("/auth/login", json={"username": "coordinator@example.com", "password": "Coord@123"})
     coord_headers = {"Authorization": f"Bearer {coord_login.json()['access_token']}"}
 
     _reset_limiter()
-    warden_login = client.post("/auth/login", json={"username": "warden@example.com", "password": "warden@123"})
+    warden_login = client.post("/auth/login", json={"username": "warden@example.com", "password": "Warden@123"})
     warden_headers = {"Authorization": f"Bearer {warden_login.json()['access_token']}"}
 
     _reset_limiter()
@@ -442,11 +442,11 @@ def test_security_supervisor_dashboard_authorization():
     admin_headers, _ = _get_admin_headers()
 
     _reset_limiter()
-    coord_login = client.post("/auth/login", json={"username": "coordinator@example.com", "password": "Coordinator@123"})
+    coord_login = client.post("/auth/login", json={"username": "coordinator@example.com", "password": "Coord@123"})
     coord_headers = {"Authorization": f"Bearer {coord_login.json()['access_token']}"}
 
     _reset_limiter()
-    warden_login = client.post("/auth/login", json={"username": "warden@example.com", "password": "warden@123"})
+    warden_login = client.post("/auth/login", json={"username": "warden@example.com", "password": "Warden@123"})
     warden_headers = {"Authorization": f"Bearer {warden_login.json()['access_token']}"}
 
     _reset_limiter()
@@ -544,7 +544,7 @@ def test_security_reports_generation_role_gated_and_validated():
 # 24. COMPLAINT OBJECT-LEVEL AUTHORIZATION
 def test_security_complaint_object_level_authorization():
     std_headers, _ = _get_student_headers()
-    warden_headers = _login_headers("warden@example.com", "warden@123")
+    warden_headers = _login_headers("warden@example.com", "Warden@123")
     mgr_headers = _login_headers("manager@example.com", "Manager@123")
     admin_headers, _ = _get_admin_headers()
     sa_headers = _login_headers("superadmin@campuspulse.edu", "Superadmin@123")
@@ -578,7 +578,7 @@ def test_security_complaint_object_level_authorization():
 # 25. ANNOUNCEMENT OWNERSHIP AND MISSING IDS
 def test_security_announcement_ownership_and_missing_ids():
     admin_headers, _ = _get_admin_headers()
-    coord_headers = _login_headers("coordinator@example.com", "Coordinator@123")
+    coord_headers = _login_headers("coordinator@example.com", "Coord@123")
     created = client.post("/announcements", json={
         "title": "Ownership test", "content": "c", "description": "d", "category": "General",
         "priority": "Normal", "target_type": "Campus", "target": "All",
@@ -843,11 +843,11 @@ def test_security_lost_found_delete_ownership_strict():
     _, _, other_student_headers = _new_student()
 
     _reset_limiter()
-    coord_login = client.post("/auth/login", json={"username": "coordinator@example.com", "password": "Coordinator@123"})
+    coord_login = client.post("/auth/login", json={"username": "coordinator@example.com", "password": "Coord@123"})
     coord_headers = {"Authorization": f"Bearer {coord_login.json()['access_token']}"}
 
     _reset_limiter()
-    warden_login = client.post("/auth/login", json={"username": "warden@example.com", "password": "warden@123"})
+    warden_login = client.post("/auth/login", json={"username": "warden@example.com", "password": "Warden@123"})
     warden_headers = {"Authorization": f"Bearer {warden_login.json()['access_token']}"}
 
     _reset_limiter()
