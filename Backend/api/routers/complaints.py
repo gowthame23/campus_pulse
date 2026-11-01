@@ -14,6 +14,7 @@ from core.constants import (
     STATUS_CANCELLED,
 )
 from services.complaint_service import ComplaintConflictError
+from services.team_service import TeamService
 
 from api.dependencies import (
     get_audit_service,
@@ -126,7 +127,15 @@ def _build_format_caches(complaint_service):
         pass
 
     affected_cache = complaint_service.get_affected_students_counts()
-    return loc_cache, dept_cache, affected_cache, user_cache, team_cache, loc_dept_team_cache, coord_asgn_cache
+
+    leave_cache = {}
+    if hasattr(complaint_service, "team_service") and complaint_service.team_service:
+        try:
+            leave_cache = complaint_service.team_service.get_active_leave_department_map()
+        except Exception:
+            pass
+
+    return loc_cache, dept_cache, affected_cache, user_cache, team_cache, loc_dept_team_cache, coord_asgn_cache, leave_cache
 
 
 def _get_critical_emergency_contacts(
@@ -137,6 +146,7 @@ def _get_critical_emergency_contacts(
     user_cache=None,
     loc_dept_team_cache=None,
     coord_asgn_cache=None,
+    leave_cache=None,
 ):
     priority_str = (getattr(complaint, "priority", "") or "").lower()
     if priority_str != "critical":
@@ -196,9 +206,15 @@ def _get_critical_emergency_contacts(
         c2 = getattr(dept, "coordinator_2_id", None)
         active_cid = None
         if c1 and hasattr(complaint_service, "team_service") and complaint_service.team_service:
-            if not complaint_service.team_service.is_user_on_leave(c1, department_id=dept.department_id):
+            if leave_cache is not None:
+                c1_on_leave = TeamService.is_user_on_leave_cached(leave_cache, c1, dept.department_id)
+                c2_on_leave = TeamService.is_user_on_leave_cached(leave_cache, c2, dept.department_id) if c2 else False
+            else:
+                c1_on_leave = complaint_service.team_service.is_user_on_leave(c1, department_id=dept.department_id)
+                c2_on_leave = complaint_service.team_service.is_user_on_leave(c2, department_id=dept.department_id) if c2 else False
+            if not c1_on_leave:
                 active_cid = c1
-            elif c2 and not complaint_service.team_service.is_user_on_leave(c2, department_id=dept.department_id):
+            elif c2 and not c2_on_leave:
                 active_cid = c2
         elif c1:
             active_cid = c1
@@ -256,6 +272,7 @@ def _format_complaint(
     team_cache=None,
     loc_dept_team_cache=None,
     coord_asgn_cache=None,
+    leave_cache=None,
 ):
     data = model_to_dict(complaint)
     if loc_cache is not None:
@@ -282,9 +299,15 @@ def _format_complaint(
         c1 = getattr(dept, "coordinator_id", None)
         c2 = getattr(dept, "coordinator_2_id", None)
         if c1 and hasattr(complaint_service, "team_service") and complaint_service.team_service:
-            if not complaint_service.team_service.is_user_on_leave(c1, department_id=dept.department_id):
+            if leave_cache is not None:
+                c1_on_leave = TeamService.is_user_on_leave_cached(leave_cache, c1, dept.department_id)
+                c2_on_leave = TeamService.is_user_on_leave_cached(leave_cache, c2, dept.department_id) if c2 else False
+            else:
+                c1_on_leave = complaint_service.team_service.is_user_on_leave(c1, department_id=dept.department_id)
+                c2_on_leave = complaint_service.team_service.is_user_on_leave(c2, department_id=dept.department_id) if c2 else False
+            if not c1_on_leave:
                 active_coord_id = c1
-            elif c2 and not complaint_service.team_service.is_user_on_leave(c2, department_id=dept.department_id):
+            elif c2 and not c2_on_leave:
                 active_coord_id = c2
         elif c1:
             active_coord_id = c1
@@ -333,6 +356,7 @@ def _format_complaint(
         user_cache=user_cache,
         loc_dept_team_cache=loc_dept_team_cache,
         coord_asgn_cache=coord_asgn_cache,
+        leave_cache=leave_cache,
     )
 
     if affected_cache is not None:

@@ -446,6 +446,57 @@ def _send_activation_email_sync(to_email, activation_link, user_name="Student") 
     return _dispatch_email(to_email, subject, html_content, plain_text)
 
 
+def _send_login_alert_email_sync(to_email, user_name, ip_address) -> bool:
+    subject = "Campus Pulse - Suspicious Login Attempts Detected"
+    plain_text = (
+        f"Hello {user_name},\r\n\r\n"
+        f"We detected multiple failed login attempts on your Campus Pulse account "
+        f"from IP address {ip_address}, and the account has been temporarily locked "
+        f"as a precaution.\r\n\r\n"
+        f"If this was you, you can simply wait for the lockout to expire and try again "
+        f"with the correct password, or use 'Forgot Password' to reset it.\r\n\r\n"
+        f"If this was NOT you, please reset your password immediately and contact an "
+        f"administrator.\r\n\r\n"
+        f"Regards,\r\nCampus Pulse Security Team"
+    )
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px;">
+  <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+    <h2 style="color: #0f172a; margin: 0 0 16px 0; font-size: 20px;">Campus Pulse - Security Alert</h2>
+    <p style="color: #334155; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0;">Hello <strong>{user_name}</strong>,</p>
+    <p style="color: #334155; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0;">
+      We detected multiple failed login attempts on your account from IP address
+      <strong>{ip_address}</strong>, and the account has been temporarily locked as a precaution.
+    </p>
+    <p style="color: #334155; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0;">
+      If this was you, wait for the lockout to clear and try again, or use "Forgot Password" to reset it.
+    </p>
+    <p style="color: #dc2626; font-size: 13px; line-height: 1.5; margin: 0 0 20px 0;">
+      If this was not you, please reset your password immediately and contact an administrator.
+    </p>
+    <p style="color: #64748b; font-size: 12px; margin: 0;">Campus Pulse Security Team</p>
+  </div>
+</body>
+</html>"""
+    return _dispatch_email(to_email, subject, html_content, plain_text)
+
+
+def send_login_alert_email(to_email, user_name, ip_address) -> bool:
+    """Non-blocking security-alert email for lockout-triggering failed login attempts."""
+    if not _smtp_configured():
+        return False
+    if _is_sync_mode():
+        return _send_login_alert_email_sync(to_email, user_name, ip_address)
+    try:
+        _email_executor.submit(_send_login_alert_email_sync, to_email, user_name, ip_address)
+        return True
+    except Exception as e:
+        logger.exception(f"Failed to submit login-alert email to thread pool: {e}")
+        return False
+
+
 def send_activation_email(to_email, activation_link, user_name="Student") -> bool:
     """Non-blocking activation email delivery."""
     if not _smtp_configured():

@@ -1,4 +1,3 @@
-import sqlite3
 from datetime import datetime, date
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -11,6 +10,7 @@ from core.constants import (
     ROLE_WARDEN,
     ROLE_EMPLOYEE,
 )
+from utils.db import get_db_connection
 
 
 class TeamService:
@@ -19,11 +19,8 @@ class TeamService:
         self.auth_service = auth_service
         self.notification_service = notification_service
 
-    def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self.db_path))
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON;")
-        return conn
+    def _connect(self):
+        return get_db_connection(str(self.db_path))
 
     # ---------------------------------------------------------
     # Leaves
@@ -67,6 +64,48 @@ class TeamService:
                     (user_id, check_date, check_date),
                 ).fetchone()
             return row is not None
+
+    def get_active_leave_department_map(self, check_date: Optional[str] = None) -> Dict[str, List[Optional[str]]]:
+        """Bulk equivalent of is_user_on_leave(): returns {user_id: [department_id_or_None, ...]}
+        for every currently active leave in one query, so callers formatting many rows
+        (e.g. the complaints list endpoint) can check leave status in memory instead of
+        issuing one is_user_on_leave() DB round-trip per row.
+        """
+        if not check_date:
+            check_date = date.today().isoformat()
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT user_id, department_id FROM user_leaves
+                WHERE date(from_date) <= date(?) AND date(?) <= date(to_date)
+                """,
+                (check_date, check_date),
+            ).fetchall()
+        leave_map: Dict[str, List[Optional[str]]] = {}
+        for r in rows:
+            leave_map.setdefault(r["user_id"], []).append(r["department_id"])
+        return leave_map
+
+    @staticmethod
+    def is_user_on_leave_cached(
+        leave_map: Dict[str, List[Optional[str]]], user_id: Optional[str], department_id: Optional[str] = None
+    ) -> bool:
+        """In-memory equivalent of is_user_on_leave() against a map from
+        get_active_leave_department_map(). Same matching rules: a leave with no
+        department_id (or '' / 'ALL') covers every department; otherwise it must
+        match department_id exactly.
+        """
+        if not user_id:
+            return False
+        depts = leave_map.get(user_id)
+        if not depts:
+            return False
+        for d in depts:
+            if not d or d == "ALL":
+                return True
+            if department_id and d == department_id:
+                return True
+        return False
 
     def get_user_leaves(self, user_id: Optional[str] = None, active_only: bool = False) -> List[Dict[str, Any]]:
         today = date.today().isoformat()
