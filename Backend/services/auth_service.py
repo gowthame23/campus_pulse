@@ -1287,6 +1287,11 @@ class AuthService:
                 )
 
     def _register_login_failure(self, identity, ip=None):
+        """Records a failed login attempt. Returns True iff this call just
+        triggered a fresh lockout -- _check_login_lockout() blocks any further
+        calls while a lockout is active, so this can only be True on the
+        attempt that newly locks the account, letting callers fire exactly
+        one alert per lockout."""
         import time
         ip = self._norm_ip(ip)
         now_ts = time.time()
@@ -1316,6 +1321,14 @@ class AuthService:
                 """,
                 (identity, ip, failed_count, locked_until, now_string()),
             )
+        return locked_until is not None
+
+    def _send_login_lockout_alert(self, user, ip=None):
+        try:
+            from utils.email import send_login_alert_email
+            send_login_alert_email(user.email, user.name, ip or "unknown")
+        except Exception as e:
+            logger.warning(f"Failed to dispatch login-lockout alert for {user.email}: {e}")
 
     def _clear_login_failures(self, identity, ip=None):
         with self._login_attempts_conn() as conn:
@@ -1347,7 +1360,9 @@ class AuthService:
             raise ValueError("Invalid credentials.")
 
         if not user.check_password(password):
-            self._register_login_failure(identity, ip=ip)
+            just_locked = self._register_login_failure(identity, ip=ip)
+            if just_locked:
+                self._send_login_lockout_alert(user, ip)
             raise ValueError("Invalid credentials.")
 
         if user.status in (User.STATUS_INACTIVE, User.STATUS_SUSPENDED, User.STATUS_ARCHIVED) or not user.active:
