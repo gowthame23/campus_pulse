@@ -8,6 +8,9 @@
 [![Database](https://img.shields.io/badge/Database-SQLite%20%7C%20PostgreSQL-336791?logo=sqlite&logoColor=white)](https://sqlite.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
+🌐 **Showcase website:** https://gowthame23.github.io/campus_pulse/  
+🚀 **Live app:** https://campuspulse-frontend-wlws.onrender.com
+
 **Campus Pulse** is a high-accountability campus grievance, emergency response, and facilities management platform. Engineered to eliminate the "black hole" of collegiate ticketing systems, Campus Pulse enforces direct coordinator ownership, tamper-evident photo verification, zero-knowledge anonymous whistleblowing, and automated SLA escalations.
 
 ---
