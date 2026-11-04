@@ -102,7 +102,7 @@ Students often stay silent about ragging, harassment, mental health crises, or f
 
 * **1-Tap Emergency Trigger**: Instant selection between Medical, Fire, and Security emergencies.
 * **Real-Time Geolocation Broadcast**: Immediately pushes the student's physical location, block, and room to security dispatchers and campus health centers via WebSockets and Web Push.
-* **10-Minute Escalation Daemon**: If an active SOS alert remains unacknowledged after 10 minutes, the background daemon automatically escalates the incident to senior administrative leadership.
+* **Manual Call Chain (no auto-escalation)**: After choosing an emergency, the student sees Security and their location's Warden with one-tap call buttons. Only if neither responds does the App Manager's number appear. Coordinators are not part of the chain.
 
 ---
 

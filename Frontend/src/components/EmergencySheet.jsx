@@ -63,6 +63,8 @@ export default function EmergencySheet({ isOpen, onClose, userLocationId, onEmer
   const [reachedState, setReachedState] = useState(null); // null | true | false
   const [submittingReached, setSubmittingReached] = useState(false);
   const [reAlertMessage, setReAlertMessage] = useState("");
+  // Per-contact call outcome: undefined | "called" | "noanswer"
+  const [outcomes, setOutcomes] = useState({});
 
   useEffect(() => {
     if (isOpen) {
@@ -72,6 +74,7 @@ export default function EmergencySheet({ isOpen, onClose, userLocationId, onEmer
       setCreatedComplaintId(null);
       setReachedState(null);
       setReAlertMessage("");
+      setOutcomes({});
       loadCategories();
     }
   }, [isOpen]);
@@ -136,27 +139,44 @@ export default function EmergencySheet({ isOpen, onClose, userLocationId, onEmer
     }
   };
 
-  const handleReached = async (reached) => {
-    if (!createdComplaintId) {
-      if (reached) onClose();
+  // Security + Warden (stage 1) are shown at once; the App Manager (stage 2)
+  // only appears after BOTH stage-1 contacts did not respond. No automatic escalation.
+  const stage1 = callList.filter((c) => (c.stage || 1) === 1);
+  const stage2 = callList.filter((c) => c.stage === 2);
+  const stage1AllNoAnswer = stage1.length > 0 && stage1.every((c) => outcomes[c.phone] === "noanswer");
+  const visibleContacts = stage1AllNoAnswer || stage1.length === 0 ? [...stage1, ...stage2] : stage1;
+  const everyoneTried =
+    callList.length > 0 && callList.every((c) => outcomes[c.phone] === "noanswer");
+
+  const handleCallClick = (contact) => {
+    setOutcomes((prev) => (prev[contact.phone] ? prev : { ...prev, [contact.phone]: "called" }));
+  };
+
+  const handleAnswer = async (contact, reached) => {
+    if (reached) {
+      if (createdComplaintId) {
+        setSubmittingReached(true);
+        try {
+          await emergencyService.recordReached(createdComplaintId, true);
+        } catch (err) {
+          console.error("Failed to record reached status:", err);
+        } finally {
+          setSubmittingReached(false);
+        }
+      }
+      setReachedState(true);
+      setTimeout(() => onClose(), 800);
       return;
     }
-    setSubmittingReached(true);
-    try {
-      await emergencyService.recordReached(createdComplaintId, reached);
-      setReachedState(reached);
-      if (reached) {
-        setTimeout(() => {
-          onClose();
-        }, 800);
-      } else {
-        setReAlertMessage("All emergency staff alerted again immediately! Please call another person below.");
+    setOutcomes((prev) => ({ ...prev, [contact.phone]: "noanswer" }));
+    if (createdComplaintId) {
+      try {
+        await emergencyService.recordReached(createdComplaintId, false);
+      } catch (err) {
+        console.error("Failed to record no-answer:", err);
       }
-    } catch (err) {
-      console.error("Failed to record reached status:", err);
-    } finally {
-      setSubmittingReached(false);
     }
+    setReAlertMessage(`${contact.name} did not respond. Please call the next contact.`);
   };
 
   if (!isOpen) return null;
@@ -277,7 +297,7 @@ export default function EmergencySheet({ isOpen, onClose, userLocationId, onEmer
                 </div>
               )}
 
-              {/* Call List (Rule 2.3d) */}
+              {/* Call chain: Security + Warden first, App Manager only if they do not respond */}
               {loadingCallList ? (
                 <div className="py-8 flex flex-col items-center justify-center gap-2 text-slate-500">
                   <Loader2 className="h-6 w-6 animate-spin text-rose-600" />
@@ -285,55 +305,84 @@ export default function EmergencySheet({ isOpen, onClose, userLocationId, onEmer
                 </div>
               ) : (
                 <div className="space-y-2.5">
-                  {callList.map((contact, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 hover:border-rose-300 transition-all"
-                    >
-                      <div className="min-w-0 pr-3">
-                        <div className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate">
-                          {contact.name}
-                        </div>
-                        <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate">
-                          {contact.role}
-                        </div>
-                      </div>
-                      <a
-                        href={`tel:${contact.phone}`}
-                        className="shrink-0 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/25 transition-all"
+                  {visibleContacts.map((contact) => {
+                    const state = outcomes[contact.phone];
+                    return (
+                      <div
+                        key={contact.phone}
+                        className={`p-3.5 rounded-2xl border transition-all ${
+                          state === "noanswer"
+                            ? "bg-slate-100/60 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700/60 opacity-70"
+                            : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/80 hover:border-rose-300"
+                        }`}
                       >
-                        <Phone className="h-3.5 w-3.5 fill-current" />
-                        Call
-                      </a>
-                    </div>
-                  ))}
+                        <div className="flex items-center justify-between">
+                          <div className="min-w-0 pr-3">
+                            <div className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate">
+                              {contact.name}
+                            </div>
+                            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate">
+                              {contact.role}
+                              {contact.stage === 2 ? " · next in line" : ""}
+                            </div>
+                          </div>
+                          <a
+                            href={`tel:${contact.phone}`}
+                            onClick={() => handleCallClick(contact)}
+                            className="shrink-0 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/25 transition-all"
+                          >
+                            <Phone className="h-3.5 w-3.5 fill-current" />
+                            Call
+                          </a>
+                        </div>
+                        {state === "called" && (
+                          <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700/60">
+                            <div className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                              Did {contact.name} answer?
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                disabled={submittingReached}
+                                onClick={() => handleAnswer(contact, true)}
+                                className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-100 font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
+                              >
+                                <CheckCircle className="h-4 w-4 text-emerald-600" />
+                                Yes, I spoke to them
+                              </button>
+                              <button
+                                disabled={submittingReached}
+                                onClick={() => handleAnswer(contact, false)}
+                                className="py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
+                              >
+                                <RefreshCw className="h-4 w-4 text-rose-600" />
+                                No answer
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {state === "noanswer" && (
+                          <div className="mt-2 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                            Did not respond
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {callList.length === 0 && (
+                    <div className="text-xs text-slate-500">No emergency contacts are configured yet.</div>
+                  )}
                 </div>
               )}
 
-              {/* "Did you reach someone?" (Rule 2.3f) */}
-              <div className="pt-3 border-t border-slate-200 dark:border-slate-800">
-                <div className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
-                  {t("emergency.did_you_reach", "Did you reach someone?")}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    disabled={submittingReached}
-                    onClick={() => handleReached(true)}
-                    className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-100 font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <CheckCircle className="h-4 w-4 text-emerald-600" />
-                    {t("emergency.yes_reached", "Yes, I spoke to them")}
-                  </button>
-                  <button
-                    disabled={submittingReached}
-                    onClick={() => handleReached(false)}
-                    className="py-2.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <RefreshCw className="h-4 w-4 text-rose-600" />
-                    {t("emergency.no_answer", "No answer / Couldn't reach")}
-                  </button>
-                </div>
-              </div>
+              {(everyoneTried || callList.length === 0) && !loadingCallList && (
+                <a
+                  href="tel:112"
+                  className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm"
+                >
+                  <Phone className="h-4 w-4 fill-current" />
+                  {t("emergency.call_112", "Call 112")}
+                </a>
+              )}
             </div>
           )}
         </div>
