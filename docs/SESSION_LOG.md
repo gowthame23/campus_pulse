@@ -1103,4 +1103,30 @@
 
 ---
 
+### Entry 72 — Built and Published the Showcase Website; Verified Its Claims Against the Code
+* **User Directive:** "give me the website link of the website we built ... commit it with my username give it a unique name ... add this link in the readme ... check it ... did you mention [that it is] only the web"
+* **Issues Addressed & Actions Taken:**
+  1. **Located the showcase site**: a single untracked file, [`Website/index.html`](Website/index.html). It was never deployed; its "Open live app" buttons point to the Render app (`https://campuspulse-frontend-wlws.onrender.com`).
+  2. **Published via GitHub Pages**: committed it to `main`, and created an orphan `gh-pages` branch holding only `index.html` + `.nojekyll`. Pages must be enabled manually (Settings -> Pages -> `gh-pages` / root). Expected URL: `https://gowthame23.github.io/campus_pulse/`.
+  3. **README**: added the showcase link and live-app link near the top of [`README.md`](README.md).
+  4. **Fact-check against the code**: most claims matched (SHA-256 photo hashing, `REUSED` / `OLDER_THAN_JOB` flags, 48 h verification window, sealed anonymous-report identity table, role set). Two corrections: Critical SLA is **4 h** in code (site and README said 12 h), and the scheduler default is **every 5 min** (site said every minute).
+  5. **Web-only wording**: removed the "works as an app" / "Capacitor Android build" claims; the site now says it is a mobile-friendly web app and a dedicated mobile app is not available yet.
+* **Verification & Testing:** claims checked by grep/read of `Backend/core/constants.py`, `services/complaint_service.py`, `services/attachment_service.py`, `api/routers/safety_reports.py`, `services/scheduler_service.py`.
+* **Status:** Done. Pending on the user: enable GitHub Pages.
+
+---
+
+### Entry 73 — SOS Changed to a Manual Call Chain (Security + Warden -> App Manager), Auto-Escalation Removed
+* **User Directive:** "provide the sos number, no auto escalation ... first warden ... if they don't lift, the app manager ... display both the warden and the security at the start ... no coordinator calls"
+* **Issues Addressed & Actions Taken:**
+  1. **Backend** ([`Backend/services/emergency_service.py`](Backend/services/emergency_service.py)): `get_call_list()` now returns a fixed chain for every category: Security (stage 1), Warden of the student's location (stage 1), App Manager (stage 2). Coordinators, department contacts and the 112 row were removed from the chain. App Manager phone comes from the `app_manager_phone` setting, else the first App Manager user with a phone.
+  2. **Auto-escalation disabled**: `check_unacknowledged_emergencies()` (the 10-minute re-alert) is now a no-op. Manual "No answer" re-alerts now go to the Warden and App Manager only (coordinators removed).
+  3. **Frontend** ([`Frontend/src/components/EmergencySheet.jsx`](Frontend/src/components/EmergencySheet.jsx)): Security and Warden show immediately with a `tel:` Call button; after tapping Call it asks "Did <name> answer?". Yes closes the sheet; No greys that contact out. The App Manager is revealed only when both stage-1 contacts are marked no-answer; a Call 112 button appears if everyone fails.
+  4. **Docs/site**: README SOS section and showcase site no longer mention the 10-minute auto-escalation.
+  5. **Tests**: replaced the old ordering test and removed the "coordinator on leave shows backup" test; added `test_call_list_is_security_warden_then_app_manager`.
+* **Verification & Testing:** `tests/test_emergency_flow.py`: 4/4 passing. `vite build` succeeds. The new SOS screen has NOT yet been checked in a browser.
+* **Status:** Done in code and pushed (`b83768e`); awaiting the user's visual check. Real Security phone (`campus_security_phone`) and App Manager phone must be configured; Security otherwise falls back to a placeholder number.
+
+---
+
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*
