@@ -43,7 +43,7 @@ flowchart TD
 
 ### SLA Resolution Deadlines & Escalation Engine
 Every ticket receives a deterministic SLA deadline calculated from its category and priority:
-* **Critical**: 12 hours *(auto-escalates to App Manager and Admin on breach)*
+* **Critical**: 4 hours *(auto-escalates to App Manager and Admin on breach)*
 * **High**: 24 hours
 * **Medium**: 48 hours
 * **Low**: 72 hours

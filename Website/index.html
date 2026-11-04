@@ -368,7 +368,7 @@ footer{border-top:1px solid var(--line);padding:36px 0;color:var(--muted);font-s
       <div class="mock">
         <div class="mock-top"><i></i><i></i><i></i></div>
         <div class="ticket"><div class="row"><div><h5>Water leakage — Hostel 1, Room 214</h5><small>Owner: Plumbing coordinator · SLA 24h</small></div><span class="tag t-go">Going On</span></div><div class="bar"><i style="--w:62%"></i></div></div>
-        <div class="ticket"><div class="row"><div><h5>Power outage — Academic Block 2</h5><small>Escalated to App Manager · SLA 12h</small></div><span class="tag t-crit">Critical</span></div><div class="bar"><i style="--w:28%"></i></div></div>
+        <div class="ticket"><div class="row"><div><h5>Power outage — Academic Block 2</h5><small>Escalated to App Manager · SLA 4h</small></div><span class="tag t-crit">Critical</span></div><div class="bar"><i style="--w:28%"></i></div></div>
         <div class="ticket" style="margin-bottom:0"><div class="row"><div><h5>Mess hall fan repaired</h5><small>Proof photo verified · Warden confirmed</small></div><span class="tag t-ok">Fixed</span></div><div class="bar"><i style="--w:100%"></i></div></div>
       </div>
       <div class="chip-float a">📸 Proof photo verified</div>
@@ -380,7 +380,7 @@ footer{border-top:1px solid var(--line);padding:36px 0;color:var(--muted);font-s
   <div class="wrap rv">
     <div class="stat-grid">
       <div class="stat"><b class="grad">3</b><span>simple stages, zero confusion</span></div>
-      <div class="stat"><b class="grad">12h</b><span>max SLA for critical issues</span></div>
+      <div class="stat"><b class="grad">4h</b><span>max SLA for critical issues</span></div>
       <div class="stat"><b class="grad">48h</b><span>student verification window</span></div>
       <div class="stat"><b class="grad">1-tap</b><span>emergency SOS broadcast</span></div>
     </div>
@@ -403,7 +403,7 @@ footer{border-top:1px solid var(--line);padding:36px 0;color:var(--muted);font-s
         <div class="a"><span class="lbl">Our answer</span><p>Fixes need <b>proof photos</b>, and each photo is fingerprinted to catch re-used images and tampered timestamps. You then get <b>48 hours to confirm or dispute</b>. A dispute sends the on-site Warden to inspect.</p></div></div>
 
       <div class="qa rv"><div class="q"><span class="lbl">The question</span><h3>“What if the problem is urgent — will anyone act in time?”</h3></div>
-        <div class="a"><span class="lbl">Our answer</span><p>Every ticket carries a <b>deadline by priority</b> — 12h critical, 24h high, 48h medium, 72h low. A scheduler watches the clock every minute and <b>auto-escalates</b> to managers and admins the moment a deadline is missed.</p></div></div>
+        <div class="a"><span class="lbl">Our answer</span><p>Every ticket carries a <b>deadline by priority</b> — 4h critical, 24h high, 48h medium, 72h low. A scheduler keeps watching the clock every few minutes and <b>auto-escalates</b> to managers and admins the moment a deadline is missed.</p></div></div>
 
       <div class="qa rv"><div class="q"><span class="lbl">The question</span><h3>“I'm scared to report ragging or harassment. Won't they know it's me?”</h3></div>
         <div class="a"><span class="lbl">Our answer</span><p>Anonymous reports are <b>stored separately from your identity</b>. You get a case code to chat with admins two-way, without logging in. Unsealing identity needs an admin's password re-entry, a written justification, and is <b>permanently audit-logged</b>.</p></div></div>
@@ -621,7 +621,7 @@ function show(i){
   const f = flow[i];
   $$('.step').forEach((s,j) => s.classList.toggle('on', i===j));
   panel.innerHTML = `<span class="stage">${f.stage} · ${f.t}</span><h3>${f.h}</h3><p>${f.p}</p><ul>${f.li.map(x=>`<li>${x}</li>`).join('')}</ul>` +
-    (i===1 ? `<div class="sla"><div class="c"><b>12h</b><span>Critical</span></div><div class="h"><b>24h</b><span>High</span></div><div class="m"><b>48h</b><span>Medium</span></div><div class="l"><b>72h</b><span>Low</span></div></div>` : '');
+    (i===1 ? `<div class="sla"><div class="c"><b>4h</b><span>Critical</span></div><div class="h"><b>24h</b><span>High</span></div><div class="m"><b>48h</b><span>Medium</span></div><div class="l"><b>72h</b><span>Low</span></div></div>` : '');
 }
 show(0);
 let auto = setInterval(()=>{ const c = $$('.step').findIndex(s=>s.classList.contains('on')); show((c+1)%flow.length); }, 6000);
@@ -731,7 +731,7 @@ const dashboards = [
    <div class="card"><div class="chd"><div><h2>Complaints waiting for assignment</h2><p>Complaints waiting for assignment, sorted by deadline (soonest first).</p></div>${tabs(['To assign','Department board','My jobs','Stats &amp; Performance','Staff Workforce'],0)}</div>
      <div class="rowi"><div><div class="t">Tap leakage in washroom ${bd('High','warning')}</div>${meta(loc('Hostel 1'),'Filed 03 Nov, 10:42','SLA: 24h')}</div><div class="nbtn">${bt('Start','pri')}${bt('Details')}</div></div>
      <div class="rowi"><div><div class="t">Water cooler not cooling ${bd('Medium','info')}</div>${meta(loc('Mess 1'),'Filed 03 Nov, 08:05','SLA: 48h')}</div><div class="nbtn">${bt('Start','pri')}${bt('Details')}</div></div>
-     <div class="rowi"><div><div class="t">Pipe burst near corridor ${bd('Critical','danger')}</div>${meta(loc('Hostel 2'),'Filed 03 Nov, 07:50','SLA: 12h')}</div><div class="nbtn">${bt('Start','pri')}${bt('Details')}</div></div>
+     <div class="rowi"><div><div class="t">Pipe burst near corridor ${bd('Critical','danger')}</div>${meta(loc('Hostel 2'),'Filed 03 Nov, 07:50','SLA: 4h')}</div><div class="nbtn">${bt('Start','pri')}${bt('Details')}</div></div>
    </div>`},
 
 { t:'Warden', e:'🛡️', url:'/location', role:'Warden', initial:'W',
