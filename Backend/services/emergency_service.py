@@ -379,99 +379,44 @@ class EmergencyService:
                         "user_id": warden_user.user_id,
                     }
 
-        # 4. Acting Coordinator
-        coord_row = None
-        dept_obj = self.auth_service.get_department(dept_id) if (dept_id and self.auth_service) else None
-        dept_label = dept_obj.name if dept_obj else cat_name
-        if loc_id and dept_id and self.team_service:
-            team = self.team_service.get_team_for_location_department(loc_id, dept_id)
-            if team:
-                acting_coord = self.team_service.get_acting_coordinator(team)
-                if acting_coord:
-                    c_phone = getattr(acting_coord, "phone_number", None) or getattr(acting_coord, "phone", "")
-                    if c_phone:
-                        coord_row = {
-                            "name": acting_coord.name,
-                            "role": f"Coordinator – {dept_label}",
-                            "phone": c_phone,
-                            "user_id": acting_coord.user_id,
-                        }
+        # 4. App Manager (final fallback). Phone comes from the "app_manager_phone"
+        # setting, otherwise from the first active App Manager user with a phone number.
+        am_row = None
+        am_phone, am_name = "", "App Manager"
+        if self.config_service:
+            try:
+                am_phone = self.config_service.get_value("app_manager_phone") or ""
+            except Exception:
+                pass
+        if not am_phone and self.auth_service:
+            try:
+                for u in self.auth_service.list_users():
+                    if (getattr(u, "role", "") or "").lower() == "app_manager":
+                        ph = getattr(u, "phone_number", None) or getattr(u, "phone", "")
+                        if ph:
+                            am_phone, am_name = ph, u.name
+                            break
+            except Exception as e:
+                logger.warning(f"App Manager lookup failed: {e}")
+        if am_phone:
+            am_row = {"name": am_name, "role": "App Manager", "phone": am_phone, "is_app_manager": True}
 
-        # 5. Department Emergency Contacts
-        dept_contact_rows = []
-        is_night = self._is_night_time()
-        if dept_id:
-            with self._connect() as conn:
-                rows = conn.execute(
-                    """
-                    SELECT * FROM emergency_contacts
-                    WHERE department_id = ? AND active = 1
-                    ORDER BY sort_order ASC
-                    """,
-                    (dept_id,),
-                ).fetchall()
+        # Fixed call chain for every emergency category: Security -> Warden -> App Manager.
+        # Coordinators and department contacts are intentionally NOT listed.
+        # stage 1 (Security + Warden) is shown immediately; stage 2 (App Manager) is only
+        # revealed by the client after both stage-1 contacts did not respond.
+        # There is no automatic escalation: the caller decides when to move to the next contact.
+        chain = []
+        if security_row and security_row.get("phone"):
+            chain.append({**security_row, "stage": 1})
+        if warden_row:
+            chain.append({**warden_row, "stage": 1})
+        if am_row:
+            chain.append({**am_row, "stage": 2})
 
-                # Filter day/night
-                candidates = []
-                for r in rows:
-                    c = dict(r)
-                    if is_night and c.get("day_only"):
-                        continue
-                    if not is_night and c.get("night_only"):
-                        continue
-                    candidates.append(c)
-
-                # Sort: location-specific first, then general (location_id IS NULL)
-                def sort_key(item):
-                    is_loc_match = 0 if (loc_id and item.get("location_id") == loc_id) else 1
-                    return (is_loc_match, item.get("sort_order", 0))
-
-                candidates.sort(key=sort_key)
-                for item in candidates:
-                    dept_contact_rows.append({
-                        "name": item["name"],
-                        "role": dept_label,
-                        "phone": item["phone"],
-                        "user_id": item.get("user_id"),
-                    })
-
-        # Order selection based on category
-        cat_lower = (cat_name or "").strip().lower()
-        is_fire_or_medical = any(x in cat_lower for x in ("fire", "smoke", "medical"))
-
-        raw_list = []
-        if is_fire_or_medical:
-            # 1. 112
-            # 2. Campus security (if set)
-            # 3. Your Warden
-            # 4. Department contacts and Coordinator (if a department is mapped)
-            raw_list.append(hotline_row)
-            if security_row and security_row.get("phone"):
-                raw_list.append(security_row)
-            if warden_row:
-                raw_list.append(warden_row)
-            raw_list.extend(dept_contact_rows)
-            if coord_row:
-                raw_list.append(coord_row)
-        else:
-            # 1. Department emergency contacts (location-specific first, day/night filtered)
-            # 2. Team's acting Coordinator (backup if Coordinator on leave)
-            # 3. Your Warden (Warden of the student's own location)
-            # 4. Campus security (if set)
-            # 5. 112 (always last row, always visible)
-            raw_list.extend(dept_contact_rows)
-            if coord_row:
-                raw_list.append(coord_row)
-            if warden_row:
-                raw_list.append(warden_row)
-            if security_row and security_row.get("phone"):
-                raw_list.append(security_row)
-            raw_list.append(hotline_row)
-
-        # Deduplicate while preserving order (and ensuring 112 stays at top/bottom as intended)
         deduped = []
         seen_phones = set()
-        for item in raw_list:
+        for item in chain:
             clean_phone = item["phone"].replace(" ", "").replace("-", "").lower()
             if clean_phone not in seen_phones:
                 seen_phones.add(clean_phone)
@@ -719,13 +664,6 @@ class EmergencyService:
 
             # Find recipients
             recipients = set()
-            team_id = c.get("team_id")
-            if team_id and self.team_service:
-                team = self.team_service.get_team(team_id)
-                if team:
-                    ac = self.team_service.get_acting_coordinator(team)
-                    if ac:
-                        recipients.add(ac.user_id)
             if loc_obj and getattr(loc_obj, "in_charge_id", None):
                 recipients.add(loc_obj.in_charge_id)
             if self.auth_service:
@@ -804,7 +742,8 @@ class EmergencyService:
     # 10-MINUTE UNACKNOWLEDGED CHECK (Rule 2.4b)
     # =========================================================================
     def check_unacknowledged_emergencies(self):
-        """Re-alerts once if nobody clicked 'I'm on it' within 10 minutes."""
+        """DISABLED: automatic escalation was removed. Callers now dial Security -> Warden -> App Manager manually."""
+        return
         with self._connect() as conn:
             rows = conn.execute(
                 """

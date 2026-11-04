@@ -80,19 +80,16 @@ def _create_dept(auth, prefix):
     return auth.create_department(f"Dept {prefix} {uid}", sla_days=2)
 
 
-def test_emergency_categories_and_call_list_ordering(services):
-    """Test emergency call list sorting:
-    - Fire/Smoke: 112 first, Security, Warden, Dept contacts
-    - Electrical: Dept contacts first, Coordinator, Warden, Security, 112 last
-    - Duplicates removed, 112 always present
-    """
+def test_call_list_is_security_warden_then_app_manager(services):
+    """Every category returns the same chain: Security + Warden (stage 1), App Manager (stage 2).
+    Coordinators, department contacts and 112 are NOT part of the chain."""
     auth = services["auth"]
     emg = services["emergency"]
     team_svc = services["team"]
 
-    # 1. Setup staff & student
-    coord, coord_headers = _create_user(auth, ROLE_COORDINATOR, "emg_coord", phone="9988771122")
-    warden, warden_headers = _create_user(auth, ROLE_LOCATION_IN_CHARGE, "emg_warden", phone="9988773344")
+    coord, _ = _create_user(auth, ROLE_COORDINATOR, "emg_coord", phone="9988771122")
+    warden, _ = _create_user(auth, ROLE_LOCATION_IN_CHARGE, "emg_warden", phone="9988773344")
+    manager, _ = _create_user(auth, "app_manager", "emg_am", phone="9988779900")
     student, student_headers = _create_user(auth, ROLE_STUDENT, "emg_stu")
 
     loc = _create_loc(auth, "EMG_LOC", in_charge_id=warden.user_id)
@@ -100,15 +97,13 @@ def test_emergency_categories_and_call_list_ordering(services):
     auth.save_user(student)
 
     elec_dept = _create_dept(auth, "Electrical")
-    team = team_svc.create_team(
+    team_svc.create_team(
         name=f"Electrical Team {loc.location_id}",
         department_id=elec_dept.department_id,
         coordinator_id=coord.user_id,
         location_ids=[loc.location_id],
         member_ids=[],
     )
-
-    # Add emergency contact for Electrical
     emg.create_contact(
         name="Senior Electrician",
         phone="9988775566",
@@ -116,81 +111,28 @@ def test_emergency_categories_and_call_list_ordering(services):
         location_id=loc.location_id,
         sort_order=1,
     )
-
-    # Create/Ensure categories
     elec_cat = emg.create_category("Electrical", department_id=elec_dept.department_id, sort_order=1)
     fire_cat = emg.create_category("Fire / Smoke", department_id=None, sort_order=2)
 
-    # 2. Test Electrical Call List (non-fire/medical)
-    res_elec = client.get(
-        f"/emergency/call-list?category={elec_cat['category_id']}&location_id={loc.location_id}",
-        headers=student_headers,
-    )
-    assert res_elec.status_code == 200
-    elec_list = res_elec.json()
-    assert len(elec_list) >= 3
+    for cat in (elec_cat, fire_cat):
+        res = client.get(
+            f"/emergency/call-list?category={cat['category_id']}&location_id={loc.location_id}",
+            headers=student_headers,
+        )
+        assert res.status_code == 200
+        items = res.json()
+        phones = [i["phone"] for i in items]
 
-    # Electrical: 112 must be the LAST item
-    assert elec_list[-1]["phone"] == "112"
-    # Department contact (Senior Electrician) should be first
-    assert any("Senior Electrician" in item["name"] for item in elec_list[:2])
-    # Coordinator and Warden must be present
-    assert any("9988771122" in item["phone"] for item in elec_list)
-    assert any("9988773344" in item["phone"] for item in elec_list)
+        # Order: Security, Warden, App Manager
+        assert items[0].get("is_security") is True
+        assert items[1]["phone"] == "9988773344" and items[1]["stage"] == 1
+        assert items[-1]["phone"] == "9988779900" and items[-1]["stage"] == 2
+        assert [i["stage"] for i in items] == [1, 1, 2]
 
-    # 3. Test Fire / Smoke Call List
-    res_fire = client.get(
-        f"/emergency/call-list?category={fire_cat['category_id']}&location_id={loc.location_id}",
-        headers=student_headers,
-    )
-    assert res_fire.status_code == 200
-    fire_list = res_fire.json()
-    assert len(fire_list) >= 2
-    # Fire/Medical: 112 must be the FIRST item
-    assert fire_list[0]["phone"] == "112"
-    # Warden must be in the list
-    assert any("9988773344" in item["phone"] for item in fire_list)
-
-
-def test_coordinator_on_leave_shows_backup(services):
-    """When coordinator is on leave, call list displays backup coordinator."""
-    auth = services["auth"]
-    emg = services["emergency"]
-    team_svc = services["team"]
-
-    coord, _ = _create_user(auth, ROLE_COORDINATOR, "c_leave", phone="9111111111")
-    backup, _ = _create_user(auth, ROLE_EMPLOYEE, "b_work", phone="9222222222")
-    student, student_headers = _create_user(auth, ROLE_STUDENT, "stu_bk")
-
-    loc = _create_loc(auth, "LOC_BK")
-    student.location_id = loc.location_id
-    auth.save_user(student)
-
-    dept = _create_dept(auth, "Plumbing")
-    team = team_svc.create_team(
-        name=f"Plumbing Team {loc.location_id}",
-        department_id=dept.department_id,
-        coordinator_id=coord.user_id,
-        backup_coordinator_id=backup.user_id,
-        location_ids=[loc.location_id],
-        member_ids=[backup.user_id],
-    )
-    cat = emg.create_category("Plumbing / Water", department_id=dept.department_id)
-
-    # Coordinator takes leave today
-    today_str = date.today().isoformat()
-    team_svc.set_leave(coord.user_id, today_str, today_str, "Flu", set_by=coord.user_id)
-
-    # Fetch call list -> should show backup's phone
-    res = client.get(
-        f"/emergency/call-list?category={cat['category_id']}&location_id={loc.location_id}",
-        headers=student_headers,
-    )
-    assert res.status_code == 200
-    call_list = res.json()
-    phones = [item["phone"] for item in call_list]
-    assert "9222222222" in phones
-    assert "9111111111" not in phones
+        # No coordinator, dept contact, or 112 in the chain
+        assert "9988771122" not in phones
+        assert "9988775566" not in phones
+        assert "112" not in phones
 
 
 def test_emergency_complaint_creation_and_reached_workflow(services):
