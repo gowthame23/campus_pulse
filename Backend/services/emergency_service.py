@@ -379,13 +379,29 @@ class EmergencyService:
                         "user_id": warden_user.user_id,
                     }
 
-        # 4. App Manager (final fallback). Phone comes from the "app_manager_phone"
-        # setting, otherwise from the first active App Manager user with a phone number.
+        # 4. App Manager (final fallback).
+        # Priority:
+        #   a. Location's assigned App Manager
+        #   b. System setting "app_manager_phone"
+        #   c. First active App Manager user with a phone number
         am_row = None
         am_phone, am_name = "", "App Manager"
-        if self.config_service:
+        if loc_obj and getattr(loc_obj, "app_manager_id", None) and self.auth_service:
             try:
-                am_phone = self.config_service.get_value("app_manager_phone") or ""
+                am_user = self.auth_service.get_user(loc_obj.app_manager_id)
+                if am_user:
+                    ph = getattr(am_user, "phone_number", None) or getattr(am_user, "phone", "")
+                    if ph:
+                        am_phone, am_name = ph, am_user.name
+            except Exception as e:
+                logger.warning(f"Location App Manager lookup failed: {e}")
+
+        if not am_phone and self.config_service:
+            try:
+                if hasattr(self.config_service, "get_setting"):
+                    am_phone = self.config_service.get_setting("app_manager_phone") or ""
+                elif hasattr(self.config_service, "get_value"):
+                    am_phone = self.config_service.get_value("app_manager_phone") or ""
             except Exception:
                 pass
         if not am_phone and self.auth_service:

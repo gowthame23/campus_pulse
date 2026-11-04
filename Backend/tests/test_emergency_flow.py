@@ -93,6 +93,8 @@ def test_call_list_is_security_warden_then_app_manager(services):
     student, student_headers = _create_user(auth, ROLE_STUDENT, "emg_stu")
 
     loc = _create_loc(auth, "EMG_LOC", in_charge_id=warden.user_id)
+    loc.app_manager_id = manager.user_id
+    auth.save_location(loc)
     student.location_id = loc.location_id
     auth.save_user(student)
 
