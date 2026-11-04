@@ -1,0 +1,912 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campus Pulse</title>
+<meta name="description" content="Campus Pulse is an accountable campus grievance, emergency and facilities platform: named owners, SLA deadlines, photo-proof verification, anonymous reporting and one-tap SOS.">
+<meta property="og:title" content="Campus Pulse — Complaints that actually get fixed">
+<meta property="og:description" content="Every campus complaint gets an owner, a deadline and proof. Try the live platform.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#070b14">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%236366f1'/><path d='M4 17h6l3-8 5 15 3-7h7' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070b14; --bg2:#0b1120; --card:#0f1729; --card2:#131d33;
+  --line:rgba(148,163,184,.14); --text:#e8edf7; --muted:#93a0b8;
+  --brand:#6366f1; --brand2:#22d3ee; --good:#34d399; --warn:#fbbf24; --bad:#fb7185;
+  --grad:linear-gradient(135deg,#6366f1 0%,#22d3ee 100%);
+  --radius:18px;
+}
+:root[data-theme="light"]{
+  --bg:#f6f8fc; --bg2:#eef2f9; --card:#ffffff; --card2:#f3f6fb;
+  --line:rgba(15,23,42,.1); --text:#0f172a; --muted:#52607a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:80px}
+body{background:var(--bg);color:var(--text);font:16px/1.6 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+h1,h2,h3,h4{font-family:'Space Grotesk',Inter,sans-serif;line-height:1.1;letter-spacing:-.02em}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1160px;margin:0 auto;padding:0 20px}
+section{padding:96px 0;position:relative}
+.eyebrow{display:inline-flex;gap:8px;align-items:center;font-size:12.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--brand2)}
+.eyebrow::before{content:"";width:22px;height:2px;background:var(--grad);border-radius:2px}
+h2{font-size:clamp(30px,4.4vw,48px);margin:14px 0 14px}
+.lead{color:var(--muted);font-size:18px;max-width:640px}
+.center{text-align:center}.center .lead{margin:0 auto}.center .eyebrow{justify-content:center}
+.grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:10px;padding:14px 24px;border-radius:12px;font-weight:600;font-size:15px;border:1px solid transparent;cursor:pointer;transition:.25s transform,.25s box-shadow,.25s background;font-family:inherit}
+.btn-primary{background:var(--grad);color:#04101c;box-shadow:0 10px 30px -8px rgba(99,102,241,.6)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 16px 40px -8px rgba(34,211,238,.55)}
+.btn-ghost{border-color:var(--line);background:rgba(148,163,184,.06);color:var(--text)}
+.btn-ghost:hover{background:rgba(148,163,184,.14);transform:translateY(-2px)}
+.btn svg{width:18px;height:18px}
+
+/* nav */
+nav{position:fixed;inset:0 0 auto 0;z-index:50;transition:.3s;border-bottom:1px solid transparent}
+nav.scrolled{background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(16px);border-color:var(--line)}
+.nav-in{display:flex;align-items:center;justify-content:space-between;height:68px}
+.logo{display:flex;align-items:center;gap:10px;font:700 20px 'Space Grotesk';letter-spacing:-.02em}
+.logo i{width:34px;height:34px;border-radius:10px;background:var(--grad);display:grid;place-items:center}
+.logo svg{width:20px;height:20px}
+.links{display:flex;gap:28px;font-size:14.5px;color:var(--muted)}
+.links a:hover{color:var(--text)}
+.nav-r{display:flex;gap:10px;align-items:center}
+.icon-btn{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer;display:grid;place-items:center}
+.nav-r .btn{padding:10px 18px;font-size:14px}
+.burger{display:none}
+
+/* hero */
+.hero{padding:150px 0 90px;overflow:hidden}
+.glow{position:absolute;border-radius:50%;filter:blur(110px);opacity:.35;pointer-events:none}
+.g1{width:520px;height:520px;background:#6366f1;top:-160px;left:-120px}
+.g2{width:460px;height:460px;background:#22d3ee;top:80px;right:-140px;opacity:.22}
+.grid-bg{position:absolute;inset:0;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:56px 56px;mask-image:radial-gradient(ellipse 70% 60% at 50% 30%,#000 30%,transparent 75%);opacity:.5}
+.hero-in{position:relative;display:grid;grid-template-columns:1.1fr .9fr;gap:56px;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:99px;border:1px solid var(--line);background:rgba(148,163,184,.07);font-size:13px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 rgba(52,211,153,.7);animation:pulse 2s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 10px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
+.hero h1{font-size:clamp(40px,6.4vw,74px);margin:22px 0 22px}
+.hero p.lead{font-size:19px}
+.cta-row{display:flex;gap:14px;flex-wrap:wrap;margin-top:34px}
+.trust{display:flex;gap:26px;flex-wrap:wrap;margin-top:38px;color:var(--muted);font-size:13.5px}
+.trust span{display:flex;gap:8px;align-items:center}
+.trust b{color:var(--good)}
+
+/* hero mock */
+.mock{background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:22px;padding:20px;box-shadow:0 40px 90px -30px rgba(0,0,0,.65);transform:perspective(1200px) rotateY(-6deg) rotateX(3deg);transition:.5s}
+.mock:hover{transform:none}
+.mock-top{display:flex;gap:6px;margin-bottom:16px}.mock-top i{width:10px;height:10px;border-radius:50%;background:#334155}
+.ticket{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
+.ticket .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ticket h5{font:600 15px Inter}
+.ticket small{color:var(--muted);font-size:12.5px}
+.tag{font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:99px;white-space:nowrap}
+.t-crit{background:rgba(251,113,133,.15);color:var(--bad)}
+.t-go{background:rgba(251,191,36,.15);color:var(--warn)}
+.t-ok{background:rgba(52,211,153,.15);color:var(--good)}
+.bar{height:6px;border-radius:9px;background:rgba(148,163,184,.15);margin-top:12px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:9px;background:var(--grad);width:0;animation:fill 2.4s .6s forwards}
+@keyframes fill{to{width:var(--w)}}
+.chip-float{position:absolute;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 15px;font-size:13px;box-shadow:0 20px 40px -15px rgba(0,0,0,.5);display:flex;gap:10px;align-items:center;animation:float 6s ease-in-out infinite}
+.chip-float.a{left:-34px;bottom:46px}.chip-float.b{right:-18px;top:-22px;animation-delay:-3s}
+@keyframes float{50%{transform:translateY(-10px)}}
+
+/* stats */
+.stats{padding:0 0 30px}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.stat{background:var(--card);padding:28px 22px;text-align:center}
+.stat b{display:block;font:700 38px 'Space Grotesk'}
+.stat span{color:var(--muted);font-size:14px}
+
+/* problems */
+.qa-list{margin-top:56px;display:grid;gap:18px}
+.qa{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--card);transition:.3s}
+.qa:hover{border-color:rgba(99,102,241,.5);transform:translateY(-3px)}
+.qa .q,.qa .a{padding:28px 30px}
+.qa .q{background:linear-gradient(135deg,rgba(251,113,133,.09),transparent);border-right:1px solid var(--line)}
+.qa .a{background:linear-gradient(135deg,rgba(52,211,153,.07),transparent)}
+.lbl{font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;display:block;margin-bottom:10px}
+.q .lbl{color:var(--bad)}.a .lbl{color:var(--good)}
+.q h3{font-size:21px;font-weight:600}
+.a p{color:var(--muted);font-size:15.5px}
+.a p b{color:var(--text);font-weight:600}
+
+/* workflow */
+.bg2{background:var(--bg2)}
+.flow{margin-top:56px;display:grid;grid-template-columns:340px 1fr;gap:28px}
+.steps{display:grid;gap:10px;align-content:start}
+.step{display:flex;gap:14px;align-items:center;text-align:left;padding:16px 18px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;font:inherit;transition:.25s}
+.step:hover{border-color:rgba(99,102,241,.5)}
+.step .n{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font:700 15px 'Space Grotesk';background:rgba(148,163,184,.12);flex:none;transition:.25s}
+.step b{display:block;font-size:15.5px}.step small{color:var(--muted);font-size:13px}
+.step.on{border-color:transparent;background:linear-gradient(var(--card),var(--card)) padding-box,var(--grad) border-box;border:1px solid transparent}
+.step.on .n{background:var(--grad);color:#04101c}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:38px;min-height:100%}
+.panel .stage{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:5px 12px;border-radius:99px;background:rgba(99,102,241,.16);color:#a5b4fc;margin-bottom:16px}
+.panel h3{font-size:30px;margin-bottom:12px}
+.panel p{color:var(--muted);margin-bottom:18px}
+.panel ul{list-style:none;display:grid;gap:11px}
+.panel li{display:flex;gap:12px;font-size:15.5px}
+.panel li::before{content:"";flex:none;width:20px;height:20px;margin-top:2px;border-radius:50%;background:var(--grad) center/12px no-repeat;-webkit-mask:none}
+.panel li::after{content:"✓";position:absolute;margin-left:4px;color:#04101c;font-size:12px;font-weight:800;margin-top:2px}
+.panel li{position:relative}
+.sla{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:26px}
+.sla div{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:16px;text-align:center}
+.sla b{display:block;font:700 26px 'Space Grotesk'}.sla span{font-size:12.5px;color:var(--muted)}
+.sla .c b{color:var(--bad)}.sla .h b{color:var(--warn)}.sla .m b{color:var(--brand2)}.sla .l b{color:var(--good)}
+
+/* feature cards */
+.cards{margin-top:56px;display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:30px;transition:.3s;position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;inset:0;background:radial-gradient(400px circle at var(--mx,50%) var(--my,0%),rgba(99,102,241,.16),transparent 55%);opacity:0;transition:.3s}
+.card:hover::before{opacity:1}.card:hover{border-color:rgba(99,102,241,.45);transform:translateY(-4px)}
+.ico{width:48px;height:48px;border-radius:13px;display:grid;place-items:center;margin-bottom:20px;background:rgba(99,102,241,.14);color:#a5b4fc;position:relative}
+.ico svg{width:24px;height:24px}
+.card h3{font-size:20px;margin-bottom:8px;position:relative}
+.card .qq{color:var(--brand2);font-size:14px;font-weight:500;margin-bottom:10px;position:relative}
+.card p{color:var(--muted);font-size:15px;position:relative}
+
+/* deep dive split */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+.split.rev .vis{order:-1}
+.checks{list-style:none;margin-top:22px;display:grid;gap:14px}
+.checks li{display:flex;gap:12px;color:var(--muted)}
+.checks li b{color:var(--text)}
+.checks svg{flex:none;width:22px;height:22px;color:var(--good);margin-top:2px}
+.vis{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:28px;position:relative;overflow:hidden}
+.code{font:500 13px/1.8 ui-monospace,SFMono-Regular,Menlo,monospace;color:#a5b4fc}
+.code .k{color:var(--brand2)}.code .r{color:var(--bad)}.code .g{color:var(--good)}.code .m{color:var(--muted)}
+.sos{display:grid;place-items:center;padding:20px 0}
+.sos-btn{width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fb7185,#be123c);display:grid;place-items:center;font:700 26px 'Space Grotesk';color:#fff;position:relative;box-shadow:0 0 60px rgba(251,113,133,.5)}
+.sos-btn::before,.sos-btn::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid #fb7185;animation:ring 2.4s infinite}
+.sos-btn::after{animation-delay:1.2s}
+@keyframes ring{to{transform:scale(1.9);opacity:0}}
+.sos-types{display:flex;gap:10px;margin-top:30px;flex-wrap:wrap;justify-content:center}
+.sos-types span{padding:8px 16px;border-radius:99px;border:1px solid var(--line);font-size:13.5px;background:var(--bg2)}
+
+/* roles */
+.roles{margin-top:56px;display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+.role{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:24px 20px;transition:.3s}
+.role:hover{transform:translateY(-4px);border-color:rgba(34,211,238,.5)}
+.role .em{font-size:30px;margin-bottom:12px}
+.role h4{font-size:18px;margin-bottom:6px}.role p{font-size:14px;color:var(--muted)}
+
+/* patience note */
+.patience{display:flex;gap:12px;align-items:flex-start;max-width:520px;margin-top:22px;padding:12px 16px;border-radius:12px;border:1px solid rgba(251,191,36,.3);background:rgba(251,191,36,.08);font-size:13.5px;color:var(--muted)}
+.patience b{color:var(--warn)}
+.cta-box .patience{margin:22px auto 0;text-align:left}
+
+/* dashboards showcase — mock windows reproduce the real app UI (light theme, primary #2563eb) */
+.dtabs{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:48px 0 28px}
+.dtab{padding:11px 20px;border-radius:99px;border:1px solid var(--line);background:var(--card);color:var(--muted);font:600 14.5px Inter,sans-serif;cursor:pointer;transition:.25s}
+.dtab:hover{color:var(--text);border-color:rgba(99,102,241,.5)}
+.dtab.on{background:var(--grad);color:#04101c;border-color:transparent}
+.dshow{display:grid;gap:26px}
+.drole{display:grid;grid-template-columns:1fr 1.2fr;gap:36px;align-items:start}
+.drole h3{font-size:26px;margin:12px 0 0}
+.drole .checks{margin-top:0}
+.note-small{margin-top:18px;font-size:12.5px;color:var(--muted)}
+
+.app{--p:#2563eb;--s9:#0f172a;--s7:#334155;--s5:#64748b;--s4:#94a3b8;--s2:#e2e8f0;--s1:#f1f5f9;--s0:#f8fafc;
+  background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 40px 90px -35px rgba(0,0,0,.65);
+  color:var(--s9);font:12px/1.45 Inter,system-ui,sans-serif;text-align:left}
+.app *{box-sizing:border-box}
+.app svg{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.app .chrome{display:flex;align-items:center;gap:6px;padding:10px 14px;background:#eef2f7;border-bottom:1px solid var(--s2)}
+.app .chrome i{width:10px;height:10px;border-radius:50%;background:#cbd5e1}
+.app .chrome span{margin-left:10px;font-size:11px;color:var(--s5);background:#fff;padding:3px 12px;border-radius:99px;border:1px solid var(--s2)}
+.app .shell{display:grid;grid-template-columns:200px 1fr;height:640px}
+.app .sb{background:#fff;border-right:1px solid var(--s2);padding:14px 10px;overflow:auto}
+.app .brand{display:flex;gap:9px;align-items:center;padding:2px 8px 14px}
+.app .brand i{width:30px;height:30px;border-radius:9px;background:var(--p);display:grid;place-items:center;color:#fff}
+.app .brand b{display:block;font-size:13px}.app .brand small{color:var(--s5);font-size:10.5px}
+.app .sec{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--s4);padding:10px 10px 5px}
+.app .nv{display:flex;align-items:center;gap:9px;height:34px;padding:0 10px;border-radius:12px;color:var(--s7);font-size:12px;white-space:nowrap}
+.app .nv .ch{margin-left:auto;width:12px;height:12px;color:var(--s4)}
+.app .nv.act{background:#eff6ff;color:var(--p);font-weight:600}
+.app .col{display:flex;flex-direction:column;min-width:0;background:var(--s0)}
+.app .top{display:flex;align-items:center;gap:12px;padding:9px 18px;background:#fff;border-bottom:1px solid var(--s2)}
+.app .crumb{font-size:11.5px;color:var(--s5);white-space:nowrap}
+.app .srch{flex:1;max-width:340px;margin:0 auto;display:flex;align-items:center;gap:8px;height:34px;padding:0 12px;border:1px solid var(--s2);border-radius:12px;background:var(--s0);color:var(--s4)}
+.app .tr{display:flex;gap:10px;align-items:center;color:var(--s5)}
+.app .av{width:28px;height:28px;border-radius:50%;background:var(--p);color:#fff;display:grid;place-items:center;font-weight:700;font-size:11px}
+.app .page{padding:18px;overflow:auto;display:grid;gap:14px;align-content:start}
+.app h1{font:700 21px 'Space Grotesk',Inter,sans-serif;letter-spacing:-.01em;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.app .sub{font-size:11.5px;color:var(--s5);margin-top:3px}
+.app .card{background:#fff;border:1px solid var(--s2);border-radius:14px;padding:14px}
+.app h2{font:700 12.5px/1.3 Inter,system-ui,sans-serif;letter-spacing:0;margin:0}
+.app .chd{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--s1)}
+.app .chd p{font-size:11px;color:var(--s5);margin-top:2px}
+.app .pills{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.app .pill{display:flex;align-items:center;gap:8px;height:42px;padding:0 14px;border-radius:99px;border:1px solid;font-weight:600;font-size:12px}
+.app .pill em{margin-left:auto;font-style:normal;font-size:10.5px;color:#fff;padding:1px 8px;border-radius:99px}
+.app .pill.blue{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}.app .pill.blue em{background:#2563eb}
+.app .pill.amber{background:#fffbeb;border-color:#fde68a;color:#92400e}.app .pill.amber em{background:#d97706}
+.app .pill.indigo{background:#eef2ff;border-color:#c7d2fe;color:#3730a3}.app .pill.indigo em{background:#4f46e5}
+.app .pill.emerald{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}.app .pill.emerald em{background:#059669}
+.app .pill.purple{background:#faf5ff;border-color:#e9d5ff;color:#6b21a8}.app .pill.purple em{background:#9333ea}
+.app .pill.rose{background:#fff1f2;border-color:#fecdd3;color:#9f1239}.app .pill.rose em{background:#e11d48}
+.app .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.app .stat{border:1px solid var(--s2);background:#fff;border-radius:12px;padding:10px 13px}
+.app .stat .r{display:flex;align-items:center;gap:8px}
+.app .stat .l{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--s5)}
+.app .stat .v{font-weight:800;font-size:13px;background:var(--s1);padding:1px 8px;border-radius:6px}
+.app .stat .arr{margin-left:auto;color:var(--s4)}
+.app .stat p{font-size:11px;color:var(--s4);margin-top:5px}
+.app .stat.acc{border-color:rgba(37,99,235,.4)}
+.app .bd{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;padding:1px 8px;border-radius:99px;border:1px solid var(--s2);background:var(--s1);color:var(--s7);white-space:nowrap}
+.app .bd.danger{background:#fff1f2;border-color:#fecdd3;color:#be123c}
+.app .bd.warning{background:#fffbeb;border-color:#fde68a;color:#b45309}
+.app .bd.info{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
+.app .bd.success{background:#ecfdf5;border-color:#a7f3d0;color:#047857}
+.app .bd.purple{background:#faf5ff;border-color:#e9d5ff;color:#7e22ce}
+.app .bt{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 11px;border-radius:9px;border:1px solid var(--s2);background:#fff;font-size:11px;font-weight:600;color:var(--s7);white-space:nowrap}
+.app .bt.pri{background:var(--p);border-color:var(--p);color:#fff}
+.app .bt.grn{background:#059669;border-color:#059669;color:#fff}
+.app .bt.rose{color:#be123c;border-color:#fda4af}
+.app .bt svg{width:13px;height:13px}
+.app .tabs{display:inline-flex;gap:4px;padding:4px;background:var(--s1);border-radius:12px;font-size:11px;font-weight:600;max-width:100%;overflow:auto}
+.app .tabs span{padding:6px 11px;border-radius:9px;color:var(--s5);white-space:nowrap}
+.app .tabs span.on{background:#fff;color:var(--s9);box-shadow:0 1px 2px rgba(15,23,42,.08)}
+.app .rowi{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--s2);border-radius:12px;background:#fff;margin-top:8px}
+.app .rowi:first-of-type{margin-top:0}
+.app .rowi .t{font-weight:700;font-size:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.app .meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--s5);font-size:11px;margin-top:4px}
+.app .meta svg{width:11px;height:11px;color:var(--p)}
+.app .stage{display:inline-block;margin-top:6px;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:6px;background:var(--s1);color:var(--s7)}
+.app .warnc{border-color:#fde68a;background:#fffbeb99}
+.app .purc{border-color:#e9d5ff;background:#faf5ff88}
+.app .note{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-radius:12px;border:1px solid #fecdd3;background:#fff1f2;color:#9f1239;font-size:11.5px;font-weight:500}
+.app .nbtn{display:flex;gap:6px;flex-wrap:wrap}
+.app .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.app .empty{padding:14px;text-align:center;color:var(--s4);font-size:11.5px}
+.app table{width:100%;border-collapse:collapse;font-size:11px}
+.app th{background:var(--s0);color:var(--s5);font-weight:700;text-align:center;padding:8px 6px;border-top:1px solid var(--s2);border-bottom:1px solid var(--s2)}
+.app th:first-child,.app td:first-child{text-align:left;padding-left:10px}
+.app td{text-align:center;padding:9px 6px;border-bottom:1px solid var(--s1)}
+.app .photo{font-size:11px;color:var(--s7);margin-top:6px}
+.app .photo b{color:var(--s9)}
+@media(max-width:980px){.drole{grid-template-columns:1fr}.app .shell{grid-template-columns:1fr;height:auto}.app .sb{display:none}.app .page{max-height:560px}}
+@media(max-width:640px){.app .pills{grid-template-columns:1fr 1fr}.app .two{grid-template-columns:1fr}.app .srch,.app .crumb{display:none}.dtab{padding:9px 14px;font-size:13.5px}.app .rowi{flex-direction:column;align-items:flex-start}}
+
+.app .nv{cursor:pointer;transition:.15s}.app .nv:hover{background:#f1f5f9}.app .nv.act:hover{background:#eff6ff}
+.app .fld{border:1px solid var(--s2);border-radius:10px;padding:7px 11px;background:#fff;color:var(--s4);font-size:11.5px;min-width:120px}
+.app .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.app .toolbar .fld:first-child{flex:1;min-width:180px}
+.app .mnav{display:none;gap:6px;overflow:auto;padding:8px 12px;background:#fff;border-bottom:1px solid var(--s2)}
+.app .mnav span{flex:none;padding:6px 12px;border-radius:99px;border:1px solid var(--s2);font-size:11.5px;font-weight:600;color:var(--s7);cursor:pointer}
+.app .mnav span.on{background:var(--p);border-color:var(--p);color:#fff}
+@media(max-width:980px){.app .mnav{display:flex}}
+
+/* cta */
+.cta{padding:60px 0 110px}
+.cta-box{position:relative;overflow:hidden;border-radius:28px;padding:72px 40px;text-align:center;border:1px solid var(--line);background:linear-gradient(135deg,rgba(99,102,241,.22),rgba(34,211,238,.12)),var(--card)}
+.cta-box h2{font-size:clamp(32px,5vw,56px);max-width:760px;margin:0 auto 16px}
+.cta-box .lead{margin:0 auto}
+.cta-box .cta-row{justify-content:center}
+.demo{max-width:720px;margin:44px auto 0;background:var(--bg);border:1px solid var(--line);border-radius:18px;padding:26px 28px;text-align:left;display:flex;gap:20px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.demo h4{font-size:18px;margin-bottom:4px}.demo p{color:var(--muted);font-size:14.5px;max-width:430px}
+.mailline{margin-top:18px;font-size:14px;color:var(--muted)}
+.mailline a{color:var(--brand2);font-weight:600;border-bottom:1px dashed currentColor}
+
+footer{border-top:1px solid var(--line);padding:36px 0;color:var(--muted);font-size:14px}
+.foot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
+.foot a:hover{color:var(--text)}
+
+/* reveal */
+.rv{opacity:0;transform:translateY(28px);transition:opacity .8s,transform .8s}
+.rv.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.rv{opacity:1;transform:none}.bar i{width:var(--w)}}
+
+/* responsive */
+@media(max-width:980px){
+  .hero-in,.split,.flow{grid-template-columns:1fr}
+  .split.rev .vis{order:0}
+  .cards{grid-template-columns:1fr 1fr}
+  .roles{grid-template-columns:1fr 1fr}
+  .stat-grid{grid-template-columns:1fr 1fr}
+  .mock{transform:none}.chip-float{display:none}
+  .links{display:none;position:absolute;top:68px;left:0;right:0;flex-direction:column;gap:0;background:var(--bg);border-bottom:1px solid var(--line);padding:8px 20px 16px}
+  .links.open{display:flex}.links a{padding:12px 0}
+  .burger{display:grid}.nav-r .btn{display:none}
+}
+@media(max-width:640px){
+  section{padding:68px 0}
+  .qa{grid-template-columns:1fr}.qa .q{border-right:0;border-bottom:1px solid var(--line)}
+  .cards,.roles{grid-template-columns:1fr}
+  .sla{grid-template-columns:1fr 1fr}
+  .panel{padding:26px}
+  .cta-box{padding:52px 22px}
+  .btn{width:100%;justify-content:center}
+  .cta-row{flex-direction:column}
+  .demo .btn{width:100%}
+}
+</style>
+</head>
+<body>
+
+<nav id="nav">
+  <div class="wrap nav-in">
+    <a href="#top" class="logo"><i><svg viewBox="0 0 24 24" fill="none" stroke="#04101c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13h5l2.5-7 4.5 13 2.5-6H22"/></svg></i>Campus Pulse</a>
+    <div class="links" id="links">
+      <a href="#problems">Problems</a><a href="#workflow">Workflow</a><a href="#trust">Trust &amp; Safety</a><a href="#roles">Roles</a><a href="#dashboards">Dashboards</a><a href="#try">Try it</a>
+    </div>
+    <div class="nav-r">
+      <button class="icon-btn" id="theme" aria-label="Toggle theme">◐</button>
+      <a class="btn btn-primary js-live" target="_blank" rel="noopener">Try Live Demo</a>
+      <button class="icon-btn burger" id="burger" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="grid-bg"></div><div class="glow g1"></div><div class="glow g2"></div>
+  <div class="wrap hero-in">
+    <div>
+      <span class="pill"><span class="dot"></span> Live &amp; ready to try — no install needed</span>
+      <h1>Why do campus complaints <span class="grad">disappear</span>?</h1>
+      <p class="lead">You report a leaking tap, a broken light, a safety concern — and then silence. Nobody owns it. Nobody checks it. Nobody is accountable. <b style="color:var(--text)">Campus Pulse was built to end that.</b></p>
+      <div class="cta-row">
+        <a class="btn btn-primary js-live" target="_blank" rel="noopener">Try Campus Pulse Live
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="btn btn-ghost" href="#problems">See the problems we solve</a>
+      </div>
+      <div class="trust">
+        <span><b>✓</b> Named owner for every ticket</span>
+        <span><b>✓</b> Photo-verified fixes</span>
+        <span><b>✓</b> Works on phone as an app</span>
+      </div>
+      <div class="patience"><span>⏳</span><span><b>Please be patient.</b> The live app can take up to a minute to open the first time while the server wakes up. After that it's fast.</span></div>
+    </div>
+    <div style="position:relative">
+      <div class="chip-float b"><span class="dot"></span> Coordinator started work</div>
+      <div class="mock">
+        <div class="mock-top"><i></i><i></i><i></i></div>
+        <div class="ticket"><div class="row"><div><h5>Water leakage — Hostel 1, Room 214</h5><small>Owner: Plumbing coordinator · SLA 24h</small></div><span class="tag t-go">Going On</span></div><div class="bar"><i style="--w:62%"></i></div></div>
+        <div class="ticket"><div class="row"><div><h5>Power outage — Academic Block 2</h5><small>Escalated to App Manager · SLA 12h</small></div><span class="tag t-crit">Critical</span></div><div class="bar"><i style="--w:28%"></i></div></div>
+        <div class="ticket" style="margin-bottom:0"><div class="row"><div><h5>Mess hall fan repaired</h5><small>Proof photo verified · Warden confirmed</small></div><span class="tag t-ok">Fixed</span></div><div class="bar"><i style="--w:100%"></i></div></div>
+      </div>
+      <div class="chip-float a">📸 Proof photo verified</div>
+    </div>
+  </div>
+</header>
+
+<div class="stats">
+  <div class="wrap rv">
+    <div class="stat-grid">
+      <div class="stat"><b class="grad">3</b><span>simple stages, zero confusion</span></div>
+      <div class="stat"><b class="grad">12h</b><span>max SLA for critical issues</span></div>
+      <div class="stat"><b class="grad">48h</b><span>student verification window</span></div>
+      <div class="stat"><b class="grad">1-tap</b><span>emergency SOS broadcast</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- PROBLEMS -->
+<section id="problems">
+  <div class="wrap">
+    <div class="center rv">
+      <span class="eyebrow">Does this sound familiar?</span>
+      <h2>Six questions every student has <span class="grad">asked</span>.</h2>
+      <p class="lead">We asked students, wardens and staff what frustrates them most. Here's what they said — and exactly how Campus Pulse answers it.</p>
+    </div>
+    <div class="qa-list">
+      <div class="qa rv"><div class="q"><span class="lbl">The question</span><h3>“I raised a complaint weeks ago. Who is even handling it?”</h3></div>
+        <div class="a"><span class="lbl">Our answer</span><p>Every complaint is <b>automatically routed by department and location</b> to a named coordinator who owns it end to end. You see their name, their progress and a live status — no more black hole.</p></div></div>
+
+      <div class="qa rv"><div class="q"><span class="lbl">The question</span><h3>“They marked it ‘resolved’ — but nothing was fixed.”</h3></div>
+        <div class="a"><span class="lbl">Our answer</span><p>Fixes need <b>proof photos</b>, and each photo is fingerprinted to catch re-used images and tampered timestamps. You then get <b>48 hours to confirm or dispute</b>. A dispute sends the on-site Warden to inspect.</p></div></div>
+
+      <div class="qa rv"><div class="q"><span class="lbl">The question</span><h3>“What if the problem is urgent — will anyone act in time?”</h3></div>
+        <div class="a"><span class="lbl">Our answer</span><p>Every ticket carries a <b>deadline by priority</b> — 12h critical, 24h high, 48h medium, 72h low. A scheduler watches the clock every minute and <b>auto-escalates</b> to managers and admins the moment a deadline is missed.</p></div></div>
+
+      <div class="qa rv"><div class="q"><span class="lbl">The question</span><h3>“I'm scared to report ragging or harassment. Won't they know it's me?”</h3></div>
+        <div class="a"><span class="lbl">Our answer</span><p>Anonymous reports are <b>stored separately from your identity</b>. You get a case code to chat with admins two-way, without logging in. Unsealing identity needs an admin's password re-entry, a written justification, and is <b>permanently audit-logged</b>.</p></div></div>
+
+      <div class="qa rv"><div class="q"><span class="lbl">The question</span><h3>“In a real emergency, who do I even call — and do they know where I am?”</h3></div>
+        <div class="a"><span class="lbl">Our answer</span><p>One tap on <b>SOS</b> — Medical, Fire or Security — instantly broadcasts your <b>location, block and room</b> to dispatchers via real-time alerts. If no one acknowledges in 10 minutes, it <b>escalates to senior leadership</b> automatically.</p></div></div>
+
+      <div class="qa rv"><div class="q"><span class="lbl">The question</span><h3>“I lost my ID card / laptop. Where do I even start looking?”</h3></div>
+        <div class="a"><span class="lbl">Our answer</span><p>Built-in <b>Lost &amp; Found</b>: post what you found or lost, claim items, and get notified — all inside the same app, alongside announcements and direct chat with staff.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- WORKFLOW -->
+<section id="workflow" class="bg2">
+  <div class="wrap">
+    <div class="center rv">
+      <span class="eyebrow">How it works</span>
+      <h2>From “it's broken” to <span class="grad">closed</span> — in plain sight.</h2>
+      <p class="lead">Instead of a dozen confusing states, every complaint follows one clear path. Tap each stage to see what happens.</p>
+    </div>
+    <div class="flow rv">
+      <div class="steps" id="steps"></div>
+      <div class="panel" id="panel"></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="wrap">
+    <div class="center rv">
+      <span class="eyebrow">Built for real campus life</span>
+      <h2>Everything a campus needs, <span class="grad">one place</span>.</h2>
+    </div>
+    <div class="cards" id="cards"></div>
+  </div>
+</section>
+
+<!-- TRUST DEEP DIVES -->
+<section id="trust" class="bg2">
+  <div class="wrap" style="display:grid;gap:110px">
+    <div class="split">
+      <div class="rv">
+        <span class="eyebrow">Anti-fraud verification</span>
+        <h2>What if someone fakes the repair?</h2>
+        <p class="lead">Traditional portals trust a click. We trust evidence.</p>
+        <ul class="checks">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg><span><b>Duplicate photo detection.</b> Every image is hashed with SHA-256; a photo used on any other complaint is instantly flagged <b>REUSED</b>.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg><span><b>Timestamp tamper check.</b> A “after repair” photo taken <i>before</i> the job started is flagged <b>OLDER_THAN_JOB</b>.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg><span><b>Skip-streak penalty.</b> Repeatedly closing without proof locks the ticket and forces an in-person Warden inspection.</span></li>
+        </ul>
+      </div>
+      <div class="vis rv"><div class="code">
+        <span class="m">// proof photo uploaded</span><br>
+        <span class="k">sha256</span>(photo) → <span class="g">a41f…9c20</span><br>
+        <span class="k">lookup</span> in all past complaints…<br>
+        <span class="r">⚠ match found → flag: REUSED</span><br><br>
+        <span class="k">exif.DateTimeOriginal</span> = <span class="g">09:12</span><br>
+        <span class="k">job.started_at</span> = <span class="g">11:40</span><br>
+        <span class="r">⚠ photo older than job → OLDER_THAN_JOB</span><br><br>
+        <span class="g">✓ Warden inspection triggered automatically</span>
+      </div></div>
+    </div>
+
+    <div class="split rev">
+      <div class="rv">
+        <span class="eyebrow">Emergency response</span>
+        <h2>When seconds matter, one tap is enough.</h2>
+        <p class="lead">No forms. No menus. Pick the emergency, and help knows where to go.</p>
+        <ul class="checks">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg><span><b>Medical, Fire or Security</b> — one tap, instantly dispatched.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg><span><b>Live location broadcast</b> with block and room via WebSockets and push notifications.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg><span><b>10-minute auto-escalation</b> if nobody acknowledges.</span></li>
+        </ul>
+      </div>
+      <div class="vis rv"><div class="sos"><div class="sos-btn">SOS</div><div class="sos-types"><span>🚑 Medical</span><span>🔥 Fire</span><span>🛡️ Security</span></div></div></div>
+    </div>
+
+    <div class="split">
+      <div class="rv">
+        <span class="eyebrow">Privacy by design</span>
+        <h2>Speak up without fear.</h2>
+        <p class="lead">Anonymity here isn't a promise — it's how the data is built.</p>
+        <ul class="checks">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg><span><b>Structural separation.</b> The report and the reporter's identity live in different sealed tables.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg><span><b>Anonymous two-way chat</b> using only a case code.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg><span><b>Tamper-proof audit trail.</b> Any unsealing is permanently recorded and can't be edited or deleted.</span></li>
+        </ul>
+      </div>
+      <div class="vis rv"><div class="code">
+        <span class="k">safety_reports</span> <span class="m">— visible to admins</span><br>
+        &nbsp;&nbsp;case_code: <span class="g">“CP-7K2Q”</span><br>
+        &nbsp;&nbsp;category: <span class="g">“harassment”</span><br>
+        &nbsp;&nbsp;reporter: <span class="r">— none —</span><br><br>
+        <span class="k">safety_report_identity</span> <span class="m">— sealed</span><br>
+        &nbsp;&nbsp;revealed: <span class="g">0</span><br>
+        &nbsp;&nbsp;🔒 needs password + written reason<br>
+        &nbsp;&nbsp;🧾 audit_logs: append-only
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ROLES -->
+<section id="roles">
+  <div class="wrap">
+    <div class="center rv">
+      <span class="eyebrow">Everyone has a clear job</span>
+      <h2>Who does what — <span class="grad">no ambiguity</span>.</h2>
+      <p class="lead">When everyone knows their role, nothing falls between the cracks.</p>
+    </div>
+    <div class="roles" id="rolegrid"></div>
+  </div>
+</section>
+
+<!-- DASHBOARDS -->
+<section id="dashboards" class="bg2">
+  <div class="wrap">
+    <div class="center rv">
+      <span class="eyebrow">See inside</span>
+      <h2>A dashboard for <span class="grad">every role</span>.</h2>
+      <p class="lead">Each person sees only what they need to act on. Pick a role to see their home screen.</p>
+    </div>
+    <div class="dtabs rv" id="dtabs"></div>
+    <div class="dshow rv" id="dshow"></div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta" id="try">
+  <div class="wrap">
+    <div class="cta-box rv">
+      <div class="glow g1" style="opacity:.25"></div>
+      <span class="eyebrow">Your turn</span>
+      <h2 style="margin-top:14px">Stop wondering. <span class="grad">See it working.</span></h2>
+      <p class="lead">File a complaint, watch it get an owner, and follow it to “Fixed”. It takes two minutes.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary js-live" target="_blank" rel="noopener">Open Campus Pulse
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>
+      </div>
+      <div class="patience"><span>⏳</span><span><b>It may take a little time to open.</b> The first visit can take up to a minute while the server wakes up — please be patient, it's worth the wait.</span></div>
+      <div class="demo">
+        <div>
+          <h4>Want to explore the dashboards too?</h4>
+          <p>Interested in seeing the Student, Coordinator, Warden, App Manager and Administrator views? Email us and we'll send you demo login credentials.</p>
+        </div>
+        <a class="btn btn-ghost js-mail">✉ Request demo access</a>
+      </div>
+      <p class="mailline">Write to <a class="js-mailtext"></a> — we usually reply quickly.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <div class="logo" style="font-size:17px"><i style="width:28px;height:28px"><svg viewBox="0 0 24 24" fill="none" stroke="#04101c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="M2 13h5l2.5-7 4.5 13 2.5-6H22"/></svg></i>Campus Pulse</div>
+    <span>Accountable campus governance — © <span id="yr"></span> Campus Pulse</span>
+    <span><a class="js-live" target="_blank" rel="noopener">Live app</a> · <a class="js-mailtext js-mailhref"></a></span>
+  </div>
+</footer>
+
+<script>
+/* ---- Edit these two values only ---- */
+const LIVE_URL = "https://campuspulse-frontend-wlws.onrender.com";
+const CONTACT  = "gowthamejjurothu@gmail.com";
+/* ------------------------------------ */
+
+const $ = (s, c=document) => c.querySelector(s), $$ = (s, c=document) => [...c.querySelectorAll(s)];
+const icons = {
+  route:'<path d="M6 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM18 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M9 16h6a3 3 0 0 0 3-3V11M6 13V9"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  cam:'<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+  bell:'<path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4zM10 21h4"/>',
+  chat:'<path d="M4 5h16v11H9l-5 4z"/>',
+  box:'<path d="m3 8 9-5 9 5v8l-9 5-9-5zM3 8l9 5 9-5M12 13v8"/>',
+  leaf:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/>',
+  star:'<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+  globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+  mega:'<path d="M3 10v4h4l8 5V5l-8 5zM18 9a4 4 0 0 1 0 6"/>',
+  chart:'<path d="M4 20V4M4 20h16M8 16v-5M13 16V8M18 16v-9"/>',
+  phone:'<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>'
+};
+const svg = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icons[k]}</svg>`;
+
+/* links */
+$$('.js-live').forEach(a => a.href = LIVE_URL);
+const mailto = `mailto:${CONTACT}?subject=${encodeURIComponent('Campus Pulse — demo access request')}&body=${encodeURIComponent('Hi,\n\nI tried Campus Pulse and would like demo credentials to explore the role dashboards.\n\nName:\nOrganisation / Institution:\nRole I am interested in (Student / Coordinator / Warden / App Manager / Administrator):\n\nThanks!')}`;
+$$('.js-mail').forEach(a => a.href = mailto);
+$$('.js-mailtext').forEach(a => { a.textContent = CONTACT; a.href = mailto; });
+$('#yr').textContent = new Date().getFullYear();
+
+/* workflow */
+const flow = [
+  {n:1, t:'Complaint Raised', s:'Student reports the issue', stage:'Stage 1', h:'Report it in under a minute',
+   p:'Pick the location, describe the problem, attach a photo. Campus Pulse does the routing for you.',
+   li:['Auto-routed to the right department and location','Assigned coordinator is notified in real time','SLA deadline set instantly from category and priority','Write in English, Telugu or Hindi — translation is built in']},
+  {n:2, t:'Going On', s:'Coordinator starts the work', stage:'Stage 2', h:'Someone owns it — visibly',
+   p:'The coordinator taps “Start” and the status changes for everyone. You can see exactly who is working on it and when.',
+   li:['Live progress updates and comments','Chat directly with the people handling it','Critical issues auto-escalate to App Manager and Admin on breach','Scheduler checks every active ticket every minute']},
+  {n:3, t:'Fixed', s:'Done — with proof', stage:'Stage 3', h:'No proof, no “done”',
+   p:'When the coordinator taps “Done”, a resolution photo is attached and automatically checked for fraud.',
+   li:['SHA-256 and timestamp checks on every photo','High / Critical tickets get a physical Warden inspection','Warden finds it not fixed? It goes back to “Going On”','Routine tickets move straight to your confirmation']},
+  {n:4, t:'Closed', s:'You confirm — or dispute', stage:'Final', h:'The last word is yours',
+   p:'You get a 48-hour window to verify the fix. Happy? Confirm. Not fixed? Dispute it.',
+   li:['Confirm — or it auto-closes after 48 hours','“Not Fixed” reopens the ticket and sends the Warden','A 3rd repeated dispute escalates to the Administrator','Feedback and recognition for great work']}
+];
+const steps = $('#steps'), panel = $('#panel');
+flow.forEach((f,i) => {
+  const b = document.createElement('button');
+  b.className = 'step'; b.innerHTML = `<span class="n">${f.n}</span><span><b>${f.t}</b><small>${f.s}</small></span>`;
+  b.onclick = () => show(i); steps.appendChild(b);
+});
+function show(i){
+  const f = flow[i];
+  $$('.step').forEach((s,j) => s.classList.toggle('on', i===j));
+  panel.innerHTML = `<span class="stage">${f.stage} · ${f.t}</span><h3>${f.h}</h3><p>${f.p}</p><ul>${f.li.map(x=>`<li>${x}</li>`).join('')}</ul>` +
+    (i===1 ? `<div class="sla"><div class="c"><b>12h</b><span>Critical</span></div><div class="h"><b>24h</b><span>High</span></div><div class="m"><b>48h</b><span>Medium</span></div><div class="l"><b>72h</b><span>Low</span></div></div>` : '');
+}
+show(0);
+let auto = setInterval(()=>{ const c = $$('.step').findIndex(s=>s.classList.contains('on')); show((c+1)%flow.length); }, 6000);
+steps.addEventListener('click', () => clearInterval(auto));
+
+/* feature cards */
+const feats = [
+  ['route','Who handles my complaint?','Smart routing','Departments and locations are mapped, so every ticket reaches the right owner automatically.'],
+  ['clock','Will it ever get done?','SLA &amp; escalation','Priority-based deadlines with multi-tier escalation when a milestone is missed.'],
+  ['cam','Was it really fixed?','Photo-proof checks','Duplicate-image and timestamp verification stops phantom fixes.'],
+  ['bell',"How will I know what's happening?",'Real-time alerts','WebSocket updates and web push notifications keep everyone in the loop.'],
+  ['chat','Can I just talk to someone?','Direct chat','Personal and complaint-linked chat between students and staff.'],
+  ['box',"Where's my lost item?",'Lost &amp; Found','Post, search and claim lost items right inside the app.'],
+  ['leaf','Is my coordinator even available?','Leave awareness','Team leave tracking so work gets reassigned, not stalled.'],
+  ['star','Does good work get noticed?','Recognition &amp; feedback','Appreciate great service and collect honest feedback after every fix.'],
+  ['globe',"What if I don't write in English?",'Multilingual','Complaint translation across English, Telugu and Hindi.'],
+  ['mega','How do I hear about campus updates?','Announcements','Targeted announcements and programs from administration.'],
+  ['chart','Is the campus improving?','Analytics &amp; reports','SLA health, workload and trend dashboards for managers and admins.'],
+  ['phone','Can I use it on my phone?','Installable app','A PWA with offline support and a Capacitor Android build.']
+];
+const cards = $('#cards');
+feats.forEach(([ic,q,t,d]) => {
+  const c = document.createElement('div'); c.className = 'card rv';
+  c.innerHTML = `<div class="ico">${svg(ic)}</div><div class="qq">${q}</div><h3>${t}</h3><p>${d}</p>`;
+  c.addEventListener('pointermove', e => { const r = c.getBoundingClientRect(); c.style.setProperty('--mx', (e.clientX-r.left)+'px'); c.style.setProperty('--my', (e.clientY-r.top)+'px'); });
+  cards.appendChild(c);
+});
+
+/* roles */
+const roles = [
+  ['🎓','Student','Reports issues, tracks them live, verifies or disputes fixes, triggers SOS.'],
+  ['👔','Coordinator','Owns complaints end to end and posts proof of every fix.'],
+  ['🛡️','Warden','On-site in-charge who physically verifies high-priority and disputed fixes.'],
+  ['📊','App Manager','Supervises zones, SLA health and unassigned tickets.'],
+  ['⚡','Administrator','Governs the campus, decides disputes and holds the audit trail.']
+];
+$('#rolegrid').innerHTML = roles.map(r => `<div class="role rv"><div class="em">${r[0]}</div><h4>${r[1]}</h4><p>${r[2]}</p></div>`).join('');
+
+/* role dashboards — recreated from the real app's screens (sample data only) */
+const P = {
+  home:'<path d="m3 11 9-8 9 8v10H4z"/><path d="M9 21v-7h6v7"/>',
+  file:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h6"/>',
+  ucheck:'<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 11l2 2 4-4"/>',
+  check:'<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+  box:icons.box, mega:icons.mega, chat:icons.chat, bell:icons.bell, chart:icons.chart, clock:icons.clock,
+  users:'<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M17 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6"/>',
+  pin:'<path d="M12 21s7-6 7-12a7 7 0 0 0-14 0c0 6 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>',
+  bld:'<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2"/>',
+  act:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  phone:'<path d="M5 4h4l2 5-2 1a11 11 0 0 0 5 5l1-2 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
+  tag:'<path d="M3 12V4h8l10 10-8 8z"/><circle cx="8" cy="9" r="1.2"/>',
+  pie:'<path d="M12 3v9h9a9 9 0 1 1-9-9zM15 3a9 9 0 0 1 6 6h-6z"/>',
+  salert:'<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="M12 8v5M12 16h.01"/>',
+  shield:'<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/>',
+  cog:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>',
+  help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7M12 17h.01"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>', search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+  trend:'<path d="m3 17 6-6 4 4 8-8M15 7h6v6"/>', chev:'<path d="m9 6 6 6-6 6"/>', arr:'<path d="M5 12h14M13 6l6 6-6 6"/>',
+  redo:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/>', refresh:'<path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/>',
+  moon:'<path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/>', globe:icons.globe
+};
+const ic = n => `<svg viewBox="0 0 24 24">${P[n]}</svg>`;
+const bd = (t,k='') => `<span class="bd ${k}">${t}</span>`;
+const bt = (t,k='',i='') => `<span class="bt ${k}">${i?ic(i):''}${t}</span>`;
+const pill = (i,l,t,c) => `<div class="pill ${t}">${ic(i)}${l}${c!=null?`<em>${c}</em>`:''}</div>`;
+const stat = (l,v,sub,acc) => `<div class="stat ${acc?'acc':''}"><div class="r"><span class="l">${l}</span><span class="v">${v}</span><span class="arr">${ic('arr')}</span></div>${sub?`<p>${sub}</p>`:''}</div>`;
+const meta = (...x) => `<div class="meta">${x.join('<span>•</span>')}</div>`;
+const loc = n => `<span style="display:inline-flex;gap:4px;align-items:center">${ic('pin')}${n}</span>`;
+const tabs = (arr,on=0) => `<div class="tabs">${arr.map((t,i)=>`<span class="${i===on?'on':''}">${t}</span>`).join('')}</div>`;
+const sub = ['Students','App Managers &amp; Wardens','Coordinators'];
+
+const MAIN_STAFF = h => [['Home',h],['Complaints','file'],['Workload','ucheck'],['Resolved Views','check'],['Lost & Found','box'],['Announcements','mega'],['Chat','chat'],['Notifications','bell']];
+const MGMT = [['User Management','users','sub'],['Locations','pin'],['Departments','bld'],['Coverage Gaps','act'],['Emergency Setup','phone']];
+const ACCT = ['ACCOUNT',[['Profile','user']]];
+
+const dashboards = [
+{ t:'Student', e:'🎓', url:'/student', role:'Student', initial:'S',
+  nav:[['MAIN',[['Home','home'],['Complaints','file'],['Report Safely','salert'],['Resolved Views','check'],['Lost & Found','box'],['Announcements','mega'],['Notifications','bell']]],ACCT],
+  page:()=>`
+   <div class="pills">${pill('plus','Report a problem','blue')}${pill('search','Lost &amp; Found','amber')}${pill('file','My complaints','indigo',2)}${pill('mega','Notices','emerald',1)}</div>
+   <div class="stats">${stat('Active Problems',2)}${stat('Resolved &amp; Closed',18)}</div>
+   <div class="card warnc">
+     <div class="chd" style="border-color:#fde68a"><h2>⚠ Action Required: Verify Resolved Work (1)</h2><span style="font-size:11px;color:#b45309">Please inspect the completed work and confirm or reopen</span></div>
+     <div class="rowi" style="flex-direction:column;align-items:stretch">
+       <div><div class="t">Ceiling fan not working ${bd('Medium','info')}<span style="font-weight:400;color:var(--s4)">#00A1B2C3</span></div>
+       ${meta(loc('Mess 1'),'Electrical','Reopen count: <b>0 / 3</b>')}</div>
+       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--s1);padding-top:9px">
+         <span style="font-size:11px;color:var(--s5)">Does this fix resolve your issue? Confirming closes the ticket.</span>
+         <div style="display:flex;gap:6px">${bt('Still not fixed / Reopen','rose','redo')}${bt('Confirm &amp; Close','grn','check')}</div></div>
+     </div></div>
+   <div class="card">
+     <div class="chd"><h2>My Reported Problems</h2>${tabs(['Need Confirmation (1)','In Progress (2)','All (21)'],1)}</div>
+     <div class="rowi"><div><div class="t">Water leakage in Room 214 ${bd('High','warning')}${bd('Going On','warning')}</div>
+       ${meta(loc('Hostel 1'),'Plumbing','<span>03 Nov, 10:42</span>')}<span class="stage">📌 Coordinator is working on it</span></div>${bt('View Details','','chev')}</div>
+     <div class="rowi"><div><div class="t">Wi-Fi down in Academic Block 1 ${bd('Medium','info')}${bd('Complaint Raised')}${bd('Community','info')}</div>
+       ${meta(loc('Academic Block 1'),'IT Support','<span>03 Nov, 09:15</span>')}<span class="stage">📌 Waiting for coordinator to start</span></div>${bt('View Details','','chev')}</div>
+   </div>
+   <div class="rowi" style="border-color:#fecdd3;background:#fff1f2"><span style="display:flex;gap:10px;align-items:center;color:#9f1239;font-weight:600">🚨 Emergency SOS — Medical · Fire · Security<span style="font-weight:400;color:var(--s5)">one tap shares your location with dispatchers</span></span></div>`},
+
+{ t:'Coordinator', e:'👔', url:'/coordinator', role:'Coordinator', initial:'C',
+  nav:[['MAIN',MAIN_STAFF('home')],ACCT],
+  page:()=>`
+   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap"><div><h1>Coordinator</h1><div class="sub">Department: <b style="color:var(--s9)">Plumbing &amp; Water Supply</b></div></div><div class="nbtn">${bt('I am on leave')}${bt('','','refresh')}</div></div>
+   <div class="pills" style="grid-template-columns:repeat(3,1fr)">${pill('users','Team Workload','indigo')}${pill('trend','Coordinator Stats','emerald')}${pill('check','Resolved Archive','blue')}</div>
+   <div class="stats">${stat('To Assign',3,'Needs worker assignment',1)}${stat('Team Board',9,'Active jobs across team')}${stat('My Jobs',2,'Assigned to me directly')}${stat('Avg Time to Assign','1h 12m','Team responsiveness')}</div>
+   <div class="card"><div class="chd"><div><h2>Complaints waiting for assignment</h2><p>Complaints waiting for assignment, sorted by deadline (soonest first).</p></div>${tabs(['To assign','Department board','My jobs','Stats &amp; Performance','Staff Workforce'],0)}</div>
+     <div class="rowi"><div><div class="t">Tap leakage in washroom ${bd('High','warning')}</div>${meta(loc('Hostel 1'),'Filed 03 Nov, 10:42','SLA: 24h')}</div><div class="nbtn">${bt('Start','pri')}${bt('Details')}</div></div>
+     <div class="rowi"><div><div class="t">Water cooler not cooling ${bd('Medium','info')}</div>${meta(loc('Mess 1'),'Filed 03 Nov, 08:05','SLA: 48h')}</div><div class="nbtn">${bt('Start','pri')}${bt('Details')}</div></div>
+     <div class="rowi"><div><div class="t">Pipe burst near corridor ${bd('Critical','danger')}</div>${meta(loc('Hostel 2'),'Filed 03 Nov, 07:50','SLA: 12h')}</div><div class="nbtn">${bt('Start','pri')}${bt('Details')}</div></div>
+   </div>`},
+
+{ t:'Warden', e:'🛡️', url:'/location', role:'Warden', initial:'W',
+  nav:[['MAIN',MAIN_STAFF('home')],['INSIGHTS',[['Campus Health Map','act'],['Reports','pie']]],ACCT],
+  page:()=>`
+   <div><h1>Good morning, Warden ${bd('🏢 Hostel 1','purple')}</h1><div class="sub">Facility Oversight &amp; Verification Authority • 2 tickets awaiting in-person inspection</div></div>
+   <div class="pills" style="grid-template-columns:repeat(3,1fr)">${pill('check','Needs verification','purple',2)}${pill('clock','Overdue','rose',1)}${pill('mega','Post notice','amber')}</div>
+   <div class="note"><span>1 complaint is breaching its SLA — act before it escalates.</span><div class="nbtn">${bt('View Overdue')}${bt('Inspect Blocked')}${bt('Review Unclaimed')}</div></div>
+   <div class="stats">${stat('Needs My Verification',2,'',1)}${stat('Active Problems',14,'Under repair across facility')}${stat('Overdue / SLA Risk',1,'Breaching turnaround SLA')}${stat('Coordinators Tracked',5,'Field operations personnel')}</div>
+   <div class="card purc"><div class="chd" style="border-color:#e9d5ff"><div><h2>Needs My Verification</h2><p>Complaints marked fixed by coordinators that require your physical in-person inspection.</p></div>${bt('Refresh List','','refresh')}</div>
+     <div class="rowi" style="flex-direction:column;align-items:stretch"><div><div class="t">AC not cooling in common room ${bd('High','warning')}${bd('Spot Check (~10%)','purple')}</div>
+       <div class="photo"><b>Reported Problem:</b> AC has been blowing warm air for two days.</div>
+       <div class="photo"><b>Coordinator Resolution Notes:</b> “Gas refilled and filter cleaned.”</div>
+       <div class="photo" style="color:var(--s5)">Completed on: 03 Nov, 11:30</div></div>
+       <div class="nbtn" style="border-top:1px solid var(--s1);padding-top:9px">${bt('Verified','grn','check')}${bt('Not Fixed','rose')}${bt('Change Priority')}${bt('View')}</div></div></div>
+   <div class="card"><div class="chd"><h2>Coordinator Performance &amp; Operational Metrics</h2></div>
+     <table><tr><th>Coordinator</th><th>Assigned</th><th>In Progress</th><th>Resolved (30d)</th><th>Avg Resolution Time</th><th>Reopen Rate</th><th>Overdue</th></tr>
+     <tr><td><b>Coordinator 1</b></td><td>6</td><td>2</td><td>41</td><td>19h</td><td>4%</td><td>0</td></tr>
+     <tr><td><b>Coordinator 2</b></td><td>4</td><td>3</td><td>35</td><td>22h</td><td>6%</td><td>1</td></tr></table></div>`},
+
+{ t:'App Manager', e:'📊', url:'/manager', role:'App Manager', initial:'M',
+  nav:[['MAIN',MAIN_STAFF('home')],['MANAGEMENT',MGMT],['INSIGHTS',[['Campus Health Map','act'],['Reports','pie'],['Analytics','chart']]],['SYSTEM',[['Audit Log','shield'],['Backups','act']]],ACCT],
+  page:()=>`
+   <div><h1>Good morning, Manager</h1></div>
+   <div class="pills" style="grid-template-columns:repeat(3,1fr)">${pill('file','All complaints','blue',31)}${pill('users','Teams &amp; setup','emerald',1)}${pill('trend','Reports','purple')}</div>
+   <div class="stats">${stat('Active Problems',31)}${stat('Overdue / SLA Risk',3,'',1)}${stat('Critical / Escalated',2)}${stat('Campus Locations',5)}</div>
+   <div class="note"><span>Reassign coordinators or adjust priorities to maintain SLA compliance.</span>${bt('Review Overdue')}</div>
+   <div class="two"><div class="card"><div class="chd"><h2>Campus Announcements</h2>${bt('View All')}</div><div class="empty">No active announcements today.</div></div>
+     <div class="card"><div class="chd"><h2>Activity Alerts</h2></div><div class="empty">No recent activity.</div></div></div>
+   <div class="card"><div class="chd"><h2>Active Complaint Ownership &amp; Triage</h2>${bt('All Tickets')}</div>
+     <div class="rowi"><div><div class="t">Power outage — Academic Block 2 ${bd('Critical','danger')}${bd('Going On','warning')}</div>${meta(loc('Academic Block 2'),'Electrical','Escalated on SLA breach')}</div>${bt('Reassign')}</div>
+     <div class="rowi"><div><div class="t">Broken bench — Sports Complex 1 ${bd('Low')}${bd('Complaint Raised')}</div>${meta(loc('Sports Complex 1'),'Civil','Unassigned')}</div>${bt('Reassign')}</div></div>`},
+
+{ t:'Administrator', e:'⚡', url:'/admin', role:'Administrator', initial:'A',
+  nav:[['MAIN',MAIN_STAFF('home')],['MANAGEMENT',[...MGMT,['Issues Taxonomy','tag']]],['INSIGHTS',[['Campus Health Map','act'],['Reports','pie'],['Analytics','chart']]],['SYSTEM',[['Safety Reports','salert'],['Audit Log','shield'],['Backups','act'],['Settings','cog'],['Technical Support','help']]],ACCT],
+  page:()=>`
+   <div><h1>Good morning, Admin</h1><div class="sub">Institutional Operations &amp; System Governance • 58 tickets and 1,240 campus members</div></div>
+   <div class="pills" style="grid-template-columns:repeat(3,1fr)">${pill('file','All complaints','blue',58)}${pill('users','Teams &amp; setup','emerald',1)}${pill('trend','Reports','purple')}</div>
+   <div class="stats">${stat('Active Problems',58)}${stat('Admin Review Queue',2,'',1)}${stat('Overdue / SLA Risk',4)}${stat('Campus Accounts','1,240')}</div>
+   <div class="note"><span>Review disputes or reassign coordinators to maintain operational flow.</span>${bt('Inspect All')}</div>
+   <div class="two"><div class="card"><div class="chd"><h2>Institutional Notices</h2>${bt('View All')}</div><div class="empty">No active announcements today.</div></div>
+     <div class="card"><div class="chd"><h2>Audit &amp; Activity Alerts</h2></div><div class="empty">No recent activity.</div></div></div>
+   <div class="card purc"><div class="chd" style="border-color:#e9d5ff"><h2>Admin Review Queue (Disputes)</h2></div>
+     <div class="rowi"><div><div class="t">Mess hall cleanliness ${bd('High','warning')}${bd('Admin Review','purple')}</div>${meta(loc('Mess 2'),'Housekeeping','Reopen count: <b>3 / 3</b>')}</div><div class="nbtn">${bt('Decide Dispute','pri')}${bt('View Timeline')}</div></div></div>
+   <div class="card"><div class="chd"><h2>Active Complaint Ownership</h2>${bt('All Tickets')}</div>
+     <div class="rowi"><div><div class="t">Water leakage in Room 214 ${bd('High','warning')}${bd('Going On','warning')}</div>${meta(loc('Hostel 1'),'Plumbing')}</div>${bt('Reassign')}</div></div>`}
+];
+
+/* ---- sidebar pages: titles and descriptions are the real ones from the app; rows are sample data ---- */
+const pTone = p => ({Critical:'danger',High:'warning',Medium:'info'}[p]||'');
+const sTone = s => /Closed|Fixed|Verified|Resolved/.test(s)?'success':/Going|Progress/.test(s)?'warning':/Admin/.test(s)?'purple':'';
+const CPL = [
+  ['Water leakage in Room 214','High','Going On','Hostel 1','Plumbing','03 Nov'],
+  ['Wi-Fi down in Academic Block 1','Medium','Complaint Raised','Academic Block 1','IT Support','03 Nov'],
+  ['Power outage','Critical','Going On','Academic Block 2','Electrical','03 Nov'],
+  ['Ceiling fan not working','Medium','Waiting for Verification','Mess 1','Electrical','02 Nov'],
+  ['Mess hall cleanliness','High','Admin Review','Mess 2','Housekeeping','31 Oct'],
+  ['Broken bench','Low','Closed','Sports Complex 1','Civil','29 Oct']
+];
+const cRow = (c,btn) => `<div class="rowi"><div><div class="t">${c[0]} ${bd(c[1],pTone(c[1]))}${bd(c[2],sTone(c[2]))}</div>${meta(loc(c[3]),c[4],c[5])}</div>${btn===undefined?bt('View Details','','chev'):btn}</div>`;
+const head = (t,d,right='') => `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap"><div><h1>${t}</h1><div class="sub">${d}</div></div>${right}</div>`;
+const fld = t => `<div class="fld">${t}</div>`;
+const tbl = (h,rows) => `<div class="card" style="padding:0;overflow:auto"><table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map(x=>`<td>${x}</td>`).join('')}</tr>`).join('')}</table></div>`;
+
+const PAGES = {
+ 'Complaints': () => head('Complaints Tracker','Monitor, filter, and track campus complaints by location, department, status, or keyword.', bt('+ New complaint','pri')) +
+   `<div class="toolbar">${fld('🔍 Search complaints...')}${fld('Location ▾')}${fld('Department ▾')}${tabs(['Active','Closed'],0)}</div><div>${CPL.slice(0,5).map(c=>cRow(c)).join('')}</div>`,
+ 'Workload': () => head('Workload &amp; Assignments','Monitor staff operational workload, track active open complaints, and process unassigned tickets.') +
+   `<div class="stats">${stat('Total Scope',24)}${stat('Unassigned Pool',3,'',1)}${stat('Assigned',16)}${stat('Resolved',5)}</div>` +
+   tbl(['Coordinator','Assigned','In Progress','Resolved (30d)','Overdue'],[['<b>Coordinator 1</b>',6,2,41,0],['<b>Coordinator 2</b>',4,3,35,1],['<b>Not Assigned</b>',3,'—','—','—']]),
+ 'Resolved Views': () => head('Resolved Views','Closed and fixed complaints, with proof of resolution.') + `<div>${CPL.filter(c=>/Closed/.test(c[2])).concat([['Corridor light replaced','Medium','Closed','Academic Block 1','Electrical','28 Oct'],['Tap leakage fixed','High','Closed','Hostel 2','Plumbing','27 Oct']]).map(c=>cRow(c,bt('Proof photo','','file'))).join('')}</div>`,
+ 'Lost & Found': () => head('Campus Lost &amp; Found','Report lost or found items on campus and manage your reports.', bt('+ Report item','pri')) +
+   `<div class="two">${[['Black wallet','Found','Hostel 1 lobby','Open'],['ID card — blue lanyard','Lost','Academic Block 2','Open'],['Water bottle','Found','Sports Complex 1','Returned / Resolved']].map(i=>`<div class="card"><div class="t" style="font-weight:700;display:flex;gap:6px;align-items:center">${i[0]} ${bd(i[1],i[1]==='Lost'?'danger':'info')}</div>${meta(loc(i[2]),bd(i[3],/Returned/.test(i[3])?'success':''))}<div style="margin-top:10px">${bt('Claim / Contact')}</div></div>`).join('')}</div>`,
+ 'Announcements': () => head('Announcements &amp; Official Notices','Official campus circulars, academic notices, exam timetables, emergency alerts, and events.', bt('Compose &amp; Publish Notice','pri')) +
+   `<div class="stats">${stat('Active',4)}${stat('Unread',2,'',1)}${stat('Critical',1)}${stat('Pending',0)}</div>` +
+   [['Water supply interruption — Hostel 2','Critical','Today, 08:00'],['Mid-semester timetable released','Medium','02 Nov'],['Sports day registrations open','Low','01 Nov']].map(a=>`<div class="rowi"><div><div class="t">${a[0]} ${bd(a[1],pTone(a[1]))}</div>${meta('Administration',a[2])}</div>${bt('Read')}</div>`).join(''),
+ 'Chat': () => head('Chat','Message coordinators, wardens and students directly, or chat inside a complaint.') +
+   `<div class="card" style="display:grid;grid-template-columns:200px 1fr;gap:0;padding:0;overflow:hidden"><div style="border-right:1px solid var(--s2)">${['Coordinator 1','Warden — Hostel 1','Complaint #A1B2C3'].map((n,i)=>`<div style="padding:11px 13px;border-bottom:1px solid var(--s1);${i===0?'background:#eff6ff':''}"><b>${n}</b><div style="color:var(--s5);font-size:11px">${['On my way to check the tap','Please confirm the inspection','Photo attached'][i]}</div></div>`).join('')}</div>
+   <div style="padding:14px;display:grid;gap:8px;align-content:start"><div class="bd" style="justify-self:start;border-radius:12px">Is the leakage still active?</div><div class="bd info" style="justify-self:end;border-radius:12px">Yes, near the main valve</div><div class="bd" style="justify-self:start;border-radius:12px">On my way to check the tap</div><div style="margin-top:50px">${fld('Type a message...')}</div></div></div>`,
+ 'Notifications': () => head('Notifications','Deliver, track, and configure system alerts, complaint updates, and operational broadcast notices.') + tabs(['Alerts &amp; Messages','Delivery Preferences'],0) +
+   [['Complaint #A1B2C3 moved to Going On','Coordinator started work','2m ago','info'],['SLA warning: Power outage — 2h left','Escalation engine','1h ago','danger'],['Your complaint was fixed — please verify','Verification window: 48h','3h ago','success']].map(n=>`<div class="rowi"><div><div class="t">${n[0]}</div>${meta(n[1],n[2])}</div>${bd('New',n[3])}</div>`).join(''),
+ 'Report Safely': () => head('Confidential Safety Reporting','Direct and sealed reporting channel exclusively to campus executive admins.') +
+   `<div class="card"><div class="note" style="margin-bottom:12px;background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8">🔒 Your identity is stored separately and is never shown to administrators.</div><div style="display:grid;gap:10px">${fld('Category ▾  (Ragging, Harassment, Mental health, Facility hazard…)')}${fld('Describe what happened...')}${fld('Location (optional)')}<div>${bt('Submit anonymously','pri')}</div></div><p class="sub" style="margin-top:12px">You will receive a <b>case code</b> to follow up and chat with admins without logging in.</p></div>`,
+ 'Profile': () => head('Account &amp; Profile Settings','View your personal details, role assignments, and profile settings.') +
+   `<div class="card" style="display:flex;gap:16px;align-items:center"><div class="av" style="width:56px;height:56px;font-size:20px">{I}</div><div><b style="font-size:14px">{N}</b><div class="sub">{R} · campus@example.edu</div><div style="margin-top:8px">${bt('Change Photo')}${' '}${bt('Change Password')}</div></div></div>`,
+ 'User Management': () => head('User Management','Create and manage students, wardens, managers and coordinators.', bt('+ Add user','pri')) + tabs(['All Accounts','Students','App Managers &amp; Wardens','Coordinators'],0) +
+   tbl(['Name','Role','Location / Scope','Status','Actions'],[['<b>Student 1</b>','Student','Hostel 1',bd('Active','success'),bt('Reset Password')],['<b>Warden 1</b>','Warden','Hostel 1',bd('Active','success'),bt('Edit')],['<b>Coordinator 1</b>','Coordinator','Plumbing',bd('Active','success'),bt('Login Slip')],['<b>Manager 1</b>','App Manager','Zone 1',bd('Active','success'),bt('Edit')]]),
+ 'Locations': () => head('Location Configuration','Manage Location Types, physical campus locations, blocks, departments, and in-charge warden assignments.', bt('+ New location','pri')) +
+   tbl(['Location','Type','In-charge Warden','Departments','Actions'],[['<b>Hostel 1</b>','Hostel','Warden 1','Plumbing, Electrical',bt('Edit')],['<b>Academic Block 1</b>','Academic','Warden 1','IT, Civil',bt('Edit')],['<b>Mess 2</b>','Mess','Warden 2','Housekeeping',bt('Edit')],['<b>Sports Complex 1</b>','Sports','None assigned','Civil',bt('Edit')]]),
+ 'Departments': () => head('Department Management','Departments, their coordinators and covered issue categories.', bt('+ New department','pri')) +
+   tbl(['Department','Coordinator 1','Coordinator 2','Categories','Actions'],[['<b>Plumbing &amp; Water</b>','Coordinator 1','Coordinator 2','Leakage, Taps',bt('Edit Categories')],['<b>Electrical</b>','Coordinator 3',bd('Unassigned'),'Power, Lights',bt('Edit Categories')],['<b>IT Support</b>','Coordinator 4','Coordinator 5','Wi-Fi, Systems',bt('Edit Categories')]]),
+ 'Coverage Gaps': () => head('Coverage Gaps','Locations and departments that have no owner, so complaints can’t be routed.', bt('Refresh','','refresh')) +
+   [['Sports Complex 1 has no Warden','Critical Gap','danger'],['Electrical has no second coordinator','Action Required','warning'],['Mess 2: department not mapped','Setup Gap','info'],['Hostel 2: coordinator on leave','Warning','warning']].map(g=>`<div class="rowi"><div class="t">${g[0]}</div>${bd(g[1],g[2])}</div>`).join(''),
+ 'Emergency Setup': () => head('Emergency Setup','Contacts shown to students when they trigger an SOS.', bt('+ Add contact','pri')) +
+   tbl(['Order','Name','Phone','Department','Location Scope','Shift Hours','Status'],[[1,'Campus Security','+91 90000 00001','Security','All locations','24/7',bd('Active Contact','success')],[2,'Health Centre','+91 90000 00002','Medical','All locations','24/7',bd('Active Contact','success')],[3,'Fire Control','+91 90000 00003','Fire','Hostel 1','08:00–20:00',bd('Active Contact','success')]]),
+ 'Issues Taxonomy': () => head('Issues Taxonomy','Categories and issue types students can pick when raising a complaint.', bt('+ Add issue','pri')) +
+   tbl(['Category','Issue','Default priority','Department'],[['Plumbing','Leakage','High','Plumbing &amp; Water'],['Electrical','Power outage','Critical','Electrical'],['IT','Wi-Fi down','Medium','IT Support'],['Civil','Broken furniture','Low','Civil']]),
+ 'Campus Health Map': () => head('Campus Health Map','Live health of every campus location by open issues and SLA risk.') +
+   `<div class="pills" style="grid-template-columns:repeat(3,1fr)">${[['Hostel 1','Attention','rose'],['Academic Block 2','Attention','rose'],['Mess 1','Warning','amber'],['Hostel 2','Warning','amber'],['Academic Block 1','Healthy','emerald'],['Sports Complex 1','Healthy','emerald']].map(h=>`<div class="pill ${h[2]}" style="height:auto;padding:14px;border-radius:14px;flex-direction:column;align-items:flex-start;gap:4px"><b>${h[0]}</b><span style="font-weight:500">${h[1]} · ${h[1]==='Healthy'?'No open issues':h[1]==='Warning'?'2 open issues':'4 open issues'}</span></div>`).join('')}</div>`,
+ 'Reports': () => head('Reports &amp; Analytics Center','Centralized report generation engine and scheduled analytics exports.', bt('Generate report','pri')) +
+   `<div class="two"><div class="card"><div class="chd"><h2>Generated reports</h2></div><div class="empty">Generated CSV/JSON reports will appear here.</div></div><div class="card"><div class="chd"><h2>Schedules</h2></div><div class="empty">Automated daily/weekly background reports will be listed here.</div></div></div>`,
+ 'Analytics': () => head('Analytics &amp; Executive Intelligence','Real-time KPI metrics, SLA performance tracking, coordinator rankings, and exportable reports.') +
+   `<div class="stats">${stat('Avg Resolution','19h')}${stat('SLA Compliance','94%')}${stat('Reopen Rate','4%')}${stat('Critical Open',2)}</div>` +
+   tbl(['Coordinator Name','Assigned','Resolved','Pending','SLA Breaches','Avg Res Time','Ranking'],[['<b>Coordinator 1</b>',48,41,7,0,'19h','#1'],['<b>Coordinator 2</b>',44,35,9,2,'22h','#2']]),
+ 'Safety Reports': () => head('Confidential Safety Reports (Admin Only)','Anonymous reports. The reporter’s identity stays sealed.') +
+   `<div class="card purc"><div class="t" style="font-weight:700;display:flex;gap:6px;flex-wrap:wrap">Case CP-7K2Q ${bd('Harassment','danger')}${bd('New','info')}</div>${meta('Reporter: <b>sealed</b>','Received today')}<div class="nbtn" style="margin-top:10px">${bt('Open anonymous chat','pri','chat')}${bt('Record decision')}${bt('Unseal identity (audited)','rose','shield')}</div><div class="sub" style="margin-top:10px">Decisions: Action Taken · Could Not Confirm · Not a Safety Issue · Deliberate False Misuse</div></div>`,
+ 'Audit Log': () => head('Audit Log &amp; Activity Monitoring','Immutable compliance trail for accountability, security investigations, and record timelines.') +
+   tbl(['Time','Actor','Action','Record'],[['11:42','Admin','Reassigned complaint','#A1B2C3'],['10:15','Coordinator 1','Marked done + proof photo','#D4E5F6'],['09:03','Admin','Safety report viewed','CP-7K2Q'],['Yesterday','System','Escalated on SLA breach','#778899']]),
+ 'Backups': () => head('Backup &amp; Restore Management','Data recovery engine generating SHA-256 verified database snapshots and file archive backups.', bt('Create System Backup Archive','pri')) +
+   tbl(['Archive','Created','Size','Checksum','Actions'],[['backup_2026-11-03.zip','Today 02:00','48 MB','SHA-256 ✓',bt('Restore')],['backup_2026-11-02.zip','Yesterday 02:00','47 MB','SHA-256 ✓',bt('Restore')]]),
+ 'Settings': () => head('System Configuration &amp; Administration','Centralized settings panel for SLA days, security policies, uploads, and maintenance mode.') +
+   `<div class="card">${[['Critical SLA (hours)','12'],['High SLA (hours)','24'],['Medium SLA (hours)','48'],['Low SLA (hours)','72'],['Student verification window (hours)','48'],['Maintenance mode','Off']].map(s=>`<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--s1)"><span>${s[0]}</span>${fld(s[1])}</div>`).join('')}<div style="margin-top:12px">${bt('Save configuration','pri')}</div></div>`,
+ 'Technical Support': () => head('Technical Support &amp; Platform Escalation','Report technical issues, error references, or platform queries directly to Campus Pulse Super Admin.') +
+   `<div class="card"><div style="display:grid;gap:10px">${fld('Category ▾  (General System, Complaint Workflow, SLA &amp; Escalation Engine…)')}${fld('Severity ▾  (Low / Medium / High / Critical)')}${fld('Describe the problem...')}<div>${bt('Report Technical Problem','pri')}</div></div></div><div class="card"><div class="chd"><h2>Submitted Technical Support Tickets</h2></div><div class="empty">No tickets submitted yet.</div></div>`
+};
+
+const dtabs = $('#dtabs'), dshow = $('#dshow');
+let curDash = 0, curPage = 'Home';
+dashboards.forEach((d,i) => {
+  const b = document.createElement('button'); b.className = 'dtab'; b.textContent = d.e + ' ' + d.t;
+  b.onclick = () => { curDash = i; curPage = 'Home'; showDash(); }; dtabs.appendChild(b);
+});
+const features = {
+  Student:['Raise a complaint with location, photo and priority','Track live status and see who owns it','Confirm a fix, or reopen it with “Still not fixed” (3 reopens escalate to Admin Review)','SOS, Lost &amp; Found and anonymous safety reports'],
+  Coordinator:['Assign incoming complaints to workers and track the team board','Mark jobs done with an after-repair photo (fraud-checked)','Team stats: assign time, overdue, on-time rate','Mark yourself on leave so a backup covers'],
+  Warden:['Physically verify High / Critical fixes and random spot checks','Send work back for rework with a mandatory reason','Change a complaint’s priority with a recorded justification','Coordinator performance: resolution time and reopen rate'],
+  'App Manager':['See overdue and critical tickets across all your locations','Reassign any complaint with a recorded reason','Find coverage gaps and manage teams and locations','Reports, analytics, audit log and backups'],
+  Administrator:['Decide disputes escalated to Admin Review','Manage users, departments, locations and emergency setup','Review anonymous safety reports (identity sealed)','Audit log, backups, settings and technical support']
+};
+function showDash(){
+  const d = dashboards[curDash];
+  $$('.dtab').forEach((t,j) => t.classList.toggle('on', curDash===j));
+  const items = d.nav.flatMap(([s,it]) => it.map(x => x[0]));
+  const nav = d.nav.map(([s,list]) => `<div class="sec">${s}</div>` + list.map(([l,ico,sb]) => `<div class="nv ${l===curPage?'act':''}" data-pg="${l}">${ic(ico)}<span>${l}</span>${sb?`<span class="ch">${ic('chev')}</span>`:''}</div>`).join('')).join('');
+  const mnav = items.map(l => `<span class="${l===curPage?'on':''}" data-pg="${l}">${l}</span>`).join('');
+  const body = curPage === 'Home' ? d.page() : (PAGES[curPage] ? PAGES[curPage]() : head(curPage,'')).replaceAll('{I}', d.initial).replaceAll('{R}', d.role).replaceAll('{N}', d.role + ' User');
+  dshow.innerHTML = `
+  <div class="app">
+    <div class="chrome"><i></i><i></i><i></i><span>${LIVE_URL.replace('https://','')}${curPage==='Home'?d.url:'/'+curPage.toLowerCase().replace(/[^a-z]+/g,'-')}</span></div>
+    <div class="shell">
+      <div class="sb"><div class="brand"><i>${ic('act')}</i><div><b>CampusPulse</b><small>${d.role}</small></div></div>${nav}</div>
+      <div class="col">
+        <div class="mnav">${mnav}</div>
+        <div class="top"><span class="crumb">Dashboard${curPage==='Home'?'':' / '+curPage}</span><div class="srch">${ic('search')}Search everywhere...</div><div class="tr">${ic('globe')}${ic('moon')}${ic('bell')}<div class="av">${d.initial}</div></div></div>
+        <div class="page">${body}</div>
+      </div>
+    </div>
+  </div>
+  <div class="drole"><div><span class="eyebrow">${d.t} view</span><h3>What the ${d.t} can do</h3>
+    <p class="note-small">Click any menu item to explore. Illustrative preview built from the real screens, with sample data. Want the real ${d.t} dashboard? <a style="color:var(--brand2);font-weight:600" href="${mailto}">Request demo access</a>.</p></div>
+    <ul class="checks">${features[d.t].map(x=>`<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg><span>${x}</span></li>`).join('')}</ul>
+  </div>`;
+}
+dshow.addEventListener('click', e => {
+  const n = e.target.closest('[data-pg]'); if(!n) return;
+  curPage = n.dataset.pg; const keep = $('.app .page'); showDash();
+  const pg = $('.app .page'); if(pg) pg.scrollTop = 0;
+});
+curDash = +((location.hash.match(/dash=(\d)/)||[])[1])||0;
+{ const m = location.hash.match(/page=([A-Za-z%0-9]+)/); if(m) curPage = decodeURIComponent(m[1]); }
+showDash();
+
+/* nav, theme, reveal */
+const nav = $('#nav');
+const onScroll = () => nav.classList.toggle('scrolled', scrollY > 20);
+addEventListener('scroll', onScroll, {passive:true}); onScroll();
+$('#burger').onclick = () => $('#links').classList.toggle('open');
+$$('#links a').forEach(a => a.onclick = () => $('#links').classList.remove('open'));
+try{ const t = localStorage.getItem('cp-theme'); if(t) document.documentElement.dataset.theme = t; }catch(e){}
+$('#theme').onclick = () => {
+  const n = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = n; try{ localStorage.setItem('cp-theme', n); }catch(e){}
+};
+const io = new IntersectionObserver(es => es.forEach(e => { if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }), {threshold:.12});
+$$('.rv').forEach((el,i) => { el.style.transitionDelay = (i%3)*80+'ms'; io.observe(el); });
+</script>
+</body>
+</html>
