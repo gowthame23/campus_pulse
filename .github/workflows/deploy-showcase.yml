@@ -1,0 +1,34 @@
+name: Deploy Showcase Website
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Website/**'
+      - '.github/workflows/deploy-showcase.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Prepare Showcase Directory
+        run: |
+          mkdir -p _site
+          cp Website/index.html _site/index.html
+          touch _site/.nojekyll
+
+      - name: Deploy to GitHub Pages (gh-pages branch)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./_site
+          publish_branch: gh-pages
+          commit_message: "auto-deploy: sync showcase from main [skip ci]"
