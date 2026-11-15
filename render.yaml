@@ -45,7 +45,7 @@ services:
     plan: free
     autoDeploy: true
     rootDir: Frontend
-    buildCommand: npm install && npm run build
+    buildCommand: npm ci && npm run build
     staticPublishPath: dist
     routes:
       - type: rewrite

@@ -49,7 +49,7 @@ from api.schemas import (
     ComplaintFeedbackRequest,
     model_to_dict,
 )
-from api.security import get_current_user, require_roles
+from api.security import get_current_user, require_roles, require_feature
 from models.administrator import Administrator
 from models.app_manager import AppManager
 from models.complaint import Complaint
@@ -1914,6 +1914,7 @@ def warden_verify_complaint(
     current_user=Depends(
         require_roles(LocationInCharge.ROLE, Administrator.ROLE)
     ),
+    _feature=Depends(require_feature("warden_inspection")),
     complaint_service=Depends(get_complaint_service),
 ):
     complaint = complaint_service.get_complaint(complaint_id)

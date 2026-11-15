@@ -12,12 +12,12 @@ from api.schemas import (
     SafetyReportMessageRequest,
     SafetyReportRevealRequest,
 )
-from api.security import get_current_user, require_roles
+from api.security import get_current_user, require_roles, require_feature
 from models.administrator import Administrator
 from models.student import Student
 from utils.helper import generate_id, now_string
 
-router = APIRouter(prefix="/safety-reports", tags=["safety-reports"])
+router = APIRouter(prefix="/safety-reports", tags=["safety-reports"], dependencies=[Depends(require_feature("anonymous_reports"))])
 
 
 def _generate_case_code() -> str:

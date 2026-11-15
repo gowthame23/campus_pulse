@@ -6,10 +6,10 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from api.dependencies import get_lost_found_service
-from api.security import block_super_admin, get_current_user
+from api.security import block_super_admin, get_current_user, require_feature
 
 router = APIRouter(
-    prefix="/lost-found", tags=["lost-found"], dependencies=[Depends(block_super_admin)]
+    prefix="/lost-found", tags=["lost-found"], dependencies=[Depends(block_super_admin), Depends(require_feature("lost_and_found"))]
 )
 
 

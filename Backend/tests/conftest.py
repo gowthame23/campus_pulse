@@ -30,6 +30,15 @@ def _cleanup_isolated_db():
                 os.remove(target)
             except Exception:
                 pass
+    platform_db = os.path.join(ROOT, "..", "storage", "platform.db") if os.path.exists(os.path.join(ROOT, "..", "storage", "platform.db")) else os.path.join(ROOT, "storage", "platform.db")
+    if os.path.exists(platform_db):
+        try:
+            import sqlite3
+            with sqlite3.connect(platform_db) as pconn:
+                pconn.execute("DELETE FROM institutes WHERE institution_id != 'INST_ABC'")
+                pconn.commit()
+        except Exception:
+            pass
 
 
 def pytest_configure(config):
@@ -71,7 +80,30 @@ def reset_rate_limiters_and_lockouts():
                 conn.commit()
     except Exception:
         pass
+
+    try:
+        platform_db = os.path.join(ROOT, "..", "storage", "platform.db") if os.path.exists(os.path.join(ROOT, "..", "storage", "platform.db")) else os.path.join(ROOT, "storage", "platform.db")
+        if os.path.exists(platform_db):
+            import sqlite3
+            with sqlite3.connect(platform_db) as pconn:
+                pconn.execute("DELETE FROM institutes WHERE institution_id != 'INST_ABC'")
+                pconn.execute("DELETE FROM institute_feature_overrides WHERE institution_id != 'INST_ABC'")
+                pconn.commit()
+    except Exception:
+        pass
+
     yield
+
+    try:
+        platform_db = os.path.join(ROOT, "..", "storage", "platform.db") if os.path.exists(os.path.join(ROOT, "..", "storage", "platform.db")) else os.path.join(ROOT, "storage", "platform.db")
+        if os.path.exists(platform_db):
+            import sqlite3
+            with sqlite3.connect(platform_db) as pconn:
+                pconn.execute("DELETE FROM institutes WHERE institution_id != 'INST_ABC'")
+                pconn.execute("DELETE FROM institute_feature_overrides WHERE institution_id != 'INST_ABC'")
+                pconn.commit()
+    except Exception:
+        pass
 
 
 def pytest_unconfigure(config):

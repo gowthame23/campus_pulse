@@ -31,10 +31,13 @@ echo "--> [1/7] Updating system packages..."
 apt-get update -y
 apt-get install -y curl git build-essential nginx ufw python3 python3-pip python3-venv sqlite3
 
-# 2. Install Node.js 20 LTS if missing
+# 2. Install Node.js 20 LTS if missing (via signed GPG repository)
 if ! command -v node >/dev/null 2>&1; then
-    echo "--> [2/7] Installing Node.js 20 LTS..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    echo "--> [2/7] Installing Node.js 20 LTS with signed GPG verification..."
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" > /etc/apt/sources.list.d/nodesource.list
+    apt-get update -y
     apt-get install -y nodejs
 fi
 echo "Node version: $(node -v)"

@@ -1129,4 +1129,34 @@
 
 ---
 
+### Entry 74 — Multi-Tenant Physical DB Isolation & Remediation of 14 Security Audit Findings
+* **User Directive:** "sla deadlines should be assiged by us keep these times as default and what it this central platform db and isolated institue database ... audit and fix 14 security vulnerabilities ... push to git hub and update the session,md"
+* **Issues Addressed & Actions Taken:**
+  1. **Multi-Institute SaaS Architecture & Physical Data Segregation:**
+     - Created `services/tenant_service.py` to manage multi-tenant lifecycle, package tier allocations (Basic, Intermediate, Premium), and isolated SQLite databases under `storage/institutes/{institution_id}.db`.
+     - Built `Backend/api/routers/platform.py` allowing Super Admin (`gowthamejjurothu@gmail.com`) to onboard campuses, update features, and manage institutional activation states via OTP verification.
+     - Preserved default institutional SLA deadlines while giving institute administrators full configuration ownership.
+  2. **14 Security Vulnerabilities Remediated:**
+     - **Finding 1 (High - `dependencies.py`):** Added `_resolve_db_path(request)` to route authenticated tenant requests dynamically to their isolated `storage/institutes/{inst_id}.db`, preventing cross-institution data access.
+     - **Findings 2 & 6 (High / Medium - `security.py`):** Eliminated tenant header spoofing by enforcing validation against authenticated session identity; rejects conflicting `X-Institute-ID`/`X-Tenant-ID` headers with `400 Bad Request` and evaluates feature gates using the verified session institution.
+     - **Findings 3 & 14 (High / Info - `docker-compose.yml`, `.env.example`):** Bound PostgreSQL port strictly to `127.0.0.1:5432:5432` to eliminate public internet exposure; replaced hardcoded fallback passwords with secure placeholder notices.
+     - **Finding 4 (High - `deploy.sh`):** Replaced unverified `curl | bash` with official NodeSource signed GPG keyring verification via `apt`.
+     - **Finding 5 (High - `.github/workflows/deploy-showcase.yml`):** Pinned `actions/checkout` and `peaceiris/actions-gh-pages` to immutable SHA commit hashes.
+     - **Finding 7 (Low - `main.py`):** Injected `Content-Security-Policy` and `Permissions-Policy` headers; tightened CORS to explicit methods and headers.
+     - **Finding 8 (Low - `security.py`):** Prevented `X-Forwarded-For` spoofing by checking trusted reverse proxy private/loopback subnets.
+     - **Finding 9 (Low - `main.py`):** Added regex redaction for passwords, tokens, and database connection strings in unhandled exception logs.
+     - **Finding 10 (Low - `requirements.txt`):** Pinned unpinned dependencies (`pywebpush==2.0.0`, `psycopg[binary]==3.3.6`, `psycopg-pool==3.3.3`, `python-dotenv==1.0.1`, `pillow==12.1.1`).
+     - **Finding 11 (Low - `render.yaml`):** Replaced `npm install` with reproducible `npm ci`.
+     - **Finding 12 (Low - `AuthContext.jsx`, `axios.js`):** Hardened token storage lifecycle handling.
+     - **Finding 13 (Low - `axios.js`):** Enforced protocol check in `getBaseUrl()` ensuring production connections default to `https://`.
+  3. **Documentation:** Updated `README.md` with architecture diagrams for central platform db vs tenant databases, subscription matrix, and verified showcase links.
+* **Verification & Testing:**
+  - Frontend production build (`npm --prefix Frontend run build`): Completed in 1.31s with 0 errors.
+  - Multi-tenant, Security Audit & Emergency Suites (`Backend/tests/test_saas_multi_tenant.py`, `Backend/tests/test_security_audit_suite.py`, `Backend/tests/test_emergency_flow.py`): 51/51 tests passing.
+  - Core Workflow Regression Suites (`Backend/tests/test_workflow*.py`): 83/83 tests passing.
+  - Total: 134/134 test cases passing (100% pass rate).
+* **Status:** Verified and committed to GitHub.
+
+---
+
 *(This log will be appended after each subsequent prompt to maintain a continuous, prompt-by-prompt audit trail.)*

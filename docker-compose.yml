@@ -11,7 +11,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-campuspulse_secure_password}
       POSTGRES_DB: ${POSTGRES_DB:-campuspulse}
     ports:
-      - "5432:5432"
+      # Bind exclusively to localhost to prevent public internet exposure
+      - "127.0.0.1:5432:5432"
     volumes:
       - campus_pulse_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -46,11 +47,10 @@ services:
       context: ./Frontend
     container_name: campuspulse_frontend
     ports:
-      - "5173:5173"
+      - "5173:80"
     depends_on:
       - backend
     restart: unless-stopped
 
 volumes:
   campus_pulse_pgdata:
-    name: campus_pulse_pgdata

@@ -1,3 +1,5 @@
+from typing import Optional
+from fastapi import Request
 import os
 
 from services.analytics_service import AnalyticsService
@@ -67,6 +69,26 @@ def get_db_path() -> str:
         p = (BACKEND_DIR / p).resolve()
     return str(p)
 
+
+
+def _resolve_db_path(request: Request = None) -> str:
+    """Resolves the isolated database path for the requesting tenant.
+    If authenticated, uses the verified user's institution_id.
+    Falls back to system default database if no specific tenant is resolved.
+    """
+    if request:
+        inst_id = getattr(request.state, "institution_id", None)
+        if not inst_id and hasattr(request.state, "user"):
+            inst_id = getattr(request.state.user, "institution_id", None)
+        if not inst_id:
+            inst_id = request.headers.get("X-Institute-ID") or request.headers.get("X-Tenant-ID")
+        if inst_id and str(inst_id).strip().upper() != "INST_ABC":
+            clean_id = str(inst_id).strip().upper()
+            from services.tenant_service import get_tenant_service
+            tenant_db = get_tenant_service().get_tenant_db_path(clean_id)
+            if os.path.exists(tenant_db):
+                return tenant_db
+    return get_db_path()
 
 _service_cache = {}
 
@@ -202,107 +224,114 @@ platform_service = _default_svcs["platform"]
 team_service = _default_svcs["team"]
 
 
-def get_dashboard_service():
-    return _get_services_for_db()["dashboard"]
+def get_dashboard_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["dashboard"]
 
 
-def get_auth_service():
-    return _get_services_for_db()["auth"]
+def get_auth_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["auth"]
 
 
-def get_notification_service():
-    return _get_services_for_db()["notification"]
+def get_notification_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["notification"]
 
 
-def get_complaint_service():
-    return _get_services_for_db()["complaint"]
+def get_complaint_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["complaint"]
 
 
-def get_analytics_service():
-    return _get_services_for_db()["analytics"]
+def get_analytics_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["analytics"]
 
 
-def get_lost_found_service():
-    return _get_services_for_db()["lost_found"]
+def get_lost_found_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["lost_found"]
 
 
-def get_announcement_service():
-    return _get_services_for_db()["announcement"]
+def get_announcement_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["announcement"]
 
 
-def get_feedback_service():
-    return _get_services_for_db()["feedback"]
+def get_feedback_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["feedback"]
 
 
-def get_report_service():
-    return _get_services_for_db()["report"]
+def get_report_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["report"]
 
 
-def get_global_search_service():
-    return _get_services_for_db()["global_search"]
+def get_global_search_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["global_search"]
 
 
-def get_public_complaint_service() -> PublicComplaintService:
-    return _get_services_for_db()["public_complaint"]
+def get_public_complaint_service(request: Request = None) -> PublicComplaintService:
+    return _get_services_for_db(_resolve_db_path(request))["public_complaint"]
 
 
-def get_backup_service():
-    return _get_services_for_db()["backup"]
+def get_backup_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["backup"]
 
 
-def get_audit_service():
-    return _get_services_for_db()["audit"]
+def get_audit_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["audit"]
 
 
-def get_department_service():
-    return _get_services_for_db()["department"]
+def get_department_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["department"]
 
 
-def get_location_service():
-    return _get_services_for_db()["location"]
+def get_location_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["location"]
 
 
-def get_comment_service():
-    return _get_services_for_db()["comment"]
+def get_comment_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["comment"]
 
 
-def get_config_service():
-    return _get_services_for_db()["config"]
+def get_config_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["config"]
 
 
-def get_attachment_service():
-    return _get_services_for_db()["attachment"]
+def get_attachment_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["attachment"]
 
 
-def get_chat_service():
-    return _get_services_for_db()["chat"]
+def get_chat_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["chat"]
 
 
-def get_classification_service():
-    return _get_services_for_db()["classification"]
+def get_classification_service(request: Request = None):
+    return _get_services_for_db(_resolve_db_path(request))["classification"]
 
 
-def get_platform_service() -> PlatformService:
-    return _get_services_for_db()["platform"]
+def get_platform_service(request: Request = None) -> PlatformService:
+    return _get_services_for_db(_resolve_db_path(request))["platform"]
 
 
-def get_program_service() -> ProgramService:
-    return _get_services_for_db()["program"]
+def get_program_service(request: Request = None) -> ProgramService:
+    return _get_services_for_db(_resolve_db_path(request))["program"]
 
 
-def get_team_service() -> TeamService:
-    return _get_services_for_db()["team"]
+def get_team_service(request: Request = None) -> TeamService:
+    return _get_services_for_db(_resolve_db_path(request))["team"]
 
 
-def get_emergency_service() -> EmergencyService:
-    return _get_services_for_db()["emergency"]
+def get_emergency_service(request: Request = None) -> EmergencyService:
+    return _get_services_for_db(_resolve_db_path(request))["emergency"]
 
 
-def get_setup_import_service() -> SetupImportService:
-    return _get_services_for_db()["setup_import"]
+def get_setup_import_service(request: Request = None) -> SetupImportService:
+    return _get_services_for_db(_resolve_db_path(request))["setup_import"]
 
 
-def get_translation_service() -> TranslationService:
-    return _get_services_for_db()["translation"]
+def get_translation_service(request: Request = None) -> TranslationService:
+    return _get_services_for_db(_resolve_db_path(request))["translation"]
 
 
+
+
+from services.tenant_service import get_tenant_service, TenantService
+
+
+def get_tenant_service_dep() -> TenantService:
+    return get_tenant_service()

@@ -91,13 +91,28 @@ def _parse_user_agent(ua: str):
     return device_name, device_type, browser, os_name
 
 
+TRUSTED_PROXY_IPS = {"127.0.0.1", "::1", "localhost", "testclient"}
+
+
+def _is_trusted_proxy(ip: str) -> bool:
+    if not ip or ip in TRUSTED_PROXY_IPS:
+        return True
+    import ipaddress
+    try:
+        addr = ipaddress.ip_address(ip)
+        return addr.is_private or addr.is_loopback
+    except ValueError:
+        return False
+
+
 def _client_ip(request: Optional[Request]):
     if not request:
         return "unknown"
+    client_host = request.client.host if request.client else "unknown"
     forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
+    if forwarded and _is_trusted_proxy(client_host):
         return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    return client_host
 
 
 def create_session(user, request: Optional[Request] = None):
@@ -275,6 +290,38 @@ def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN, detail="Your account has been deactivated."
         )
 
+    # Strict Tenant Resolution: Prevent client header spoofing
+    header_inst = request.headers.get("X-Institute-ID") or request.headers.get("X-Tenant-ID")
+    user_inst = getattr(user, "institution_id", None)
+
+    # Authoritative check: User cannot spoof tenant with a conflicting header
+    if user_inst and header_inst and user_inst.strip().upper() != header_inst.strip().upper():
+        logger.warning(
+            f"Tenant Spoofing Blocked - Header '{header_inst}' conflicts with user institution '{user_inst}' | User: {user.user_id}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Supplied tenant header does not match authenticated user institution.",
+        )
+
+    # For authenticated users, user_inst is strictly authoritative; fallback to validated header or default
+    inst_id = user_inst or header_inst or "INST_ABC"
+    inst_id = inst_id.strip().upper()
+    request.state.institution_id = inst_id
+    if not hasattr(user, "institution_id") or not user.institution_id:
+        user.institution_id = inst_id
+
+    if inst_id and (user.role or "").lower() != "super_admin":
+        from services.tenant_service import get_tenant_service
+        if not get_tenant_service().is_institution_active(inst_id):
+            logger.warning(
+                f"Authentication Blocked - Institution '{inst_id}' is Inactive: User={user.user_id} | Path: {request.url.path}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This institution is currently inactive. Contact your platform administrator.",
+            )
+
     if user.first_login and request.url.path not in (
         "/auth/change-password",
         "/auth/logout",
@@ -336,6 +383,29 @@ def block_super_admin(current_user=Depends(get_current_user)):
             detail="Super Admin cannot access institutional operational data.",
         )
     return current_user
+
+
+def require_feature(feature_key: str):
+    """Enforces that the current institution's subscription package has `feature_key` enabled."""
+    def dependency(request: Request, current_user=Depends(get_current_user)):
+        if (current_user.role or "").lower() == "super_admin":
+            return current_user
+        # Read authoritative institution_id established during authentication, never raw client header
+        inst_id = getattr(current_user, "institution_id", None) or getattr(request.state, "institution_id", None) or "INST_ABC"
+        inst_id = str(inst_id).strip().upper()
+        from services.tenant_service import get_tenant_service
+        tenant_svc = get_tenant_service()
+        if not tenant_svc.is_feature_enabled(inst_id, feature_key):
+            logger.warning(
+                f"403 Forbidden - Feature '{feature_key}' not enabled for institute '{inst_id}' | User: {current_user.user_id}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"The '{feature_key}' module is not enabled for your institute subscription package.",
+            )
+        return current_user
+
+    return dependency
 
 
 def create_ws_ticket(user_id: str, db_path: str = None) -> str:

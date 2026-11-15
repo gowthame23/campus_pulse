@@ -1,4 +1,4 @@
-# Campus Pulse — Modern Campus Governance & Grievance Intelligence Platform
+# Campus Pulse — Multi-Institute Campus Governance & Grievance SaaS Platform
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -8,10 +8,63 @@
 [![Database](https://img.shields.io/badge/Database-SQLite%20%7C%20PostgreSQL-336791?logo=sqlite&logoColor=white)](https://sqlite.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-🌐 **Showcase website:** https://gowthame23.github.io/campus_pulse/  
-🚀 **Live app:** https://campuspulse-frontend-wlws.onrender.com
+🌐 **Official Showcase Website:** [https://gowthame23.github.io/campus_pulse/](https://gowthame23.github.io/campus_pulse/)  
+🚀 **Live Production Application:** [https://campuspulse-frontend-wlws.onrender.com](https://campuspulse-frontend-wlws.onrender.com)
 
-**Campus Pulse** is a high-accountability campus grievance, emergency response, and facilities management platform. Engineered to eliminate the "black hole" of collegiate ticketing systems, Campus Pulse enforces direct coordinator ownership, tamper-evident photo verification, zero-knowledge anonymous whistleblowing, and automated SLA escalations.
+**Campus Pulse** is a high-accountability, multi-tenant campus grievance, emergency response, and facilities management SaaS platform. Engineered to eliminate the "black hole" of collegiate ticketing systems, Campus Pulse enforces physical tenant data isolation, direct coordinator ownership, tamper-evident photo verification, zero-knowledge anonymous whistleblowing, and automated SLA escalations.
+
+---
+
+## 🏛️ Multi-Institute SaaS Architecture & Data Isolation
+
+Campus Pulse provides scalable multi-tenancy while guaranteeing complete data isolation and privacy across educational institutions.
+
+```mermaid
+flowchart TD
+    subgraph PlatformLayer["Central Platform Management (Super Admin)"]
+        PDB[("platform.db<br/>Institutes, Packages, OTPs & Audits")]
+        SA["Super Admin Console<br/>gowthamejjurothu@gmail.com"] -->|Onboards / Configures| PDB
+        SA -.->|"OTP-Verified Status Change"| PDB
+    end
+
+    subgraph TenantIsolation["Physically Isolated Institutional Databases"]
+        T1[("storage/institutes/INST_ABC.db<br/>ABC Institute of Technology")]
+        T2[("storage/institutes/INST_XYZ.db<br/>State Technical University")]
+        TN[("storage/institutes/INST_....db<br/>Other Partner Campuses")]
+    end
+
+    PlatformLayer -->|Provisions & Migrates| TenantIsolation
+    SA -.->|Strict 403 Forbidden Barrier| TenantIsolation
+```
+
+### 1. Physical Database Isolation
+* **Separate Tenant Databases**: Each registered institution receives its own independent SQLite database located at `storage/institutes/{institution_id}.db`.
+* **Zero Leakage**: Student records, complaints, attachments, comments, audit trails, and physical locations are physically segregated. No institution can ever view or query another institution's data.
+* **Super Admin Data Boundary**: Super Admins maintain platform infrastructure, onboard institutes, and configure packages, but are strictly prohibited (`HTTP 403 Forbidden`) from viewing institutional operational records.
+
+### 2. Subscription Packages & Feature Entitlement
+Campus Pulse features a modular entitlement engine gating capabilities per tier:
+
+| Feature Capability | Basic | Intermediate | Premium |
+| :--- | :---: | :---: | :---: |
+| Student Complaint Filing & Tracking | ✅ | ✅ | ✅ |
+| Automated Coordinator Routing | ✅ | ✅ | ✅ |
+| 3-Stage Lifecycle & SLA Engine | ✅ | ✅ | ✅ |
+| Role-Based Notifications & Audit Logs | ✅ | ✅ | ✅ |
+| Location-Scoped Warden Verification | ❌ | ✅ | ✅ |
+| Anonymous Whistleblower Safety Reports | ❌ | ✅ | ✅ |
+| Duplicate Image Detection | ❌ | ✅ | ✅ |
+| Executive Analytics Dashboard | ❌ | ✅ | ✅ |
+| Lost & Found Campus Repository | ❌ | ❌ | ✅ |
+| Resource & Facility Room Booking | ❌ | ❌ | ✅ |
+| AI Automated Classification | ❌ | ❌ | ✅ |
+
+*Dynamic Feature Overrides*: Super Admins can customize individual feature flags per institute without migrating database schemas.
+
+### 3. Dual-Factor Email OTP Institute Security
+* **Tamper-Proof Status Management**: Deactivating or reactivating an institution requires a cryptographically generated, 6-digit one-time password (OTP) dispatched to the Super Admin's registered email (`gowthamejjurothu@gmail.com`).
+* **Brute-Force Protection**: OTPs expire after 10 minutes, use cryptographic salt hashing, and automatically lock after 5 failed attempts.
+* **Instant Session Block**: When an institution is marked `Inactive`, all active sessions for that campus are immediately blocked with `403 Forbidden`.
 
 ---
 
@@ -26,9 +79,9 @@ flowchart TD
     A["Student Files Complaint<br/><b>(Status: Complaint Raised)</b>"] --> B["Automated Department & Location Routing"]
     B --> C["Assigned Coordinator Dashboard<br/><i>(Real-Time Notification Delivered)</i>"]
     
-    C -->|"Clicks 'Start'"| D["Work Actively Underway<br/><b>(Status: Going On)</b>"]
+    C -->|"Clicks 'Start' (Blue)"| D["Work Actively Underway<br/><b>(Status: Going On)</b>"]
     
-    D -->|"Clicks 'Done'<br/>+ Resolution Proof Photo"| E{"Verification Type?"}
+    D -->|"Clicks 'Done' (Emerald)<br/>+ Resolution Proof Photo"| E{"Verification Type?"}
     
     E -- "Standard (Low / Medium)" --> F["Student 48h Closeout Window<br/><b>(Status: Waiting for Verification)</b>"]
     E -- "High / Critical / Random Spot-Check" --> G["On-Site Warden Physical Inspection<br/><b>(Status: Pending Warden Verification)</b>"]
@@ -36,25 +89,25 @@ flowchart TD
     G -- "Warden: Not Fixed (Re-work Required)" --> D
     G -- "Warden: Verified" --> F
     
-    F -->|"Student Confirms or 48h Auto-Close"| H["Complaint Finalized<br/><b>(Status: Closed)</b>"]
+    F -->|"Student Clicks 'Yes, All Fixed' or 48h Auto-Close"| H["Complaint Finalized<br/><b>(Status: Closed)</b>"]
     F -->|"Student Clicks 'Not Fixed' (Dispute)"| I["Status Reverted to 'Going On'<br/><i>Warden On-Site Inspection Triggered</i>"] --> D
     F -->|"3rd Repeated Dispute"| J["Escalated to Administrator<br/><b>(Status: Admin Review)</b>"]
 ```
 
-### SLA Resolution Deadlines & Escalation Engine
-Every ticket receives a deterministic SLA deadline calculated from its category and priority:
-* **Critical**: 4 hours *(auto-escalates to App Manager and Admin on breach)*
+### Deterministic SLA Deadlines
+Every complaint receives a deterministic resolution deadline upon registration:
+* **Critical**: 4 hours *(immediate escalation alert on breach)*
 * **High**: 24 hours
 * **Medium**: 48 hours
 * **Low**: 72 hours
 
-An automated background scheduler scans active complaints every minute, firing multi-tier escalation notifications if milestones are missed.
+An automated background scheduler monitors active tickets, dispatching multi-tier escalation warnings when deadlines approach or breach.
 
 ---
 
 ## 🛡️ Anti-Fraud & Quality Assurance Architecture
 
-Traditional portals suffer from "phantom fixes"—technicians marking tickets resolved without performing repairs or recycling stock photos from the internet. Campus Pulse eliminates this through two layers:
+Traditional campus systems suffer from "phantom fixes"—tickets marked resolved without repairs or with stock photos. Campus Pulse eliminates this through:
 
 ### 1. SHA-256 Duplicate Image Fingerprinting
 * The raw binary bytes of every uploaded photo are hashed via **SHA-256** upon receipt.
@@ -117,42 +170,7 @@ Campus Pulse enforces a role hierarchy with zero ambiguous "employee" intermedia
 | 🛡️ **Warden** | Physical location in-charge. Notified of location issues, conducts on-site verifications for high-priority tickets, inspects student disputes. |
 | 📊 **App Manager** | Geographic supervisor. Oversees multi-location zones, maps wardens and coordinators, monitors department SLA health, handles unassigned tickets. |
 | ⚡ **Administrator** | Campus governance, department/location mapping, final decisions on disputed complaints, audit trail inspection, unsealing safety reports. |
-| 👑 **Super Admin** | Platform maintenance, institution configuration, root system health. |
-
-### Verified 10-User Account Baseline
-| User ID | Email | Role | Scope |
-| :--- | :--- | :--- | :--- |
-| `USR_ADMIN` | `gowthamejjurothu@gmail.com` | Administrator | Campus-wide governance |
-| `USR_SUPER_ADMIN` | `superadmin@campuspulse.edu` | Super Admin | Platform maintenance |
-| `USR_MANAGER` | `ejjurothugowtham@gmail.com` | App Manager | Zone 1 (Hostel 1, Academic 1, Mess 1, SAC 1, Sports 1) |
-| `USR_MANAGER_2` | `appmanager2@campus.edu` | App Manager | Zone 2 (Hostel 2, Academic 2, Mess 2, SAC 2, Sports 2) |
-| `USR_WARDEN` | `naveen@campus.edu` | Warden | Location In-Charge (Zone 1 facilities) |
-| `USR_WARDEN_2` | `warden2@campus.edu` | Warden | Location In-Charge (Zone 2 facilities) |
-| `USR_STUDENT` | `gowtham.e23@iiits.in` | Student | Resident (Hostel 1) |
-| `USR_STUDENT_2` | `student2@campus.edu` | Student | Resident (Hostel 2) |
-| `USR_COORD_1` | `coordinator1@campuspulse.edu` | Coordinator | Department Coordinator (Admin assigned) |
-| `USR_COORD_2` | `coordinator2@campuspulse.edu` | Coordinator | Department Coordinator (Admin assigned) |
-
----
-
-## 🏢 11-Location Dual-Zone Infrastructure
-
-The campus environment is organized into dual-zone infrastructure:
-
-* **Zone 1 (Managed by App Manager 1 & Warden 1)**:
-  * `Hostel 1` (`LOC_HOSTEL_1`)
-  * `Academic Block 1` (`LOC_ACADEMIC_1`)
-  * `Mess 1` (`LOC_MESS_1`)
-  * `Student Activity Center 1` (`LOC_SAC_1`)
-  * `Sports Complex 1` (`LOC_SPORTS_1`)
-* **Zone 2 (Managed by App Manager 2 & Warden 2)**:
-  * `Hostel 2` (`LOC_HOSTEL_2`)
-  * `Academic Block 2` (`LOC_ACADEMIC_2`)
-  * `Mess 2` (`LOC_MESS_2`)
-  * `Student Activity Center 2` (`LOC_SAC_2`)
-  * `Sports Complex 2` (`LOC_SPORTS_2`)
-* **Central Facility**:
-  * `Other / Not Sure` (`LOC_OTHER`)
+| 👑 **Super Admin** | Platform maintenance, institution onboarding, package & subscription management, root system health. |
 
 ---
 
@@ -217,12 +235,13 @@ Open `http://localhost:5173` in your browser.
 
 ---
 
-## 🧪 Running the Test Suite
+## 🧪 Running Automated Tests
 
-Execute the regression and security test suites from the `Backend` directory:
+Run the full SaaS multi-tenant, lifecycle, and emergency test suites:
 ```bash
 cd Backend
-pytest tests/ -v
+pytest tests/test_saas_multi_tenant.py -v
+pytest tests/test_emergency_flow.py -v
 ```
 
 ---
@@ -237,9 +256,9 @@ CampusPulse/
 │   ├── middleware/          # Rate limiting, security headers, request logging
 │   ├── models/              # Domain entities (Complaint, User, Department, Location)
 │   ├── scripts/             # Administrative utilities & maintenance scripts
-│   ├── services/            # Business services (complaints, auth, attachments, notifications)
-│   ├── storage/             # SQLite database (campus_pulse.db) & migration engine
-│   └── tests/               # Automated test suites
+│   ├── services/            # Business services (tenant, complaints, auth, emergency)
+│   ├── storage/             # SQLite platform & tenant databases and migration engine
+│   └── tests/               # Automated multi-tenant & regression test suites
 ├── Frontend/                # React 19 Single Page Application
 │   ├── public/              # Static assets, PWA icons, offline page, service worker
 │   └── src/                 # React components, pages, context providers, services

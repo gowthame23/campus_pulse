@@ -95,8 +95,8 @@ app.add_middleware(
     # access, add it to CORS_ORIGINS by name instead of widening this regex.)
     allow_origin_regex=r"^http://(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?$",
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Institute-ID", "X-Tenant-ID", "X-Requested-With", "Origin"],
 )
 
 @app.middleware("http")
@@ -107,6 +107,16 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Cache-Control"] = "no-store"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "img-src 'self' data: https: blob:; "
+        "style-src 'self' 'unsafe-inline'; "
+        "script-src 'self'; "
+        "connect-src 'self' ws: wss: https:; "
+        "frame-ancestors 'none'; "
+        "object-src 'none';"
+    )
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)"
     # HSTS only makes sense once the connection is actually HTTPS -- forcing
     # it during local HTTP development would make browsers refuse to connect
     # over plain http:// afterward. request.url.scheme reflects Starlette's
@@ -218,8 +228,12 @@ async def global_exception_handler(request: Request, exc: Exception):
     if hasattr(request.state, "user"):
         user_id = getattr(request.state.user, "user_id", "unknown")
 
+    # Sanitize exception message to avoid credential leaks in log files
+    raw_msg = f"{type(exc).__name__}: {str(exc)}"
+    sanitized_msg = re.sub(r"://([^:]+):([^@]+)@", r"://:***@", raw_msg)
+    sanitized_msg = re.sub(r"(?i)(password|token|secret)\s*[:=]\s*\S+", r"\1=***", sanitized_msg)
     logger.error(
-        f"Time: - | User: {user_id} | Route: {request.url.path} | Exception: {type(exc).__name__}: {str(exc)}\nStack Trace:\n{''.join(traceback.format_tb(exc.__traceback__))}"
+        f"Time: - | User: {user_id} | Route: {request.url.path} | Exception: {sanitized_msg}\nStack Trace:\n{''.join(traceback.format_tb(exc.__traceback__))}"
     )
 
     return JSONResponse(

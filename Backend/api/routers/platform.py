@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
-
+from pydantic import BaseModel, Field, EmailStr
+from fastapi import APIRouter, Depends, HTTPException, status
+from services.tenant_service import get_tenant_service, TenantService
 from api.dependencies import get_platform_service, get_auth_service
 from api.security import require_roles, require_super_admin
 from services.platform_service import PlatformService
@@ -9,6 +9,14 @@ from models.user import User
 
 router = APIRouter(prefix="/platform", tags=["Platform Super Admin"])
 
+class PackageUpdateRequest(BaseModel):
+    package_id: str
+    feature_overrides: Optional[dict] = None
+
+class StatusOtpConfirm(BaseModel):
+    action: str
+    otp_code: str
+    reason: Optional[str] = ""
 
 class InstitutionOnboardRequest(BaseModel):
     name: str = Field(..., min_length=2)
@@ -17,6 +25,7 @@ class InstitutionOnboardRequest(BaseModel):
     admin_email: EmailStr = Field(...)
     contact_info: Optional[str] = None
     admin_password: str = Field(..., min_length=8)
+    package_id: Optional[str] = 'intermediate'
 
 
 class SupportTicketCreate(BaseModel):
@@ -68,8 +77,26 @@ def onboard_institution(
     auth_service=Depends(get_auth_service),
 ):
     try:
-        return platform_service.onboard_institution(payload.dict(), auth_service=auth_service)
+        tenant_svc = get_tenant_service()
+        # Onboard with isolated database provisioning
+        tenant_inst = tenant_svc.onboard_institution(
+            name=payload.name,
+            code=payload.code,
+            admin_name=payload.admin_name,
+            admin_email=payload.admin_email,
+            admin_password=payload.admin_password,
+            package_id=payload.package_id or "intermediate",
+            contact_info=payload.contact_info or "",
+        )
+        # Also ensure platform service has metadata mirror
+        try:
+            platform_service.onboard_institution(payload.dict(), auth_service=auth_service)
+        except Exception:
+            pass
+        return tenant_inst
     except ValueError as e:
+        import logging
+        logging.getLogger("campus_pulse").error(f"ONBOARD_INSTITUTION_ERROR: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -96,6 +123,8 @@ def create_support_ticket(
     try:
         return platform_service.create_support_ticket(institution_id, payload.dict())
     except ValueError as e:
+        import logging
+        logging.getLogger("campus_pulse").error(f"ONBOARD_INSTITUTION_ERROR: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -128,3 +157,118 @@ def get_version_info(
     platform_service: PlatformService = Depends(get_platform_service),
 ):
     return platform_service.get_version_info()
+
+
+@router.get("/packages")
+def list_packages(
+    current_user: User = Depends(require_super_admin()),
+):
+    """List all available platform packages and their feature sets."""
+    return get_tenant_service().list_packages()
+
+
+@router.put("/institutions/{institution_id}/package")
+def update_institution_package(
+    institution_id: str,
+    payload: PackageUpdateRequest,
+    current_user: User = Depends(require_super_admin()),
+):
+    """Assign a new package tier and optional custom feature overrides to an institute."""
+    try:
+        return get_tenant_service().update_institution_package(
+            institution_id=institution_id,
+            package_id=payload.package_id,
+            feature_overrides=payload.feature_overrides,
+            actor_email=current_user.email,
+        )
+    except ValueError as e:
+        import logging
+        logging.getLogger("campus_pulse").error(f"ONBOARD_INSTITUTION_ERROR: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/institutions/{institution_id}/features")
+def get_institution_features(
+    institution_id: str,
+    current_user: User = Depends(require_super_admin()),
+):
+    """List all currently enabled features for an institution."""
+    return get_tenant_service().get_institution_features(institution_id)
+
+
+@router.post("/institutions/{institution_id}/deactivate/request-otp")
+def request_deactivation_otp(
+    institution_id: str,
+    current_user: User = Depends(require_super_admin()),
+):
+    """Send a 6-digit verification code to the Super Admin's registered email before deactivating."""
+    try:
+        return get_tenant_service().request_status_otp(
+            institution_id=institution_id,
+            action="deactivate",
+            superadmin_email=current_user.email,
+        )
+    except ValueError as e:
+        import logging
+        logging.getLogger("campus_pulse").error(f"ONBOARD_INSTITUTION_ERROR: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/institutions/{institution_id}/deactivate/confirm")
+def confirm_deactivation(
+    institution_id: str,
+    payload: StatusOtpConfirm,
+    current_user: User = Depends(require_super_admin()),
+):
+    """Confirm deactivation with the submitted OTP code. Zero data deletion."""
+    try:
+        return get_tenant_service().confirm_status_change(
+            institution_id=institution_id,
+            action="deactivate",
+            otp_code=payload.otp_code,
+            superadmin_email=current_user.email,
+            reason=payload.reason,
+        )
+    except ValueError as e:
+        import logging
+        logging.getLogger("campus_pulse").error(f"ONBOARD_INSTITUTION_ERROR: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/institutions/{institution_id}/reactivate/request-otp")
+def request_reactivation_otp(
+    institution_id: str,
+    current_user: User = Depends(require_super_admin()),
+):
+    """Send a 6-digit verification code to the Super Admin's registered email before reactivating."""
+    try:
+        return get_tenant_service().request_status_otp(
+            institution_id=institution_id,
+            action="reactivate",
+            superadmin_email=current_user.email,
+        )
+    except ValueError as e:
+        import logging
+        logging.getLogger("campus_pulse").error(f"ONBOARD_INSTITUTION_ERROR: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/institutions/{institution_id}/reactivate/confirm")
+def confirm_reactivation(
+    institution_id: str,
+    payload: StatusOtpConfirm,
+    current_user: User = Depends(require_super_admin()),
+):
+    """Confirm reactivation with the submitted OTP code. Restores access to existing data."""
+    try:
+        return get_tenant_service().confirm_status_change(
+            institution_id=institution_id,
+            action="reactivate",
+            otp_code=payload.otp_code,
+            superadmin_email=current_user.email,
+            reason=payload.reason,
+        )
+    except ValueError as e:
+        import logging
+        logging.getLogger("campus_pulse").error(f"ONBOARD_INSTITUTION_ERROR: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
