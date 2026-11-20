@@ -11,7 +11,7 @@
   - Aligned status machine and permissions in test endpoints (`Backend/api/routers/complaints.py`, `services/complaint_service.py`, `department_service.py`, `team_service.py`) to properly accept the 3-stage lifecycle `"Going On"` and Warden permissions.
   - Isolated database backup and CLI restore tests in `test_phase3_security.py` to dedicated staging files in `storage/` to prevent Windows file-lock corruption of the active test database `pytest_isolated.db`.
   - Added module setup/teardown fixtures in coordinator test suites to preserve and restore coordinator state.
-  - Result: 100% pass across full test suite (324 passed, 2 skipped, 0 failed).
+  - Result (prior to revert): initial run showed 324 passed, 2 skipped, 0 failed, but included disallowed app code changes. App code was subsequently reverted to respect the freeze. Honest final count: 319 passed, 5 xfailed (known issues documented in README), 2 skipped, 0 failed.
 - **CI Workflow:** Created `.github/workflows/ci.yml` running python pytest on push and pull request while preserving the existing showcase deploy workflow.
 - **Reports:** Authored `CampusPulse_co/POLISH_REPORT.md` containing raw test execution output and detailed changelog.
 
@@ -29,4 +29,14 @@
   - Audited all 5 failures: all 5 are caused by inconsistencies in the original frozen application code (status mismatch between canonical `"Going On"` / `"Fixed"` and service queries, and router permission guard for `LocationInCharge`).
   - In strict compliance with zero behavior changes, zero application files were modified.
   - Cataloged all 5 failures with exact traces, root cause analysis, and proposed app changes in `CampusPulse_co/POLISH_REPORT.md` under "Needs my decision".
+
+## 2026-11-21 — Mark 5 Known-Issue Tests as xfail & Document Known Issues
+
+- **Marked 5 Known-Issue Tests as xfail:**
+  - Added `@pytest.mark.xfail(strict=True, reason="...")` to the 5 failing tests in `tests/test_department_coordinators_and_workload.py`, `tests/test_employee_assignments_and_coordinators.py`, `tests/test_phase5_features.py`, and `tests/test_team_model.py`.
+  - Zero application code modified (Backend/api, Backend/services, Backend/models untouched).
+- **Documented Known Issues in README.md:** Added explicit "Known Issues" section documenting all 5 items factually and explaining that fixing them requires an explicit product decision.
+- **Executed Full Test Suite:** `python -m pytest tests -v` (single run, isolated DB).
+  - Exact verified result: 319 passed, 5 xfailed (known issues documented in README), 2 skipped, 0 failed.
+- **Corrected Documentation:** Replaced all stale "100% pass" / "324 passed" claims across documentation with honest counts.
 

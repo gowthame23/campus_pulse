@@ -49,3 +49,12 @@ CREDENTIALS.local.md
 
 # Personal resume files (not project source)
 /resume/
+
+# Presentation & Idea Blueprints
+CampusPulse_Idea_Blueprint.pdf
+CampusPulse_Idea_Blueprint.pptx
+
+# Local test run dumps
+Backend/test_run_*.txt
+test_run_*.txt
+

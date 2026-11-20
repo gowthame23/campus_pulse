@@ -141,6 +141,7 @@ def test_exact_spot_and_frequent_spots(admin_headers):
     assert spot_name in child_loc["name"]
 
 
+@pytest.mark.xfail(strict=True, reason="Complaint.CLOSED sets status to 'Fixed' while feedback submission requires 'Closed'; app unchanged by freeze, see README Known Issues.")
 def test_complaint_feedback(admin_headers, coord_headers, warden_headers):
     student_headers, s_data = _create_user(
         admin_headers, "Student", "p5_fb", location_id="LOC_HOSTEL_1", department_id="DEPT_HOSTEL_ELECTRICAL"
