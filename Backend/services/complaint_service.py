@@ -687,7 +687,7 @@ class ComplaintService:
                     LEFT JOIN departments d ON c.department_id = d.department_id
                     LEFT JOIN locations l ON c.location_id = l.location_id
                     WHERE c.assigned_to = ?
-                      AND c.status IN ('Assigned', 'In Progress', 'Going On', 'Waiting for Parts')
+                      AND c.status IN ('Assigned', 'In Progress', 'Waiting for Parts')
                       AND (c.is_deleted = 0 OR c.is_deleted IS NULL)
                     ORDER BY c.created_at DESC
                     """,

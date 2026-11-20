@@ -1579,7 +1579,7 @@ def assign_complaint(
 
     complaint_id: str,
     payload: ComplaintAssignRequest,
-    current_user=Depends(require_roles(Administrator.ROLE, Coordinator.ROLE, AppManager.ROLE, LocationInCharge.ROLE)),
+    current_user=Depends(require_roles(Administrator.ROLE, Coordinator.ROLE, AppManager.ROLE)),
     complaint_service=Depends(get_complaint_service),
     audit_service=Depends(get_audit_service),
 ):
@@ -1626,7 +1626,7 @@ def assign_complaint(
 def reroute_complaint(
     complaint_id: str,
     payload: ComplaintRerouteRequest,
-    current_user=Depends(require_roles(Administrator.ROLE, Coordinator.ROLE, AppManager.ROLE, LocationInCharge.ROLE)),
+    current_user=Depends(require_roles(Administrator.ROLE, Coordinator.ROLE, AppManager.ROLE)),
     complaint_service=Depends(get_complaint_service),
     audit_service=Depends(get_audit_service),
 ):
@@ -1787,13 +1787,11 @@ def update_status(
                 detail="You can only change status for complaints assigned to you or in your team.",
             )
 
-    target_status = payload.status
-    if target_status == "Assigned":
+    if payload.status == Complaint.ASSIGNED:
         if complaint.status not in (
             Complaint.PENDING,
             Complaint.SUBMITTED,
             Complaint.REOPENED,
-            "Complaint Raised",
         ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -1814,11 +1812,11 @@ def update_status(
         except ValueError as e:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    elif target_status in ("In Progress", "Going On", Complaint.IN_PROGRESS):
-        if complaint.status not in (Complaint.ASSIGNED, Complaint.REOPENED, "Going On", "Assigned"):
+    elif payload.status == Complaint.IN_PROGRESS:
+        if complaint.status not in (Complaint.ASSIGNED, Complaint.REOPENED):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Can only transition to In Progress from Assigned, Reopened, or Going On status.",
+                detail="Can only transition to In Progress from Assigned or Reopened status.",
             )
         try:
             if u_role in ("coordinator", "employee"):
@@ -2755,7 +2753,7 @@ def submit_complaint_feedback(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found.")
 
     # Must be closed
-    if complaint.status not in (STATUS_CLOSED, STATUS_AUTO_CLOSED, "Closed", "Closed (Auto Closed)", "Fixed", getattr(Complaint, "CLOSED", "Fixed")) and not getattr(complaint, "closed_at", None):
+    if complaint.status not in (STATUS_CLOSED, STATUS_AUTO_CLOSED, "Closed", "Closed (Auto Closed)"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Feedback can only be submitted once the complaint is closed.",

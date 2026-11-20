@@ -225,7 +225,7 @@ class TeamService:
                         SET assignee_on_leave_flag = 1
                         WHERE assigned_to = ?
                           AND department_id = ?
-                          AND status IN ('Assigned', 'In Progress', 'Going On', 'Waiting for Parts')
+                          AND status IN ('Assigned', 'In Progress', 'Waiting for Parts')
                         """,
                         (user_id, department_id),
                     )
@@ -235,7 +235,7 @@ class TeamService:
                         UPDATE complaints
                         SET assignee_on_leave_flag = 1
                         WHERE assigned_to = ?
-                          AND status IN ('Assigned', 'In Progress', 'Going On', 'Waiting for Parts')
+                          AND status IN ('Assigned', 'In Progress', 'Waiting for Parts')
                         """,
                         (user_id,),
                     )

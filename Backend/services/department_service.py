@@ -173,7 +173,7 @@ class DepartmentService:
                 ).fetchall()
                 loc_ids = [lr["location_id"] for lr in loc_rows]
                 active_jobs = conn.execute(
-                    "SELECT COUNT(*) FROM complaints WHERE assigned_to = ? AND status IN ('Assigned', 'In Progress', 'Going On')",
+                    "SELECT COUNT(*) FROM complaints WHERE assigned_to = ? AND status IN ('Assigned', 'In Progress')",
                     (uid,),
                 ).fetchone()[0]
 
