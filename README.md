@@ -23,7 +23,7 @@ Campus Pulse provides scalable multi-tenancy while guaranteeing complete data is
 flowchart TD
     subgraph PlatformLayer["Central Platform Management (Super Admin)"]
         PDB[("platform.db<br/>Institutes, Packages, OTPs & Audits")]
-        SA["Super Admin Console<br/>gowthamejjurothu@gmail.com"] -->|Onboards / Configures| PDB
+        SA["Super Admin Console<br/>superadmin@campuspulse.edu"] -->|Onboards / Configures| PDB
         SA -.->|"OTP-Verified Status Change"| PDB
     end
 
@@ -62,9 +62,53 @@ Campus Pulse features a modular entitlement engine gating capabilities per tier:
 *Dynamic Feature Overrides*: Super Admins can customize individual feature flags per institute without migrating database schemas.
 
 ### 3. Dual-Factor Email OTP Institute Security
-* **Tamper-Proof Status Management**: Deactivating or reactivating an institution requires a cryptographically generated, 6-digit one-time password (OTP) dispatched to the Super Admin's registered email (`gowthamejjurothu@gmail.com`).
+* **Tamper-Proof Status Management**: Deactivating or reactivating an institution requires a cryptographically generated, 6-digit one-time password (OTP) dispatched to the Super Admin's registered email (`superadmin@campuspulse.edu`).
 * **Brute-Force Protection**: OTPs expire after 10 minutes, use cryptographic salt hashing, and automatically lock after 5 failed attempts.
 * **Instant Session Block**: When an institution is marked `Inactive`, all active sessions for that campus are immediately blocked with `403 Forbidden`.
+
+---
+
+## 🏗️ Multi-Tenant Architecture & Tradeoff Analysis
+
+```mermaid
+flowchart TD
+    Client["Client / Browser<br/>(Student, Coordinator, Admin)"]
+    Proxy["Reverse Proxy / Ingress<br/>(Tenant Domain / Header Resolver)"]
+    
+    subgraph RoutingLayer["Tenant Routing & Dispatcher"]
+        Resolve["Tenant Context Middleware<br/>(extracts institution_id from Host or Header)"]
+        Pool["Tenant Connection Manager<br/>(LRU Cache of SQLite / DB Handles)"]
+    end
+
+    subgraph DataIsolation["Multi-Tenant Isolation Strategy"]
+        PlatformDB[("Central platform.db<br/>• Institutions Registry<br/>• Package Tiers & Feature Overrides<br/>• Super Admin & OTP Verifications<br/>• Global Audit Log")]
+        
+        TenantA[("Tenant A: INST_ABC.db<br/>• Complaints & SLA History<br/>• Users & Roles<br/>• Departments & Locations<br/>• Local Audit Logs")]
+        TenantB[("Tenant B: INST_XYZ.db<br/>• Complaints & SLA History<br/>• Users & Roles<br/>• Departments & Locations<br/>• Local Audit Logs")]
+        TenantN[("Tenant N: INST_....db<br/>• Physical Isolated Database<br/>• Zero Cross-Tenant Leakage")]
+    end
+
+    Client --> Proxy
+    Proxy --> Resolve
+    Resolve --> Pool
+    Resolve -.-> PlatformDB
+    Pool --> TenantA
+    Pool --> TenantB
+    Pool --> TenantN
+```
+
+### Why One SQLite Database Per Tenant?
+1. **Physical Data Isolation (Zero Cross-Tenant Leakage)**: Queries never need complex `WHERE institution_id = ?` clauses that can be accidentally omitted in ORMs or raw SQL. A catastrophic data leak between rival colleges or departments is physically impossible because each institution's data resides in its own isolated file.
+2. **Simplified Tenant Lifecycle (Point-in-Time Backups & Archival)**: Backing up, restoring, offboarding, or moving an institution to another storage tier is simply a file-system copy (`shutil.copy2` or SQLite `.backup()`) with zero downtime or locks for other institutions.
+3. **Tailored SLAs, Upgrades, & Maintenance Windows**: Migrations can be applied incrementally tenant-by-tenant. If a migration fails on one tenant, no other tenant's operations are affected.
+4. **Zero-Resource Idle Tenants**: An inactive small college incurs zero memory overhead, database server connection pooling cost, or idle compute.
+5. **Regulatory & Compliance Alignment (FERPA, GDPR)**: Individual institution databases can easily be retained, encrypted with separate tenant keys, or deleted on contract termination without complex schema scrubbing.
+
+### What Changes at Scale?
+1. **Connection Pooling & File Handle Limits**: With thousands of simultaneous active tenants, operating system open file descriptors (`nofile`) can be exhausted. A dynamic connection cache with LRU eviction must close idle SQLite handles.
+2. **Horizontal Scaling Across Multi-Nodes**: Local SQLite files bind a tenant to a single container or server. At multi-node scale, tenants must either use network replication (e.g., Litestream / LiteFS replicated to object storage) or migrate to a managed distributed database (PostgreSQL with row-level security or Citus/schema-per-tenant).
+3. **Cross-Tenant Aggregation & Global Analytics**: Platform-wide reporting across hundreds of institutions requires federated ETL (e.g., DuckDB querying across multiple tenant databases or periodic data replication into an analytical warehouse).
+4. **Write Concurrency per Tenant**: SQLite supports one concurrent writer per database file (WAL mode allows concurrent readers). For large campuses with thousands of simultaneous ticket updates, write lock contention requires partitioning into micro-databases or transitioning busy tenants to PostgreSQL.
 
 ---
 
@@ -199,7 +243,7 @@ Campus Pulse enforces a role hierarchy with zero ambiguous "employee" intermedia
 ### Option A: Docker Compose (Recommended)
 Clone the repository and spin up the full stack in one command:
 ```bash
-git clone https://github.com/gowthame23/campus_pulse.git
+git clone https://github.com/campuspulse/campus_pulse.git
 cd campus_pulse
 docker-compose up --build
 ```

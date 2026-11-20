@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 # Ensure environment variables from Backend/.env are loaded immediately if dotenv is available
 try:

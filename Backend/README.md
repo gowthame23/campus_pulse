@@ -33,7 +33,7 @@ The app creates `storage/campus_pulse.db` automatically if it does not exist.
 | Role | Email | Password | Responsibilities |
 | --- | --- | --- | --- |
 | Super Admin | superadmin@campuspulse.edu | Admin@123 | Platform Owner & Governance |
-| Administrator | gowthamejjurothu@gmail.com | Admin@123 | Campus Operations & Admin Controls |
+| Administrator | admin@campuspulse.edu | Admin@123 | Campus Operations & Admin Controls |
 | App Manager 1 | ejjurothugowtham@gmail.com | Manager@123 | Operations Supervisor (North Zone) |
 | App Manager 2 | appmanager2@campus.edu | Manager@123 | Operations Supervisor (South Zone) |
 | Employees (6 total) | employee.a1@campuspulse.edu to employee.b3@campuspulse.edu | Employee@123 | Field Maintenance (4 serve as C1/C2 Coordinators) |

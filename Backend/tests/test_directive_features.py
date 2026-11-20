@@ -206,6 +206,7 @@ def test_send_activation_email_formatting_and_safety(monkeypatch):
     # When unconfigured, safely returns False and does not crash
     monkeypatch.setenv("SMTP_USERNAME", "")
     monkeypatch.setenv("SMTP_PASSWORD", "")
+    monkeypatch.setenv("BREVO_API_KEY", "")
     result = send_activation_email("test@example.com", "/activate?token=test12345", "Test User")
     assert result is False
 

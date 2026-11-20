@@ -65,7 +65,7 @@ def _get_coordinator_headers():
 # =========================================================================
 # 3.1 SAFE DATABASE RESTORE TESTS
 # =========================================================================
-def test_safe_database_restore_staging_and_startup_apply(tmp_path):
+def test_safe_database_restore_staging_and_startup_apply():
     admin_headers = _get_admin_headers()
     # 1. Create a backup first
     create_res = client.post("/settings/backup", json={"backup_name": "TestPhase3Backup"}, headers=admin_headers)
@@ -92,12 +92,19 @@ def test_safe_database_restore_staging_and_startup_apply(tmp_path):
         meta = json.load(mf)
         assert meta["backup_id"] == b_id
 
-    # 4. Execute apply_pending_restore and verify safe application
-    applied = apply_pending_restore(db_path=db_path)
-    assert applied is True
-
-    # Marker and pending db should be removed after application
-    assert not os.path.exists(marker_file)
+    # 4. Execute apply_pending_restore on dedicated isolated target in db_dir
+    test_target = os.path.join(db_dir, "test_restore_staging_target.db")
+    shutil.copy2(db_path, test_target)
+    try:
+        applied = apply_pending_restore(db_path=test_target)
+        assert applied is True
+    finally:
+        for p in (test_target, marker_file, pending_db):
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
     assert not os.path.exists(pending_db)
 
 
@@ -249,8 +256,20 @@ def test_cli_restore_script():
     b_id = create_res.json()["backup_id"]
 
     db_path = os.environ.get("DATABASE_PATH", "storage/campus_pulse.db")
-    # Execute CLI restore function directly
-    restore_db_cli(backup_id=b_id, db_path=db_path)
+    db_dir = os.path.dirname(os.path.abspath(db_path))
+    test_cli_target = os.path.join(db_dir, "test_cli_restore_target.db")
+    shutil.copy2(db_path, test_cli_target)
+    try:
+        # Execute CLI restore function directly on isolated target in db_dir
+        restore_db_cli(backup_id=b_id, db_path=test_cli_target)
+        assert os.path.exists(test_cli_target)
+    finally:
+        for p in [test_cli_target]:
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
 
 
 def test_non_blocking_email():
