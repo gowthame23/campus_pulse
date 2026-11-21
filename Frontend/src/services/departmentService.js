@@ -34,6 +34,7 @@ export const departmentService = {
       location_ids: locationIds,
     }),
   getEligibleEmployees: (departmentId) => apiClient.get(`/departments/${departmentId}/eligible-employees`),
+  getCategoryPrioritiesStatus: () => apiClient.get("/departments/category-priorities/status"),
   getCategoryPriorities: (departmentId, locationId) =>
     apiClient.get(`/departments/${departmentId}/category-priorities`, {
       params: locationId ? { location_id: locationId } : {},

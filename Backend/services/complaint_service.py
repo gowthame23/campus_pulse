@@ -23,6 +23,7 @@ from core.constants import (
     STATUS_ASSIGNED,
     STATUS_RAISED,
     STATUS_GOING_ON,
+    is_category_priority_enabled,
     STATUS_FIXED,
     STATUS_AUTO_CLOSED,
     STATUS_BLOCKED,
@@ -332,7 +333,7 @@ class ComplaintService:
                 if isinstance(e, ValueError):
                     raise e
 
-        if not final_priority and department_id:
+        if not final_priority and department_id and is_category_priority_enabled():
             try:
                 target_cat = (category or complaint_type or "").strip()
                 if target_cat:

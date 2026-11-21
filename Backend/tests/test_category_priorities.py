@@ -42,7 +42,8 @@ def test_category_priorities_service():
     assert department_service.get_effective_category_priority("DEPT_MAINT", "A/C", location_id="LOC_ACADEMIC_1") == "Critical"
 
 
-def test_complaint_creation_uses_configured_category_priority():
+def test_complaint_creation_uses_configured_category_priority(monkeypatch):
+    monkeypatch.setenv("CATEGORY_PRIORITY_ENABLED", "true")
     auth_service = get_auth_service()
     department_service = get_department_service()
     complaint_service = get_complaint_service()
@@ -73,7 +74,8 @@ def test_complaint_creation_uses_configured_category_priority():
     assert complaint.priority == "Critical"
 
 
-def test_category_priorities_api():
+def test_category_priorities_api(monkeypatch):
+    monkeypatch.setenv("CATEGORY_PRIORITY_ENABLED", "true")
     from fastapi.testclient import TestClient
     from api.main import app
     from middleware.rate_limiter import auth_limiter
@@ -138,7 +140,8 @@ def test_category_priorities_api():
         assert denied_res.status_code == 403
 
 
-def test_complaint_creation_location_override_wins():
+def test_complaint_creation_location_override_wins(monkeypatch):
+    monkeypatch.setenv("CATEGORY_PRIORITY_ENABLED", "true")
     auth_service = get_auth_service()
     department_service = get_department_service()
     complaint_service = get_complaint_service()
@@ -209,6 +212,7 @@ def test_complaint_creation_with_none_uses_old_default():
 
 
 def test_complaint_creation_fallback_and_logged_on_exception(monkeypatch, caplog):
+    monkeypatch.setenv("CATEGORY_PRIORITY_ENABLED", "true")
     import logging
     auth_service = get_auth_service()
     department_service = get_department_service()
@@ -238,6 +242,148 @@ def test_complaint_creation_fallback_and_logged_on_exception(monkeypatch, caplog
     assert c.priority == "Medium"
     # Exception was logged with error text
     assert any("Simulated DB lookup crash" in record.message for record in caplog.records)
+
+
+def test_feature_flag_disabled_behavior(monkeypatch):
+    """When CATEGORY_PRIORITY_ENABLED is false (or unset):
+    - Complaint creation ignores custom priorities and uses standard default.
+    - GET /departments/category-priorities/status returns enabled: False.
+    - GET /departments/{id}/category-priorities returns empty priorities and enabled: False.
+    - PUT /departments/{id}/category-priorities returns HTTP 403 Forbidden.
+    - Department listing enrich_department_dict returns empty category_priorities dict.
+    """
+    monkeypatch.setenv("CATEGORY_PRIORITY_ENABLED", "false")
+    from fastapi.testclient import TestClient
+    from api.main import app
+    from middleware.rate_limiter import auth_limiter
+
+    auth_service = get_auth_service()
+    department_service = get_department_service()
+    complaint_service = get_complaint_service()
+
+    # Pre-configure a priority in the table directly
+    department_service.set_category_priority(
+        department_id="DEPT_FLAG_TEST",
+        category_name="Plumbing",
+        priority="Critical",
+        location_id="ALL",
+        actor_id="admin1",
+    )
+
+    # 1. Complaint creation ignores the priority table and falls back to standard default
+    student = auth_service.get_user("USR_STUDENT")
+    if not student:
+        student = Student("USR_STUDENT", "Student User", "student@campus.edu", "pass")
+
+    complaint = complaint_service.create_complaint(
+        user=student,
+        location_id="LOC_HOSTEL_1",
+        department_id="DEPT_FLAG_TEST",
+        complaint_type="Plumbing",
+        description="Disabled flag test",
+        category="Plumbing",
+    )
+    # Even though DB table has Critical, flag is disabled so it should NOT use it!
+    # In CATEGORY_PRIORITY_MAP "plumbing" maps to "High" or fallback "Medium"
+    # The key test is it does NOT get "Critical" from the location_category_priorities table!
+    assert complaint.priority != "Critical"
+
+    # 2. Test Client API checks
+    auth_limiter._requests.clear()
+    auth_limiter._lockouts.clear()
+    client = TestClient(app)
+
+    admin_res = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
+    assert admin_res.status_code == 200
+    headers = {"Authorization": f"Bearer {admin_res.json()['access_token']}"}
+
+    # Status endpoint
+    status_res = client.get("/departments/category-priorities/status")
+    assert status_res.status_code == 200
+    assert status_res.json()["enabled"] is False
+
+    # GET category-priorities returns empty priorities
+    get_res = client.get("/departments/DEPT_FLAG_TEST/category-priorities", headers=headers)
+    assert get_res.status_code == 200
+    assert get_res.json()["enabled"] is False
+    assert get_res.json()["priorities"] == {}
+
+    # PUT category-priorities returns 403 Forbidden
+    put_res = client.put(
+        "/departments/DEPT_FLAG_TEST/category-priorities",
+        json={"category_name": "Plumbing", "priority": "Low", "location_id": "ALL"},
+        headers=headers,
+    )
+    assert put_res.status_code == 403
+    assert "disabled" in put_res.json()["detail"].lower()
+
+    # Department listing enrichment returns empty dict for category_priorities
+    list_res = client.get("/departments", headers=headers)
+    assert list_res.status_code == 200
+    depts = list_res.json()
+    flag_dept = next((d for d in depts if d["department_id"] == "DEPT_FLAG_TEST"), None)
+    if flag_dept:
+        assert flag_dept.get("category_priorities") == {}
+
+
+def test_feature_flag_enabled_behavior(monkeypatch):
+    """When CATEGORY_PRIORITY_ENABLED is true:
+    - GET /departments/category-priorities/status returns enabled: True.
+    - PUT /departments/{id}/category-priorities allows configuring priority.
+    - GET /departments/{id}/category-priorities returns configured priorities and enabled: True.
+    - Complaint creation resolves configured priority.
+    """
+    monkeypatch.setenv("CATEGORY_PRIORITY_ENABLED", "true")
+    from fastapi.testclient import TestClient
+    from api.main import app
+    from middleware.rate_limiter import auth_limiter
+
+    auth_service = get_auth_service()
+    complaint_service = get_complaint_service()
+
+    auth_limiter._requests.clear()
+    auth_limiter._lockouts.clear()
+    client = TestClient(app)
+
+    admin_res = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
+    assert admin_res.status_code == 200
+    headers = {"Authorization": f"Bearer {admin_res.json()['access_token']}"}
+
+    # Status endpoint
+    status_res = client.get("/departments/category-priorities/status")
+    assert status_res.status_code == 200
+    assert status_res.json()["enabled"] is True
+
+    # PUT updates successfully
+    put_res = client.put(
+        "/departments/DEPT_FLAG_TEST/category-priorities",
+        json={"category_name": "CustomFlagCat", "priority": "Critical", "location_id": "ALL"},
+        headers=headers,
+    )
+    assert put_res.status_code == 200
+    assert put_res.json()["priority"] == "Critical"
+
+    # GET returns configured priorities
+    get_res = client.get("/departments/DEPT_FLAG_TEST/category-priorities", headers=headers)
+    assert get_res.status_code == 200
+    assert get_res.json()["enabled"] is True
+    assert get_res.json()["priorities"].get("CustomFlagCat") == "Critical"
+
+    # Complaint creation gets Critical
+    student = auth_service.get_user("USR_STUDENT")
+    if not student:
+        student = Student("USR_STUDENT", "Student User", "student@campus.edu", "pass")
+
+    complaint = complaint_service.create_complaint(
+        user=student,
+        location_id="LOC_HOSTEL_1",
+        department_id="DEPT_FLAG_TEST",
+        complaint_type="CustomFlagCat",
+        description="Flag enabled test",
+        category="CustomFlagCat",
+    )
+    assert complaint.priority == "Critical"
+
 
 
 

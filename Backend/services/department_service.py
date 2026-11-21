@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from core.constants import is_category_priority_enabled
 
 
 class DepartmentService:
@@ -252,7 +253,7 @@ class DepartmentService:
         else:
             d["coordinator_2"] = None
 
-        d["category_priorities"] = self.get_category_priorities(dept_id)
+        d["category_priorities"] = self.get_category_priorities(dept_id) if is_category_priority_enabled() else {}
 
         return d
 

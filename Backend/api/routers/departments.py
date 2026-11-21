@@ -20,6 +20,7 @@ from api.schemas import (
     model_to_dict,
 )
 from api.security import get_current_user, require_roles
+from core.constants import is_category_priority_enabled
 from models.administrator import Administrator
 from models.app_manager import AppManager
 
@@ -511,6 +512,11 @@ def update_department_sla_config(
     return saved
 
 
+@router.get("/category-priorities/status")
+def get_category_priorities_status():
+    return {"enabled": is_category_priority_enabled()}
+
+
 @router.get("/{department_id}/category-priorities")
 def get_department_category_priorities(
     department_id: str,
@@ -521,10 +527,20 @@ def get_department_category_priorities(
     dept = department_service.get_department(department_id)
     if not dept:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found.")
+
+    if not is_category_priority_enabled():
+        return {
+            "department_id": department_id,
+            "location_id": location_id or "ALL",
+            "priorities": {},
+            "enabled": False,
+        }
+
     return {
         "department_id": department_id,
         "location_id": location_id or "ALL",
         "priorities": department_service.get_category_priorities(department_id, location_id=location_id),
+        "enabled": True,
     }
 
 
@@ -536,6 +552,12 @@ def update_department_category_priority(
     department_service=Depends(get_department_service),
     auth_service=Depends(get_auth_service),
 ):
+    if not is_category_priority_enabled():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Category priority customization is disabled via CATEGORY_PRIORITY_ENABLED.",
+        )
+
     dept = department_service.get_department(department_id)
     if not dept:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found.")

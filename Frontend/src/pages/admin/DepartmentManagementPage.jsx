@@ -177,6 +177,22 @@ export default function DepartmentManagementPage() {
   const [categoryPriorities, setCategoryPriorities] = useState({});
   const [modalLocationId, setModalLocationId] = useState("ALL");
   const [categoryModalSaving, setCategoryModalSaving] = useState(false);
+  const [categoryPriorityEnabled, setCategoryPriorityEnabled] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    departmentService
+      .getCategoryPrioritiesStatus()
+      .then((res) => {
+        if (isMounted) setCategoryPriorityEnabled(Boolean(res?.data?.enabled));
+      })
+      .catch(() => {
+        if (isMounted) setCategoryPriorityEnabled(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Manage Department Coordinators Modal State
   const [assignCoordsTarget, setAssignCoordsTarget] = useState(null);
@@ -831,17 +847,19 @@ export default function DepartmentManagementPage() {
         complaint_types: categoryList,
       });
 
-      const targetLoc = isAppManager
-        ? (modalLocationId || selectedLocation || "ALL")
-        : (modalLocationId || selectedLocation || "ALL");
+      if (categoryPriorityEnabled) {
+        const targetLoc = isAppManager
+          ? (modalLocationId || selectedLocation || "ALL")
+          : (modalLocationId || selectedLocation || "ALL");
 
-      for (const cat of categoryList) {
-        const p = categoryPriorities[cat] || "Medium";
-        await departmentService.updateCategoryPriority(categoryModalDept.department_id, {
-          category_name: cat,
-          priority: p,
-          location_id: targetLoc,
-        });
+        for (const cat of categoryList) {
+          const p = categoryPriorities[cat] || "Medium";
+          await departmentService.updateCategoryPriority(categoryModalDept.department_id, {
+            category_name: cat,
+            priority: p,
+            location_id: targetLoc,
+          });
+        }
       }
 
       setMessage(`Updated covered categories and priorities for ${categoryModalDept.name}.`);
@@ -907,7 +925,7 @@ export default function DepartmentManagementPage() {
                   >
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className="truncate">{cat}</span>
-                      {renderPriorityBadge(row.category_priorities?.[cat] || "Medium")}
+                      {categoryPriorityEnabled && renderPriorityBadge(row.category_priorities?.[cat] || "Medium")}
                     </div>
                     <span className="text-[10px] text-slate-400 group-hover:text-primary shrink-0 opacity-70 group-hover:translate-x-0.5 transition-transform">
                       &rarr;
@@ -1218,7 +1236,7 @@ export default function DepartmentManagementPage() {
                   >
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className="truncate">{cat}</span>
-                      {renderPriorityBadge(row.category_priorities?.[cat] || "Medium")}
+                      {categoryPriorityEnabled && renderPriorityBadge(row.category_priorities?.[cat] || "Medium")}
                     </div>
                     <span className="text-[10px] text-slate-400 group-hover:text-primary shrink-0 opacity-70 group-hover:translate-x-0.5 transition-transform">
                       &rarr;
@@ -2624,7 +2642,7 @@ export default function DepartmentManagementPage() {
                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700"
               >
                 <span>{cat}</span>
-                {renderPriorityBadge(viewCategoriesTarget?.category_priorities?.[cat] || "Medium")}
+                {categoryPriorityEnabled && renderPriorityBadge(viewCategoriesTarget?.category_priorities?.[cat] || "Medium")}
               </span>
             ))}
           </div>
@@ -2639,36 +2657,45 @@ export default function DepartmentManagementPage() {
       {/* Edit Covered Categories Modal */}
       <Modal
         open={!!categoryModalDept}
-        title={`Edit Covered Categories & Priorities — ${categoryModalDept?.name || ""}`}
+        title={
+          categoryPriorityEnabled
+            ? `Edit Covered Categories & Priorities — ${categoryModalDept?.name || ""}`
+            : `Edit Covered Categories — ${categoryModalDept?.name || ""}`
+        }
         onClose={() => setCategoryModalDept(null)}
         className="max-w-lg"
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Configure covered complaint categories and their default priorities.
-            {isAppManager
-              ? " Priority changes apply to your assigned location(s)."
-              : " Set campus-wide defaults or override for a specific location."}
+            {categoryPriorityEnabled
+              ? `Configure covered complaint categories and their default priorities.${
+                  isAppManager
+                    ? " Priority changes apply to your assigned location(s)."
+                    : " Set campus-wide defaults or override for a specific location."
+                }`
+              : "Configure covered complaint categories for this department."}
           </p>
 
-          {/* Location Scope Selector */}
-          <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-slate-100/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Priority Scope:
-            </span>
-            <select
-              value={modalLocationId}
-              onChange={(e) => handleLocationChangeInModal(e.target.value)}
-              className="text-xs font-medium py-1 px-2.5 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 cursor-pointer focus:outline-none focus:border-primary"
-            >
-              {isAdmin && <option value="ALL">All Locations (Campus-Wide Default)</option>}
-              {(data?.locations || []).map((loc) => (
-                <option key={loc.location_id} value={loc.location_id}>
-                  {loc.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Location Scope Selector (only when category priorities enabled) */}
+          {categoryPriorityEnabled && (
+            <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-slate-100/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Priority Scope:
+              </span>
+              <select
+                value={modalLocationId}
+                onChange={(e) => handleLocationChangeInModal(e.target.value)}
+                className="text-xs font-medium py-1 px-2.5 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 cursor-pointer focus:outline-none focus:border-primary"
+              >
+                {isAdmin && <option value="ALL">All Locations (Campus-Wide Default)</option>}
+                {(data?.locations || []).map((loc) => (
+                  <option key={loc.location_id} value={loc.location_id}>
+                    {loc.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Quick Add input */}
           <div className="flex items-center gap-2">
@@ -2712,31 +2739,33 @@ export default function DepartmentManagementPage() {
                     {cat}
                   </span>
 
-                  {/* Compact Priority Selector */}
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <select
-                      value={categoryPriorities[cat] || "Medium"}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setCategoryPriorities((prev) => ({ ...prev, [cat]: val }));
-                      }}
-                      className={`text-[11px] font-bold py-1 px-2 rounded-md border cursor-pointer focus:outline-none ${
-                        (categoryPriorities[cat] || "Medium") === "Critical"
-                          ? "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border-red-300 dark:border-red-800"
-                          : (categoryPriorities[cat] || "Medium") === "High"
-                          ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-300 dark:border-amber-800"
-                          : (categoryPriorities[cat] || "Medium") === "Low"
-                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
-                          : "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-300 border-yellow-300 dark:border-yellow-800"
-                      }`}
-                      title={`Configure default priority for ${cat}`}
-                    >
-                      <option value="Critical">🔴 Critical</option>
-                      <option value="High">🟠 High</option>
-                      <option value="Medium">🟡 Medium</option>
-                      <option value="Low">🟢 Low</option>
-                    </select>
-                  </div>
+                  {/* Compact Priority Selector (only when category priorities enabled) */}
+                  {categoryPriorityEnabled && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <select
+                        value={categoryPriorities[cat] || "Medium"}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCategoryPriorities((prev) => ({ ...prev, [cat]: val }));
+                        }}
+                        className={`text-[11px] font-bold py-1 px-2 rounded-md border cursor-pointer focus:outline-none ${
+                          (categoryPriorities[cat] || "Medium") === "Critical"
+                            ? "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border-red-300 dark:border-red-800"
+                            : (categoryPriorities[cat] || "Medium") === "High"
+                            ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-300 dark:border-amber-800"
+                            : (categoryPriorities[cat] || "Medium") === "Low"
+                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
+                            : "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-300 border-yellow-300 dark:border-yellow-800"
+                        }`}
+                        title={`Configure default priority for ${cat}`}
+                      >
+                        <option value="Critical">🔴 Critical</option>
+                        <option value="High">🟠 High</option>
+                        <option value="Medium">🟡 Medium</option>
+                        <option value="Low">🟢 Low</option>
+                      </select>
+                    </div>
+                  )}
 
                   <button
                     type="button"

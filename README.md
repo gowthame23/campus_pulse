@@ -277,6 +277,10 @@ npm run dev
 ```
 Open `http://localhost:5173` in your browser.
 
+#### 3. Feature Flags & Configuration
+* `CATEGORY_PRIORITY_ENABLED` (default: `false`): Feature flag controlling category-specific priority overrides and management badges. When disabled (`false`), complaint creation uses standard default priorities, priority modification endpoints return 403 Forbidden, GET endpoints return empty priorities, and the frontend hides all priority badges and edit controls. When enabled (`true`), department administrators and app managers can customize priorities per category and per location.
+
+
 ---
 
 ## 🧪 Running Automated Tests
