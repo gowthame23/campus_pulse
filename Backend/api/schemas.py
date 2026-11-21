@@ -247,6 +247,13 @@ class DepartmentResponse(BaseModel):
     coordinator_1: Optional[Dict[str, Any]] = None
     coordinator_2: Optional[Dict[str, Any]] = None
     location_ids: Optional[List[str]] = []
+    category_priorities: Optional[Dict[str, str]] = {}
+
+
+class CategoryPriorityUpdateRequest(BaseModel):
+    category_name: str
+    priority: str
+    location_id: Optional[str] = "ALL"
 
 
 class DepartmentSlaConfigResponse(BaseModel):

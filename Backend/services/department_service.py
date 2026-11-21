@@ -252,6 +252,8 @@ class DepartmentService:
         else:
             d["coordinator_2"] = None
 
+        d["category_priorities"] = self.get_category_priorities(dept_id)
+
         return d
 
     def create_department(
@@ -634,3 +636,89 @@ class DepartmentService:
             )
             conn.commit()
             return True
+
+    def _ensure_category_priorities_table(self, conn):
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS location_category_priorities (
+                id TEXT PRIMARY KEY,
+                department_id TEXT NOT NULL,
+                location_id TEXT NOT NULL,
+                category_name TEXT NOT NULL,
+                priority TEXT NOT NULL,
+                updated_by TEXT,
+                updated_at TEXT,
+                UNIQUE(department_id, location_id, category_name)
+            )
+        """)
+
+    def get_category_priorities(self, department_id, location_id=None):
+        with self._db_conn() as conn:
+            self._ensure_category_priorities_table(conn)
+            if location_id and location_id != "ALL":
+                rows = conn.execute("""
+                    SELECT category_name, priority, location_id
+                    FROM location_category_priorities
+                    WHERE department_id = ? AND location_id IN (?, 'ALL')
+                    ORDER BY CASE WHEN location_id = ? THEN 1 ELSE 2 END
+                """, (department_id, location_id, location_id)).fetchall()
+            else:
+                rows = conn.execute("""
+                    SELECT category_name, priority, location_id
+                    FROM location_category_priorities
+                    WHERE department_id = ? AND location_id = 'ALL'
+                """, (department_id,)).fetchall()
+            
+            result = {}
+            for r in rows:
+                c_name = r["category_name"]
+                if c_name not in result:
+                    result[c_name] = r["priority"]
+            return result
+
+    def set_category_priority(self, department_id, category_name, priority, location_id="ALL", actor_id=None):
+        allowed = {"Low", "Medium", "High", "Critical"}
+        norm_priority = priority.strip().title() if priority else "Medium"
+        if norm_priority not in allowed:
+            raise ValueError(f"Invalid priority '{priority}'. Must be one of: {', '.join(sorted(allowed))}")
+        
+        from utils.helper import generate_id, now_string
+        target_loc = location_id if location_id else "ALL"
+        record_id = f"LCP_{department_id}_{target_loc}_{category_name.strip()}"[:60]
+        ts = now_string()
+
+        with self._db_conn() as conn:
+            self._ensure_category_priorities_table(conn)
+            conn.execute("""
+                INSERT INTO location_category_priorities (id, department_id, location_id, category_name, priority, updated_by, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(department_id, location_id, category_name) DO UPDATE SET
+                    priority = excluded.priority,
+                    updated_by = excluded.updated_by,
+                    updated_at = excluded.updated_at
+            """, (record_id, department_id, target_loc, category_name.strip(), norm_priority, actor_id, ts))
+            conn.commit()
+        return norm_priority
+
+    def get_effective_category_priority(self, department_id, category_name, location_id=None):
+        if not category_name:
+            return None
+        c_name = category_name.strip()
+        with self._db_conn() as conn:
+            self._ensure_category_priorities_table(conn)
+            if location_id and location_id != "ALL":
+                row = conn.execute("""
+                    SELECT priority FROM location_category_priorities
+                    WHERE department_id = ? AND category_name = ? AND location_id IN (?, 'ALL')
+                    ORDER BY CASE WHEN location_id = ? THEN 1 ELSE 2 END
+                    LIMIT 1
+                """, (department_id, c_name, location_id, location_id)).fetchone()
+            else:
+                row = conn.execute("""
+                    SELECT priority FROM location_category_priorities
+                    WHERE department_id = ? AND category_name = ? AND location_id = 'ALL'
+                    LIMIT 1
+                """, (department_id, c_name)).fetchone()
+            
+            if row:
+                return row["priority"]
+        return None

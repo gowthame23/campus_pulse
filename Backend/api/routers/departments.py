@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from api.dependencies import (
@@ -9,6 +10,7 @@ from api.schemas import (
     AssignCoordinatorRequest,
     AssignDepartmentCoordinatorsRequest,
     AssignLocationsToDepartmentRequest,
+    CategoryPriorityUpdateRequest,
     CoordinatorAssignmentCreateRequest,
     DepartmentCreateRequest,
     DepartmentResponse,
@@ -507,4 +509,88 @@ def update_department_sla_config(
     )
 
     return saved
+
+
+@router.get("/{department_id}/category-priorities")
+def get_department_category_priorities(
+    department_id: str,
+    location_id: Optional[str] = None,
+    current_user=Depends(get_current_user),
+    department_service=Depends(get_department_service),
+):
+    dept = department_service.get_department(department_id)
+    if not dept:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found.")
+    return {
+        "department_id": department_id,
+        "location_id": location_id or "ALL",
+        "priorities": department_service.get_category_priorities(department_id, location_id=location_id),
+    }
+
+
+@router.put("/{department_id}/category-priorities")
+def update_department_category_priority(
+    department_id: str,
+    payload: CategoryPriorityUpdateRequest,
+    current_user=Depends(require_roles(Administrator.ROLE, AppManager.ROLE)),
+    department_service=Depends(get_department_service),
+    auth_service=Depends(get_auth_service),
+):
+    dept = department_service.get_department(department_id)
+    if not dept:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found.")
+
+    target_loc = (payload.location_id or "ALL").strip()
+    user_role = (current_user.role or "").lower()
+
+    if user_role == AppManager.ROLE.lower():
+        if target_loc == "ALL":
+            # If App Manager passes "ALL", apply to their assigned locations
+            mgr_locs = auth_service.get_app_manager_locations(current_user.user_id)
+            if not mgr_locs:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="App Manager is not assigned to any locations.",
+                )
+            results = []
+            for loc in mgr_locs:
+                p = department_service.set_category_priority(
+                    department_id=department_id,
+                    category_name=payload.category_name,
+                    priority=payload.priority,
+                    location_id=loc.location_id,
+                    actor_id=current_user.user_id,
+                )
+                results.append({"location_id": loc.location_id, "priority": p})
+            return {
+                "status": "success",
+                "department_id": department_id,
+                "category_name": payload.category_name,
+                "updated_locations": results,
+            }
+        else:
+            if not auth_service.is_app_manager_assigned(current_user.user_id, target_loc):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"App Manager is not assigned to location '{target_loc}'.",
+                )
+
+    try:
+        updated_priority = department_service.set_category_priority(
+            department_id=department_id,
+            category_name=payload.category_name,
+            priority=payload.priority,
+            location_id=target_loc,
+            actor_id=current_user.user_id,
+        )
+        return {
+            "status": "success",
+            "department_id": department_id,
+            "category_name": payload.category_name,
+            "priority": updated_priority,
+            "location_id": target_loc,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
 

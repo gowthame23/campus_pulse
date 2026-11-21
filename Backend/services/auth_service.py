@@ -4508,6 +4508,14 @@ class AuthService:
 
                 VALUES (?, ?, ?, ?, ?, ?, 'Active')
 
+                ON CONFLICT (coordinator_id, location_id, department_id) DO UPDATE SET
+
+                    status = 'Active',
+
+                    assigned_at = excluded.assigned_at,
+
+                    assigned_by = excluded.assigned_by
+
                 """,
 
                 (asgn_id, coordinator_id, department_id, loc_target, now_str, assigned_by)

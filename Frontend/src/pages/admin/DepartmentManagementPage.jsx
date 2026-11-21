@@ -84,6 +84,7 @@ export default function DepartmentManagementPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = ["administrator", "super_admin"].includes((user?.role || "").toLowerCase());
+  const isAppManager = (user?.role || "").toLowerCase() === "app_manager";
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -173,6 +174,8 @@ export default function DepartmentManagementPage() {
   const [categoryModalDept, setCategoryModalDept] = useState(null);
   const [categoryList, setCategoryList] = useState([]);
   const [newCategoryInput, setNewCategoryInput] = useState("");
+  const [categoryPriorities, setCategoryPriorities] = useState({});
+  const [modalLocationId, setModalLocationId] = useState("ALL");
   const [categoryModalSaving, setCategoryModalSaving] = useState(false);
 
   // Manage Department Coordinators Modal State
@@ -729,11 +732,74 @@ export default function DepartmentManagementPage() {
     }
   };
 
+  // Category priority badge helper
+  const renderPriorityBadge = (priority) => {
+    const p = priority || "Medium";
+    let badgeClass = "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800";
+    let dotClass = "bg-yellow-500";
+
+    if (p === "Critical") {
+      badgeClass = "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border-red-200 dark:border-red-800";
+      dotClass = "bg-red-500";
+    } else if (p === "High") {
+      badgeClass = "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-800";
+      dotClass = "bg-amber-500";
+    } else if (p === "Low") {
+      badgeClass = "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800";
+      dotClass = "bg-emerald-500";
+    }
+
+    return (
+      <span
+        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-bold border shrink-0 ${badgeClass}`}
+        title={`Priority: ${p}`}
+      >
+        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotClass}`} />
+        {p}
+      </span>
+    );
+  };
+
   // Category modal handlers
-  const openEditCategoriesModal = (dept) => {
+  const openEditCategoriesModal = async (dept) => {
     setCategoryModalDept(dept);
-    setCategoryList(Array.isArray(dept.complaint_types) ? [...dept.complaint_types] : []);
+    const types = Array.isArray(dept.complaint_types) ? [...dept.complaint_types] : [];
+    setCategoryList(types);
     setNewCategoryInput("");
+    setCategoryPriorities(dept.category_priorities ? { ...dept.category_priorities } : {});
+
+    const locId = selectedLocation || (isAppManager ? (data?.locations?.[0]?.location_id || "") : "ALL");
+    setModalLocationId(locId);
+
+    if (locId && locId !== "ALL") {
+      try {
+        const res = await departmentService.getCategoryPriorities(dept.department_id, locId);
+        if (res?.data?.priorities) {
+          setCategoryPriorities((prev) => ({ ...prev, ...res.data.priorities }));
+        }
+      } catch (e) {
+        console.error("Failed to load category priorities for location:", e);
+      }
+    }
+  };
+
+  const handleLocationChangeInModal = async (newLocId) => {
+    setModalLocationId(newLocId);
+    if (!categoryModalDept) return;
+    try {
+      const res = await departmentService.getCategoryPriorities(
+        categoryModalDept.department_id,
+        newLocId === "ALL" ? undefined : newLocId
+      );
+      if (res?.data?.priorities) {
+        setCategoryPriorities((prev) => ({
+          ...(categoryModalDept.category_priorities || {}),
+          ...res.data.priorities,
+        }));
+      }
+    } catch (e) {
+      console.error("Failed to load category priorities for location:", e);
+    }
   };
 
   const handleAddCategoryItem = () => {
@@ -764,7 +830,21 @@ export default function DepartmentManagementPage() {
       await departmentService.update(categoryModalDept.department_id, {
         complaint_types: categoryList,
       });
-      setMessage(`Updated covered categories for ${categoryModalDept.name}.`);
+
+      const targetLoc = isAppManager
+        ? (modalLocationId || selectedLocation || "ALL")
+        : (modalLocationId || selectedLocation || "ALL");
+
+      for (const cat of categoryList) {
+        const p = categoryPriorities[cat] || "Medium";
+        await departmentService.updateCategoryPriority(categoryModalDept.department_id, {
+          category_name: cat,
+          priority: p,
+          location_id: targetLoc,
+        });
+      }
+
+      setMessage(`Updated covered categories and priorities for ${categoryModalDept.name}.`);
       setCategoryModalDept(null);
       reload();
     } catch (err) {
@@ -825,7 +905,10 @@ export default function DepartmentManagementPage() {
                     className="inline-flex items-center justify-between gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700/60 hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-all text-left group cursor-pointer shadow-2xs"
                     title={`View complaints for category: ${cat}`}
                   >
-                    <span className="truncate">{cat}</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="truncate">{cat}</span>
+                      {renderPriorityBadge(row.category_priorities?.[cat] || "Medium")}
+                    </div>
                     <span className="text-[10px] text-slate-400 group-hover:text-primary shrink-0 opacity-70 group-hover:translate-x-0.5 transition-transform">
                       &rarr;
                     </span>
@@ -1133,7 +1216,10 @@ export default function DepartmentManagementPage() {
                     className="inline-flex items-center justify-between gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700/60 hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-all text-left group cursor-pointer shadow-2xs"
                     title={`View complaints for category: ${cat}`}
                   >
-                    <span className="truncate">{cat}</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="truncate">{cat}</span>
+                      {renderPriorityBadge(row.category_priorities?.[cat] || "Medium")}
+                    </div>
                     <span className="text-[10px] text-slate-400 group-hover:text-primary shrink-0 opacity-70 group-hover:translate-x-0.5 transition-transform">
                       &rarr;
                     </span>
@@ -2535,9 +2621,10 @@ export default function DepartmentManagementPage() {
             {(viewCategoriesTarget?.complaint_types || []).map((cat, idx) => (
               <span
                 key={idx}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700"
               >
-                {cat}
+                <span>{cat}</span>
+                {renderPriorityBadge(viewCategoriesTarget?.category_priorities?.[cat] || "Medium")}
               </span>
             ))}
           </div>
@@ -2552,14 +2639,36 @@ export default function DepartmentManagementPage() {
       {/* Edit Covered Categories Modal */}
       <Modal
         open={!!categoryModalDept}
-        title={`Edit Covered Categories — ${categoryModalDept?.name || ""}`}
+        title={`Edit Covered Categories & Priorities — ${categoryModalDept?.name || ""}`}
         onClose={() => setCategoryModalDept(null)}
         className="max-w-lg"
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Manage complaint and service categories covered by <strong>{categoryModalDept?.name}</strong>. Students and staff will choose from these issues when filing requests.
+            Configure covered complaint categories and their default priorities.
+            {isAppManager
+              ? " Priority changes apply to your assigned location(s)."
+              : " Set campus-wide defaults or override for a specific location."}
           </p>
+
+          {/* Location Scope Selector */}
+          <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-slate-100/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Priority Scope:
+            </span>
+            <select
+              value={modalLocationId}
+              onChange={(e) => handleLocationChangeInModal(e.target.value)}
+              className="text-xs font-medium py-1 px-2.5 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 cursor-pointer focus:outline-none focus:border-primary"
+            >
+              {isAdmin && <option value="ALL">All Locations (Campus-Wide Default)</option>}
+              {(data?.locations || []).map((loc) => (
+                <option key={loc.location_id} value={loc.location_id}>
+                  {loc.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* Quick Add input */}
           <div className="flex items-center gap-2">
@@ -2599,9 +2708,36 @@ export default function DepartmentManagementPage() {
                   key={idx}
                   className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 shadow-2xs group"
                 >
-                  <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+                  <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate flex-1">
                     {cat}
                   </span>
+
+                  {/* Compact Priority Selector */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <select
+                      value={categoryPriorities[cat] || "Medium"}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCategoryPriorities((prev) => ({ ...prev, [cat]: val }));
+                      }}
+                      className={`text-[11px] font-bold py-1 px-2 rounded-md border cursor-pointer focus:outline-none ${
+                        (categoryPriorities[cat] || "Medium") === "Critical"
+                          ? "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border-red-300 dark:border-red-800"
+                          : (categoryPriorities[cat] || "Medium") === "High"
+                          ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-300 dark:border-amber-800"
+                          : (categoryPriorities[cat] || "Medium") === "Low"
+                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
+                          : "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-300 border-yellow-300 dark:border-yellow-800"
+                      }`}
+                      title={`Configure default priority for ${cat}`}
+                    >
+                      <option value="Critical">🔴 Critical</option>
+                      <option value="High">🟠 High</option>
+                      <option value="Medium">🟡 Medium</option>
+                      <option value="Low">🟢 Low</option>
+                    </select>
+                  </div>
+
                   <button
                     type="button"
                     onClick={() => handleRemoveCategoryItem(cat)}

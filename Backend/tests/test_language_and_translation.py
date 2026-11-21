@@ -109,6 +109,7 @@ def test_translation_caching_and_invalidation():
     """Test persistent caching in complaint_translations and cache invalidation on description update."""
     translation_svc = TranslationService(db_path)
     test_id = "CMP_CACHE_VERIFY_99"
+    translation_svc.invalidate_complaint_translations(test_id)
     complaint_data = {
         "complaint_id": test_id,
         "title": "Leaking tap",

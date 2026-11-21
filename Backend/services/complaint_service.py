@@ -328,6 +328,34 @@ class ComplaintService:
                 if isinstance(e, ValueError):
                     raise e
 
+        if not final_priority and department_id:
+            try:
+                target_cat = (category or complaint_type or "").strip()
+                if target_cat:
+                    with self.auth_service._connect() as conn:
+                        conn.execute("""
+                            CREATE TABLE IF NOT EXISTS location_category_priorities (
+                                id TEXT PRIMARY KEY,
+                                department_id TEXT NOT NULL,
+                                location_id TEXT NOT NULL,
+                                category_name TEXT NOT NULL,
+                                priority TEXT NOT NULL,
+                                updated_by TEXT,
+                                updated_at TEXT,
+                                UNIQUE(department_id, location_id, category_name)
+                            )
+                        """)
+                        row = conn.execute("""
+                            SELECT priority FROM location_category_priorities
+                            WHERE department_id = ? AND category_name = ? AND location_id IN (?, 'ALL')
+                            ORDER BY CASE WHEN location_id = ? THEN 1 ELSE 2 END
+                            LIMIT 1
+                        """, (department_id, target_cat, location_id or "ALL", location_id or "ALL")).fetchone()
+                        if row:
+                            final_priority = row["priority"]
+            except Exception:
+                pass
+
         if not final_priority:
             cat_key = (category or "").strip().lower()
             ct_key = (complaint_type or "").strip().lower()
