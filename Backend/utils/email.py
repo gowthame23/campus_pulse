@@ -268,8 +268,9 @@ def _dispatch_email(to_email: str, subject: str, html_content: str, plain_text: 
     global _last_email_error
 
     # Local Email Mode: Bypasses Brevo / external SMTP to keep emails local during testing and development
-    if os.environ.get("USE_LOCAL_EMAIL", "true").lower() in ("true", "1", "yes"):
-        logger.info(f"[LOCAL EMAIL] To: {to_email} | Subject: {subject}")
+    # Defaults to false in production to ensure real emails are dispatched.
+    if os.environ.get("USE_LOCAL_EMAIL", "false").lower() in ("true", "1", "yes"):
+        logger.warning(f"[LOCAL EMAIL] USE_LOCAL_EMAIL is enabled: emails are NOT being sent! To: {to_email} | Subject: {subject}")
         return True
 
     # 1. Brevo HTTPS API (Port 443 - zero credit card, 300 free emails/day)
