@@ -21,7 +21,7 @@ export const pushService = {
     try {
       const res = await apiClient.get("/push/vapid-public-key");
       return res.data?.public_key || "";
-    } catch (err) {
+    } catch {
       return "";
     }
   },

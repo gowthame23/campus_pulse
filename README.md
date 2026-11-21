@@ -308,6 +308,21 @@ In the automated test suite, these 5 scenarios are marked with `@pytest.mark.xfa
 
 ---
 
+## 🚀 Deployment Checklist
+
+Before triggering a production deployment (e.g. on Render or Linux VPS), complete these prerequisite safety steps:
+
+1. **Storage & Database Backup:**
+   - Create a full backup of `platform.db` and the `storage/institutes/` directory to secure staging/storage outside the application directory.
+2. **Administrative Credentials:**
+   - Ensure `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `MANAGER_EMAIL`, and `MANAGER_PASSWORD` are configured in the production environment variables (or Render Dashboard). Initial database seeding requires these values to initialize governance accounts safely.
+3. **Feature Flag Configuration:**
+   - Keep `CATEGORY_PRIORITY_ENABLED=false` on initial deployment. Enable it only after confirming application health and verifying triage behavior on at least one real complaint.
+4. **Email Dispatch Safety:**
+   - Keep `USE_LOCAL_EMAIL` unset or strictly `false` in production to ensure real email notifications (SMTP) are dispatched to coordinators, managers, and students. Local email logging mode should only be used in local development.
+
+---
+
 ## 📁 Repository Structure
 
 ```text
