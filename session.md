@@ -40,3 +40,46 @@
   - Exact verified result: 319 passed, 5 xfailed (known issues documented in README), 2 skipped, 0 failed.
 - **Corrected Documentation:** Replaced all stale "100% pass" / "324 passed" claims across documentation with honest counts.
 
+## 2026-11-21 — Location-Aware Category Priority Badges & Scoped Management
+
+- **Feature Branch Created:**
+  - Branch: `feature/category-priority-badges` in `CampusPulse_co`.
+- **Local Email Safeguard:**
+  - Modified `Backend/utils/email.py`: Enabled `USE_LOCAL_EMAIL=true` environment bypass in `_dispatch_email`. Intercepts all email dispatches, logs them locally, and disables external Brevo HTTPS API calls to ensure zero email leakage during development and test execution.
+- **Backend Service Layer (`Backend/services/department_service.py`):**
+  - Added table `location_category_priorities (id TEXT PRIMARY KEY, department_id TEXT, location_id TEXT, category_name TEXT, priority TEXT, updated_by TEXT, updated_at TEXT, UNIQUE(department_id, location_id, category_name))`.
+  - Added methods `_ensure_category_priorities_table`, `get_category_priorities(department_id, location_id)`, `set_category_priority(...)`, and `get_effective_category_priority(department_id, category_name, location_id)`.
+  - Resolution precedence: Specific `location_id` override takes precedence over global campus-wide default (`ALL`).
+  - Enriched `enrich_department_dict` to include `category_priorities`.
+- **API & Schemas (`Backend/api/schemas.py` & `Backend/api/routers/departments.py`):**
+  - Extended `DepartmentResponse` with `category_priorities: Optional[Dict[str, str]] = {}`.
+  - Added `CategoryPriorityUpdateRequest` schema (`category_name`, `priority`, `location_id`).
+  - Added `GET /departments/{department_id}/category-priorities`: Retrieves resolved category priorities for a department and optional location.
+  - Added `PUT /departments/{department_id}/category-priorities`: Configures category priority with RBAC guards. Campus Administrator can set campus-wide defaults (`ALL`) or per-location overrides. App Manager is strictly scoped to assigned physical locations via `auth_service.is_app_manager_assigned` (`403 Forbidden` for unassigned locations).
+- **Complaint Creation Enforcement (`Backend/services/complaint_service.py`):**
+  - Updated `create_complaint` to query `location_category_priorities` for the complaint's department and location before falling back to `CATEGORY_PRIORITY_MAP`, ensuring newly raised complaints automatically inherit the configured category priority and calculate matching SLA durations.
+- **Coordinator Assignment Idempotency Fix (`Backend/services/auth_service.py`):**
+  - Updated `assign_coordinator` with `ON CONFLICT (coordinator_id, location_id, department_id) DO UPDATE SET status = 'Active', ...` to prevent SQLite unique constraint crashes during reassignment workflows.
+- **Frontend Service Layer (`Frontend/src/services/departmentService.js`):**
+  - Added `getCategoryPriorities(departmentId, locationId)` and `updateCategoryPriority(departmentId, payload)`.
+- **Frontend UI & Compact Badge Styling (`Frontend/src/pages/admin/DepartmentManagementPage.jsx`):**
+  - Added `renderPriorityBadge(priority)` helper rendering a single compact pill with a color dot indicator:
+    - 🔴 **Critical**: Red background/border with red dot.
+    - 🟠 **High**: Amber background/border with amber dot.
+    - 🟡 **Medium**: Yellow background/border with yellow dot.
+    - 🟢 **Low**: Emerald background/border with emerald dot.
+  - Displayed compact priority badges beside each category name across both grid and card table views.
+  - Updated "Edit Covered Categories" modal:
+    - Added location scope dropdown: Campus Administrator can select "All Locations (Campus-Wide Default)" or individual locations; App Manager selects from their assigned locations.
+    - Added compact priority dropdown beside each category item in the list, styled with matching priority colors.
+    - Synchronized priority updates with backend upon clicking "Save Categories".
+- **Local Testing & Verification:**
+  - Authored `Backend/tests/test_category_priorities.py` covering service logic, location overrides, complaint priority resolution, Admin API, and App Manager authorization scoping.
+  - Ran `test_category_priorities.py`: 3 passed in 4.30s.
+  - Ran `test_language_and_translation.py`: 7 passed in 4.51s.
+  - Ran `test_phase1_complete.py`: Passed.
+  - Ran `npm run build` in `Frontend/`: Compiled successfully in 1.07s with zero errors.
+- **Commit:**
+  - Committed all changes to branch `feature/category-priority-badges` (`commit 672c18d`).
+
+
