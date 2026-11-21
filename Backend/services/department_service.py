@@ -722,3 +722,6 @@ class DepartmentService:
             if row:
                 return row["priority"]
         return None
+
+    def resolve_category_priority(self, department_id, category_name, location_id=None):
+        return self.get_effective_category_priority(department_id, category_name, location_id)

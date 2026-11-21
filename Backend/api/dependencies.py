@@ -122,6 +122,7 @@ def _get_services_for_db(path: str = None):
         val_svc = ValidationService(auth_svc)
         dep_svc = DependencyService(auth_svc, cmpl_svc, notif_svc)
         dept_svc = DepartmentService(auth_svc, val_svc, dep_svc, team_service=tm_svc)
+        cmpl_svc.department_service = dept_svc
 
         loc_svc = LocationService(auth_svc, val_svc, dep_svc)
         lf_svc = LostFoundService(notification_service=notif_svc, audit_service=aud_svc, db_path=path, auth_service=auth_svc)

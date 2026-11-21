@@ -138,3 +138,106 @@ def test_category_priorities_api():
         assert denied_res.status_code == 403
 
 
+def test_complaint_creation_location_override_wins():
+    auth_service = get_auth_service()
+    department_service = get_department_service()
+    complaint_service = get_complaint_service()
+
+    # Campus-wide priority is Low
+    department_service.set_category_priority(
+        department_id="DEPT_OVERRIDE_TEST",
+        category_name="Plumbing",
+        priority="Low",
+        location_id="ALL",
+        actor_id="admin1",
+    )
+    # Location override is Critical
+    department_service.set_category_priority(
+        department_id="DEPT_OVERRIDE_TEST",
+        category_name="Plumbing",
+        priority="Critical",
+        location_id="LOC_HOSTEL_1",
+        actor_id="admin1",
+    )
+
+    student = auth_service.get_user("USR_STUDENT")
+    if not student:
+        student = Student("USR_STUDENT", "Student User", "student@campus.edu", "pass")
+
+    # Override location gets Critical
+    c1 = complaint_service.create_complaint(
+        user=student,
+        location_id="LOC_HOSTEL_1",
+        department_id="DEPT_OVERRIDE_TEST",
+        complaint_type="Plumbing",
+        description="Leak at hostel",
+        category="Plumbing",
+    )
+    assert c1.priority == "Critical"
+
+    # Other location gets campus-wide default Low
+    student.location_id = "LOC_HOSTEL_2"
+    c2 = complaint_service.create_complaint(
+        user=student,
+        location_id="LOC_HOSTEL_2",
+        department_id="DEPT_OVERRIDE_TEST",
+        complaint_type="Plumbing",
+        description="Leak at other location",
+        category="Plumbing",
+    )
+    assert c2.priority == "Low"
+
+
+def test_complaint_creation_with_none_uses_old_default():
+    auth_service = get_auth_service()
+    complaint_service = get_complaint_service()
+
+    student = auth_service.get_user("USR_STUDENT")
+    if not student:
+        student = Student("USR_STUDENT", "Student User", "student@campus.edu", "pass")
+
+    # Unconfigured category and department uses CATEGORY_PRIORITY_MAP
+    c = complaint_service.create_complaint(
+        user=student,
+        location_id="LOC_HOSTEL_1",
+        department_id="DEPT_UNCONFIGURED_999",
+        complaint_type="Carpentry",
+        description="Broken desk",
+        category="Carpentry",
+    )
+    assert c.priority == "Medium"
+
+
+def test_complaint_creation_fallback_and_logged_on_exception(monkeypatch, caplog):
+    import logging
+    auth_service = get_auth_service()
+    department_service = get_department_service()
+    complaint_service = get_complaint_service()
+
+    student = auth_service.get_user("USR_STUDENT")
+    if not student:
+        student = Student("USR_STUDENT", "Student User", "student@campus.edu", "pass")
+
+    def mock_failing_resolve(*args, **kwargs):
+        raise RuntimeError("Simulated DB lookup crash")
+
+    monkeypatch.setattr(department_service, "resolve_category_priority", mock_failing_resolve)
+
+    with caplog.at_level(logging.WARNING):
+        c = complaint_service.create_complaint(
+            user=student,
+            location_id="LOC_HOSTEL_1",
+            department_id="DEPT_HOSTEL_ELECTRICAL",
+            complaint_type="Electrical",
+            description="Flickering bulb",
+            category="Electrical",
+        )
+
+    # Complaint is still created successfully with the default priority
+    assert c is not None
+    assert c.priority == "Medium"
+    # Exception was logged with error text
+    assert any("Simulated DB lookup crash" in record.message for record in caplog.records)
+
+
+

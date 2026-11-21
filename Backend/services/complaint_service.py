@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 from datetime import datetime, timedelta
@@ -42,6 +43,8 @@ from models.student import Student
 from storage.sqlite_repository import SQLiteRepository
 from utils.helper import now, now_string, parse_date
 
+logger = logging.getLogger(__name__)
+
 
 class ComplaintConflictError(Exception):
     """Raised when an atomic operation conflicts with existing complaint state."""
@@ -50,10 +53,11 @@ class ComplaintConflictError(Exception):
 
 class ComplaintService:
     def __init__(
-        self, auth_service, notification_service, db_path="storage/campus_pulse.db", team_service=None
+        self, auth_service, notification_service, db_path="storage/campus_pulse.db", team_service=None, department_service=None
     ):
         self.auth_service = auth_service
         self.notification_service = notification_service
+        self.department_service = department_service
         self.repository = SQLiteRepository(db_path, {"complaints": []})
         from services.config_service import ConfigService
 
@@ -332,29 +336,17 @@ class ComplaintService:
             try:
                 target_cat = (category or complaint_type or "").strip()
                 if target_cat:
-                    with self.auth_service._connect() as conn:
-                        conn.execute("""
-                            CREATE TABLE IF NOT EXISTS location_category_priorities (
-                                id TEXT PRIMARY KEY,
-                                department_id TEXT NOT NULL,
-                                location_id TEXT NOT NULL,
-                                category_name TEXT NOT NULL,
-                                priority TEXT NOT NULL,
-                                updated_by TEXT,
-                                updated_at TEXT,
-                                UNIQUE(department_id, location_id, category_name)
-                            )
-                        """)
-                        row = conn.execute("""
-                            SELECT priority FROM location_category_priorities
-                            WHERE department_id = ? AND category_name = ? AND location_id IN (?, 'ALL')
-                            ORDER BY CASE WHEN location_id = ? THEN 1 ELSE 2 END
-                            LIMIT 1
-                        """, (department_id, target_cat, location_id or "ALL", location_id or "ALL")).fetchone()
-                        if row:
-                            final_priority = row["priority"]
-            except Exception:
-                pass
+                    dept_svc = getattr(self, "department_service", None)
+                    if not dept_svc:
+                        from services.department_service import DepartmentService
+                        dept_svc = DepartmentService(self.auth_service)
+                    eff_priority = dept_svc.resolve_category_priority(department_id, target_cat, location_id)
+                    if eff_priority:
+                        final_priority = eff_priority
+            except Exception as e:
+                logger.warning(
+                    f"Error resolving category priority for department='{department_id}', category='{target_cat}', location='{location_id}': {e}"
+                )
 
         if not final_priority:
             cat_key = (category or "").strip().lower()
