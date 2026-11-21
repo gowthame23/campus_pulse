@@ -651,6 +651,32 @@ class DepartmentService:
                 UNIQUE(department_id, location_id, category_name)
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS location_category_priority_history (
+                id TEXT PRIMARY KEY,
+                department_id TEXT NOT NULL,
+                location_id TEXT NOT NULL,
+                category_name TEXT NOT NULL,
+                old_priority TEXT,
+                new_priority TEXT NOT NULL,
+                changed_by TEXT,
+                changed_at TEXT
+            )
+        """)
+
+    def get_category_priority_history(self, department_id, category_name=None, location_id=None):
+        with self._db_conn() as conn:
+            self._ensure_category_priorities_table(conn)
+            query = "SELECT * FROM location_category_priority_history WHERE department_id = ?"
+            params = [department_id]
+            if location_id:
+                query += " AND location_id = ?"
+                params.append(location_id)
+            if category_name:
+                query += " AND category_name = ?"
+                params.append(category_name.strip())
+            query += " ORDER BY rowid ASC"
+            return [dict(r) for r in conn.execute(query, params).fetchall()]
 
     def get_category_priorities(self, department_id, location_id=None):
         with self._db_conn() as conn:
@@ -682,13 +708,24 @@ class DepartmentService:
         if norm_priority not in allowed:
             raise ValueError(f"Invalid priority '{priority}'. Must be one of: {', '.join(sorted(allowed))}")
         
-        from utils.helper import generate_id, now_string
+        from utils.helper import now_string
         target_loc = location_id if location_id else "ALL"
-        record_id = f"LCP_{department_id}_{target_loc}_{category_name.strip()}"[:60]
+        clean_cat = category_name.strip()
+        record_id = f"LCP_{uuid.uuid4().hex}"
         ts = now_string()
 
         with self._db_conn() as conn:
             self._ensure_category_priorities_table(conn)
+
+            # 1. Fetch existing priority to determine change
+            existing_row = conn.execute("""
+                SELECT priority FROM location_category_priorities
+                WHERE department_id = ? AND location_id = ? AND category_name = ?
+            """, (department_id, target_loc, clean_cat)).fetchone()
+            old_priority = existing_row["priority"] if existing_row else None
+
+            # 2. Upsert using UNIQUE(department_id, location_id, category_name) as arbiter.
+            # This ensures legacy records with old truncated IDs are updated in place, never duplicated.
             conn.execute("""
                 INSERT INTO location_category_priorities (id, department_id, location_id, category_name, priority, updated_by, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -696,7 +733,16 @@ class DepartmentService:
                     priority = excluded.priority,
                     updated_by = excluded.updated_by,
                     updated_at = excluded.updated_at
-            """, (record_id, department_id, target_loc, category_name.strip(), norm_priority, actor_id, ts))
+            """, (record_id, department_id, target_loc, clean_cat, norm_priority, actor_id, ts))
+
+            # 3. Write change history row in same transaction only when priority actually changes
+            if old_priority != norm_priority:
+                hist_id = f"LCPH_{uuid.uuid4().hex}"
+                conn.execute("""
+                    INSERT INTO location_category_priority_history (id, department_id, location_id, category_name, old_priority, new_priority, changed_by, changed_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (hist_id, department_id, target_loc, clean_cat, old_priority, norm_priority, actor_id, ts))
+
             conn.commit()
         return norm_priority
 

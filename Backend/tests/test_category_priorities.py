@@ -130,14 +130,16 @@ def test_category_priorities_api(monkeypatch):
         )
         assert ok_res.status_code == 200, ok_res.text
 
-        # Forbidden for unassigned location
-        unassigned_loc = "LOC_NON_EXISTENT_OR_UNASSIGNED"
-        denied_res = client.put(
-            f"/departments/{first_dept['department_id']}/category-priorities",
-            json={"category_name": "A/C", "priority": "Low", "location_id": unassigned_loc},
-            headers=mgr_headers,
-        )
-        assert denied_res.status_code == 403
+        # Forbidden for unassigned location (must be a valid location the manager is not assigned to)
+        all_locs = auth_svc.list_locations()
+        unassigned_loc = next((l.location_id for l in all_locs if not auth_svc.is_app_manager_assigned("USR_MANAGER", l.location_id)), None)
+        if unassigned_loc:
+            denied_res = client.put(
+                f"/departments/{first_dept['department_id']}/category-priorities",
+                json={"category_name": "A/C", "priority": "Low", "location_id": unassigned_loc},
+                headers=mgr_headers,
+            )
+            assert denied_res.status_code == 403
 
 
 def test_complaint_creation_location_override_wins(monkeypatch):
@@ -383,6 +385,148 @@ def test_feature_flag_enabled_behavior(monkeypatch):
         category="CustomFlagCat",
     )
     assert complaint.priority == "Critical"
+
+
+def test_history_row_written_on_change_and_none_on_noop():
+    department_service = get_department_service()
+    dept_id = "DEPT_HIST_TEST"
+    cat_name = "Water Cooler"
+
+    # Initial set: old_priority is None, new_priority is High
+    department_service.set_category_priority(
+        department_id=dept_id,
+        category_name=cat_name,
+        priority="High",
+        location_id="ALL",
+        actor_id="admin_hist",
+    )
+    hist = department_service.get_category_priority_history(dept_id, category_name=cat_name)
+    assert len(hist) == 1
+    assert hist[0]["old_priority"] is None
+    assert hist[0]["new_priority"] == "High"
+    assert hist[0]["changed_by"] == "admin_hist"
+
+    # Changed priority: High -> Critical
+    department_service.set_category_priority(
+        department_id=dept_id,
+        category_name=cat_name,
+        priority="Critical",
+        location_id="ALL",
+        actor_id="admin_hist_2",
+    )
+    hist2 = department_service.get_category_priority_history(dept_id, category_name=cat_name)
+    assert len(hist2) == 2
+    assert hist2[1]["old_priority"] == "High"
+    assert hist2[1]["new_priority"] == "Critical"
+    assert hist2[1]["changed_by"] == "admin_hist_2"
+
+    # No-op: priority is still Critical
+    department_service.set_category_priority(
+        department_id=dept_id,
+        category_name=cat_name,
+        priority="Critical",
+        location_id="ALL",
+        actor_id="admin_hist_3",
+    )
+    hist3 = department_service.get_category_priority_history(dept_id, category_name=cat_name)
+    assert len(hist3) == 2  # No new row written for no-op!
+
+
+def test_invalid_location_returns_400(monkeypatch):
+    monkeypatch.setenv("CATEGORY_PRIORITY_ENABLED", "true")
+    from fastapi.testclient import TestClient
+    from api.main import app
+    from middleware.rate_limiter import auth_limiter
+
+    auth_limiter._requests.clear()
+    auth_limiter._lockouts.clear()
+    client = TestClient(app)
+
+    admin_res = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
+    assert admin_res.status_code == 200
+    headers = {"Authorization": f"Bearer {admin_res.json()['access_token']}"}
+
+    # Invalid location
+    res = client.put(
+        "/departments/DEPT_MAINT/category-priorities",
+        json={"category_name": "AC", "priority": "High", "location_id": "LOC_DOES_NOT_EXIST_XYZ"},
+        headers=headers,
+    )
+    assert res.status_code == 400
+    assert "does not exist" in res.json()["detail"]
+
+
+def test_long_categories_with_same_60_char_prefix_do_not_collide():
+    department_service = get_department_service()
+    dept_id = "DEPT_COLLISION_TEST"
+    prefix = "VeryLongCategoryNameWithIdenticalInitialPrefixCharacterSeq_" * 2  # >60 chars
+    cat_a = prefix + "_SUFFIX_AAA"
+    cat_b = prefix + "_SUFFIX_BBB"
+
+    department_service.set_category_priority(
+        department_id=dept_id,
+        category_name=cat_a,
+        priority="Low",
+        location_id="ALL",
+        actor_id="admin1",
+    )
+    department_service.set_category_priority(
+        department_id=dept_id,
+        category_name=cat_b,
+        priority="Critical",
+        location_id="ALL",
+        actor_id="admin1",
+    )
+
+    priorities = department_service.get_category_priorities(dept_id)
+    assert priorities.get(cat_a) == "Low"
+    assert priorities.get(cat_b) == "Critical"
+
+
+def test_app_manager_scoping_rules(monkeypatch):
+    monkeypatch.setenv("CATEGORY_PRIORITY_ENABLED", "true")
+    from fastapi.testclient import TestClient
+    from api.main import app
+    from middleware.rate_limiter import auth_limiter
+
+    auth_limiter._requests.clear()
+    auth_limiter._lockouts.clear()
+    client = TestClient(app)
+
+    mgr_res = client.post("/auth/login", json={"username": "manager@example.com", "password": "Manager@123"})
+    assert mgr_res.status_code == 200
+    mgr_headers = {"Authorization": f"Bearer {mgr_res.json()['access_token']}"}
+
+    auth_svc = get_auth_service()
+    mgr_locs = auth_svc.get_app_manager_locations("USR_MANAGER")
+    assert len(mgr_locs) > 0
+    assigned_loc_id = mgr_locs[0].location_id
+
+    all_locs = auth_svc.list_locations()
+    unassigned_loc = next((l for l in all_locs if not auth_svc.is_app_manager_assigned("USR_MANAGER", l.location_id)), None)
+    assert unassigned_loc is not None, "Need at least one unassigned location for test"
+
+    # App Manager cannot change a location they are not assigned to (403)
+    denied = client.put(
+        "/departments/DEPT_MAINT/category-priorities",
+        json={"category_name": "Projector", "priority": "High", "location_id": unassigned_loc.location_id},
+        headers=mgr_headers,
+    )
+    assert denied.status_code == 403
+    assert "not assigned" in denied.json()["detail"].lower()
+
+    # App Manager with 'ALL' only affects their own assigned locations
+    all_res = client.put(
+        "/departments/DEPT_MAINT/category-priorities",
+        json={"category_name": "Projector", "priority": "Critical", "location_id": "ALL"},
+        headers=mgr_headers,
+    )
+    assert all_res.status_code == 200
+    updated_loc_ids = [u["location_id"] for u in all_res.json()["updated_locations"]]
+    mgr_loc_ids = [l.location_id for l in mgr_locs]
+    assert set(updated_loc_ids) == set(mgr_loc_ids)
+    assert unassigned_loc.location_id not in updated_loc_ids
+
 
 
 

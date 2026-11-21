@@ -563,6 +563,14 @@ def update_department_category_priority(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found.")
 
     target_loc = (payload.location_id or "ALL").strip()
+    if target_loc != "ALL":
+        loc = auth_service.get_location(target_loc)
+        if not loc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Location '{target_loc}' does not exist.",
+            )
+
     user_role = (current_user.role or "").lower()
 
     if user_role == AppManager.ROLE.lower():
