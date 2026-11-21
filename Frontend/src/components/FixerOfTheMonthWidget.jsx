@@ -42,7 +42,7 @@ export default function FixerOfTheMonthWidget({ scope = "campus" }) {
   const leaderboard = data.leaderboard || [];
 
   return (
-    <Card className="p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border-amber-200/80 dark:border-amber-800/60 relative overflow-hidden">
+    <Card className="p-4 bg-amber-50/70 dark:bg-amber-950/20 border-amber-200/80 dark:border-amber-800/60 relative overflow-hidden">
       <div className="absolute top-2 right-2 opacity-10 dark:opacity-5 pointer-events-none">
         <Trophy className="h-32 w-32 text-amber-500" />
       </div>

@@ -456,7 +456,7 @@ export default function PublicComplaintsPage() {
             </button>
           )}
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 dark:bg-teal-950/50 text-teal-700 dark:text-teal-400">
               <Globe className="h-5 w-5" />
             </div>
             <div>
@@ -662,7 +662,7 @@ export default function PublicComplaintsPage() {
                       <div className="space-y-1 text-xs text-slate-600">
                         <div className="flex justify-between">
                           <span>Affected Students:</span>
-                          <strong className="text-indigo-600">
+                          <strong className="text-teal-700">
                             {loc.affectedCount}
                           </strong>
                         </div>
@@ -712,7 +712,7 @@ export default function PublicComplaintsPage() {
                   <div className="space-y-1 text-xs text-slate-600">
                     <div className="flex justify-between">
                       <span>Affected Students:</span>
-                      <strong className="text-indigo-600">
+                      <strong className="text-teal-700">
                         {dept.affectedCount}
                       </strong>
                     </div>
@@ -768,12 +768,12 @@ export default function PublicComplaintsPage() {
                       </div>
                       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
                         <span className="font-semibold text-slate-700">
-                          Type: <strong className="text-indigo-700">{c.category || c.complaint_type || "General Issue"}</strong>
+                          Type: <strong className="text-teal-800">{c.category || c.complaint_type || "General Issue"}</strong>
                         </span>
                         <span>•</span>
                         <span>
                           Affected Students:{" "}
-                          <strong className="text-indigo-600">
+                          <strong className="text-teal-700">
                             {c.affected_count || 1}
                           </strong>
                         </span>
@@ -824,7 +824,7 @@ export default function PublicComplaintsPage() {
                     <span>•</span>
                     <span>
                       Affected Students:{" "}
-                      <strong className="text-indigo-600">
+                      <strong className="text-teal-700">
                         {selectedComplaint.affected_count || 1}
                       </strong>
                     </span>
@@ -866,7 +866,7 @@ export default function PublicComplaintsPage() {
                 </div>
                 <div>
                   <span className="text-slate-400 font-semibold block">Type / Issue</span>
-                  <span className="font-bold text-indigo-700">
+                  <span className="font-bold text-teal-800">
                     {selectedComplaint.category || selectedComplaint.complaint_type || "General Issue"}
                   </span>
                 </div>
@@ -944,7 +944,7 @@ export default function PublicComplaintsPage() {
                     onClick={handleFollowToggle}
                     className={`flex items-center gap-2 rounded-xl border px-5 py-2.5 text-xs font-bold transition-all ${
                       following
-                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                        ? "border-indigo-500 bg-indigo-50 text-teal-800"
                         : "border-slate-300 text-slate-700 hover:bg-slate-50"
                     }`}
                   >

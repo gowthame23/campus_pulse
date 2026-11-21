@@ -82,14 +82,14 @@ export default function StageTimeline({ complaint }) {
 
   if (isOtherTriage) {
     return (
-      <div className="rounded-xl border border-purple-200/80 dark:border-purple-800/60 bg-purple-50/50 dark:bg-purple-950/20 p-3 shadow-xs flex items-center justify-between flex-wrap gap-2">
+      <div className="rounded-xl border border-teal-200/80 dark:border-teal-800/60 bg-teal-50/60 dark:bg-teal-950/20 p-3 shadow-xs flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse" />
-          <span className="text-xs font-bold text-purple-900 dark:text-purple-200">
+          <span className="w-2.5 h-2.5 rounded-full bg-teal-600 animate-pulse" />
+          <span className="text-xs font-bold text-teal-900 dark:text-teal-200">
             Admin Triage & Review
           </span>
         </div>
-        <span className="text-[11px] text-purple-700 dark:text-purple-300 font-medium">
+        <span className="text-[11px] text-teal-700 dark:text-teal-300 font-medium">
           No SLA • Directly Routed to Administration
         </span>
       </div>
@@ -170,7 +170,7 @@ export default function StageTimeline({ complaint }) {
               <span
                 className={`mt-1.5 text-xs font-bold tracking-tight ${
                   isAct
-                    ? "text-primary dark:text-blue-400 font-extrabold"
+                    ? "text-primary dark:text-teal-400 font-extrabold"
                     : isComp
                     ? "text-slate-900 dark:text-slate-100 font-semibold"
                     : "text-slate-400 dark:text-slate-500"

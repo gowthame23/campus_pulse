@@ -2,24 +2,24 @@
 @config "../tailwind.config.js";
 
 :root {
-  /* Light Theme Colors - Calm & Professional Neutral Palette */
+  /* Light Theme Colors - Modern Institutional Nordic Slate & Verdigris */
   --ink: #0f172a; /* Slate 900 */
-  --muted: #64748b; /* Slate 500 */
+  --muted: #475569; /* Slate 600 */
   --page: #f8fafc; /* Slate 50 */
   --surface: #ffffff;
   --surface-raised: #f1f5f9; /* Slate 100 */
   --border: #e2e8f0; /* Slate 200 */
 
-  /* Semantic Status Accents (Restrained & Muted) */
+  /* Semantic Status Accents (Clean Solid & High Contrast) */
   --success: #059669; /* Emerald 600 */
-  --danger: #e11d48; /* Rose 600 */
+  --danger: #dc2626; /* Crimson Red 600 */
   --warning: #d97706; /* Amber 600 */
-  --info: #2563eb; /* Blue 600 */
+  --info: #0284c7; /* Sky 600 */
   --orange: #ea580c; /* Orange 600 */
 
-  /* Primary Accent - Authoritative Calm Slate Blue */
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
+  /* Primary Accent - Authoritative Verdigris / Deep Pine Teal */
+  --primary: #0f766e; /* Teal 700 */
+  --primary-hover: #115e59; /* Teal 800 */
 
   /* Typography & Rendering */
   font-family:
@@ -38,24 +38,24 @@
 
 :root.dark,
 html.dark {
-  /* Dark Theme Colors - Restful Deep Slate (Anti-glare for long hours) */
+  /* Dark Theme Colors - Velvety Obsidian & Graphite Charcoal */
   --ink: #f8fafc; /* Slate 50 */
   --muted: #94a3b8; /* Slate 400 */
-  --page: #090d16; /* Deep Neutral Slate */
-  --surface: #101726; /* Charcoal Slate */
-  --surface-raised: #182234; /* Elevated Slate */
+  --page: #0b0f17; /* Deep Obsidian */
+  --surface: #111827; /* Graphite Charcoal */
+  --surface-raised: #1f2937; /* Elevated Surface */
   --border: #1e293b; /* Subtle Slate 800 */
 
-  /* Dark Theme Semantic Colors (Comfortable Glow-free) */
+  /* Dark Theme Semantic Colors (High Readability Glow-free) */
   --success: #10b981; /* Emerald 500 */
-  --danger: #f43f5e; /* Rose 500 */
+  --danger: #ef4444; /* Crimson Red 500 */
   --warning: #f59e0b; /* Amber 500 */
-  --info: #3b82f6; /* Blue 500 */
+  --info: #38bdf8; /* Sky 400 */
   --orange: #f97316; /* Orange 500 */
 
-  /* Primary Accent for Dark Mode */
-  --primary: #3b82f6;
-  --primary-hover: #60a5fa;
+  /* Primary Accent for Dark Mode - Luminous Crisp Verdigris */
+  --primary: #14b8a6; /* Teal 500 */
+  --primary-hover: #2dd4bf; /* Teal 400 */
 }
 
 * {
@@ -92,7 +92,7 @@ body {
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: #475569; /* Slate 600 */
+  background: #334155; /* Slate 700 */
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -100,7 +100,7 @@ body {
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #64748b; /* Slate 500 */
+  background: #475569; /* Slate 600 */
 }
 
 /* Modern inputs, buttons, and select styling */
@@ -143,7 +143,7 @@ select option {
 :root.dark select option,
 html.dark select option,
 .dark option {
-  background-color: #0f172a !important;
+  background-color: #111827 !important;
   color: #f8fafc !important;
 }
 

@@ -127,7 +127,7 @@ export default function SuperAdminDashboard() {
                 </div>
                 <div className="flex justify-between items-center py-1.5">
                   <span className="text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                    <Shield className="w-3.5 h-3.5 text-indigo-500" /> Operational Data Boundary
+                    <Shield className="w-3.5 h-3.5 text-teal-600" /> Operational Data Boundary
                   </span>
                   <Badge tone="success">Isolated</Badge>
                 </div>
@@ -137,7 +137,7 @@ export default function SuperAdminDashboard() {
             <Card className="!p-5">
               <div className="pb-3 border-b border-slate-100 dark:border-slate-800 mb-3">
                 <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-indigo-500" />
+                  <Shield className="h-4 w-4 text-teal-600" />
                   Data Privacy & Boundary Scope
                 </h2>
               </div>

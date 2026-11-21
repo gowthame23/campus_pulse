@@ -1154,7 +1154,7 @@ export default function UserManagementPage() {
                 setStatusModalUser(row);
                 setSelectedLifecycleStatus(row.status || (isUserActive ? "Active" : "Inactive"));
               }}
-              className="!h-8 px-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+              className="!h-8 px-2 text-xs font-bold text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950/40"
               title="Manage Student Lifecycle Status (Graduated, Transferred, etc.)"
             >
               <GraduationCap className="h-4 w-4" />
@@ -1349,7 +1349,7 @@ export default function UserManagementPage() {
               <span
                 className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold ${
                   isAppMgr
-                    ? "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/50"
+                    ? "bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/50"
                     : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/50"
                 }`}
               >
@@ -1379,9 +1379,9 @@ export default function UserManagementPage() {
             }
 
             const btnTheme = isAppMgr
-              ? "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 border-indigo-200/50 dark:border-indigo-800/50"
+              ? "bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-indigo-300 hover:bg-indigo-100 border-indigo-200/50 dark:border-indigo-800/50"
               : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 border-amber-200/50 dark:border-amber-800/50";
-            const iconColor = isAppMgr ? "text-indigo-500" : "text-amber-500";
+            const iconColor = isAppMgr ? "text-teal-600" : "text-amber-500";
 
             return (
               <button
@@ -1581,10 +1581,10 @@ export default function UserManagementPage() {
               <button
                 type="button"
                 onClick={() => openManageLocationsModal(row)}
-                className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-all border border-indigo-200/50 dark:border-indigo-800/50 shadow-sm text-left"
+                className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-all border border-indigo-200/50 dark:border-indigo-800/50 shadow-sm text-left"
                 title="Click to view or edit managed locations"
               >
-                <MapPin className="h-3.5 w-3.5 text-indigo-500 shrink-0 group-hover:scale-110 transition-transform" />
+                <MapPin className="h-3.5 w-3.5 text-teal-600 shrink-0 group-hover:scale-110 transition-transform" />
                 <span>{locNames.length > 0 ? (locNames.length <= 2 ? locNames.join(", ") : `${locNames.length} Locations Managed`) : "Assign Locations"}</span>
                 <Edit2 className="h-3 w-3 ml-0.5 opacity-60 group-hover:opacity-100" />
               </button>
@@ -2202,7 +2202,7 @@ export default function UserManagementPage() {
                                         setCopiedLinkIndex(idx);
                                         setTimeout(() => setCopiedLinkIndex(null), 2000);
                                       }}
-                                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900"
+                                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-600 dark:text-indigo-400 hover:underline px-2 py-0.5 rounded bg-teal-50 dark:bg-teal-950/40 border border-indigo-200 dark:border-indigo-900"
                                       title={item.activation_link}
                                     >
                                       {copiedLinkIndex === idx ? (
@@ -2449,7 +2449,7 @@ export default function UserManagementPage() {
                 variant="subtle"
                 size="sm"
                 onClick={() => setShowStaffImportModal(true)}
-                className="h-10 text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1 shrink-0"
+                className="h-10 text-xs font-bold text-teal-600 dark:text-indigo-400 flex items-center gap-1 shrink-0"
                 title="Bulk Import Staff"
               >
                 <Upload className="h-3.5 w-3.5" /> Import Staff
@@ -3371,7 +3371,7 @@ export default function UserManagementPage() {
           <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <GraduationCap className="h-5 w-5 text-indigo-500" />
+                <GraduationCap className="h-5 w-5 text-teal-600" />
                 Student Lifecycle Status
               </h3>
               <button
@@ -3525,7 +3525,7 @@ export default function UserManagementPage() {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-indigo-500" />
+                  <Shield className="h-5 w-5 text-teal-600" />
                   Edit Responsibility & Role
                 </h3>
                 <p className="text-[11px] text-slate-500 mt-0.5">

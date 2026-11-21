@@ -453,10 +453,10 @@ export default function AdminDashboard() {
           <div className="space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-slate-200/80 dark:border-slate-800/80">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                <Scale className="h-3.5 w-3.5 text-purple-600" />
+                <Scale className="h-3.5 w-3.5 text-teal-600" />
                 Admin Review Queue (Disputes)
               </h2>
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300">
                 {adminReviewComplaints.length} Pending
               </span>
             </div>
@@ -472,7 +472,7 @@ export default function AdminDashboard() {
                     key={c.complaint_id}
                     variants={listItem}
                     whileHover={{ y: -2 }}
-                    className="p-3.5 rounded-xl border border-purple-200 dark:border-purple-900/60 bg-purple-50/50 dark:bg-purple-950/20 text-xs space-y-2"
+                    className="p-3.5 rounded-xl border border-teal-200 dark:border-teal-900/60 bg-teal-50/50 dark:bg-teal-950/20 text-xs space-y-2"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <Link
@@ -489,7 +489,7 @@ export default function AdminDashboard() {
                       <span>•</span>
                       <span>{getLocationName(c.location_id, locations)}</span>
                       <span>•</span>
-                      <span className="text-purple-700 font-semibold">
+                      <span className="text-teal-700 font-semibold">
                         Reopened {c.reopen_count || 3} times
                       </span>
                     </div>
@@ -665,7 +665,7 @@ export default function AdminDashboard() {
           title={`Admin Review: ${reviewTarget.complaint_id}`}
         >
           <form onSubmit={handleReviewDecisionSubmit} className="space-y-4">
-            <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-xs space-y-1">
+            <div className="p-3 rounded-xl bg-teal-50 dark:bg-teal-950/40 text-xs space-y-1">
               <div className="font-bold text-slate-900 dark:text-slate-100">
                 {reviewTarget.title}
               </div>

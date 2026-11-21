@@ -312,7 +312,7 @@ export default function TeamsManagementPage() {
               <Button
                 variant="outline"
                 onClick={() => setShowBulkImport(true)}
-                className="flex items-center gap-1.5 text-xs font-bold border-indigo-200 text-indigo-700 dark:border-indigo-800 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+                className="flex items-center gap-1.5 text-xs font-bold border-teal-200 text-teal-800 dark:border-teal-800 dark:text-teal-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
               >
                 <Upload className="h-4 w-4" />
                 Bulk Import Teams

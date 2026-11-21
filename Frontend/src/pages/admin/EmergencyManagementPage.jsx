@@ -444,7 +444,7 @@ export default function EmergencyManagementPage() {
                     <td className="py-3 px-3 text-slate-600 dark:text-slate-300">{cnt.department_name || "All"}</td>
                     <td className="py-3 px-3 text-slate-600 dark:text-slate-300">
                       {cnt.location_name ? (
-                        <span className="font-semibold text-purple-700 dark:text-purple-300">
+                        <span className="font-semibold text-rose-700 dark:text-rose-300">
                           {cnt.location_name}
                         </span>
                       ) : (
@@ -519,7 +519,7 @@ export default function EmergencyManagementPage() {
 
             <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
               <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-indigo-600" />
+                <Clock className="h-4 w-4 text-rose-600" />
                 Night Hours Window
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">

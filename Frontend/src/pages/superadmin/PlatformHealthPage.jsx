@@ -60,7 +60,7 @@ export default function PlatformHealthPage() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center py-2 border-b dark:border-gray-800">
                   <span className="text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                    <Activity className="w-5 h-5 text-indigo-500" /> Overall Status
+                    <Activity className="w-5 h-5 text-emerald-500" /> Overall Status
                   </span>
                   <Badge tone={health.application_status === "Healthy" ? "success" : "danger"}>
                     {health.application_status}
@@ -78,7 +78,7 @@ export default function PlatformHealthPage() {
 
                 <div className="flex justify-between items-center py-2 border-b dark:border-gray-800">
                   <span className="text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                    <Database className="w-5 h-5 text-purple-500" /> Database Connection
+                    <Database className="w-5 h-5 text-teal-600" /> Database Connection
                   </span>
                   <span className="flex items-center gap-1.5 text-sm font-semibold text-green-600">
                     <CheckCircle2 className="w-4 h-4" /> Connected
@@ -112,7 +112,7 @@ export default function PlatformHealthPage() {
 
                 <div className="flex justify-between items-center py-2 border-b dark:border-gray-800">
                   <span className="text-gray-600 dark:text-gray-400">Environment</span>
-                  <span className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+                  <span className="text-sm font-semibold text-teal-600 dark:text-teal-400">
                     {version.environment}
                   </span>
                 </div>

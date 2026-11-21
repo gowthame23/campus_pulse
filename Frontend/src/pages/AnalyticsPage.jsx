@@ -286,13 +286,13 @@ export default function AnalyticsPage() {
           </div>
         </Card>
 
-        <Card className="flex flex-col justify-between border-l-4 border-l-indigo-500">
+        <Card className="flex flex-col justify-between border-l-4 border-l-teal-500">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                 Community Voice
               </span>
-              <Award className="h-5 w-5 text-indigo-500" />
+              <Award className="h-5 w-5 text-teal-600" />
             </div>
             <div className="text-3xl font-extrabold text-slate-900 mt-2">
               {analytics?.community_total || 0}
@@ -302,7 +302,7 @@ export default function AnalyticsPage() {
             </p>
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between text-xs font-semibold">
-            <span className="text-indigo-600">Affected Count Tracked</span>
+            <span className="text-teal-700">Affected Count Tracked</span>
           </div>
         </Card>
       </div>

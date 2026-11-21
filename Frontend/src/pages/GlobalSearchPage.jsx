@@ -154,11 +154,11 @@ export default function GlobalSearchPage() {
       case "WorkOrder":
         return <Wrench className="h-4 w-4 text-sky-500" />;
       case "Visitor":
-        return <UserCheck className="h-4 w-4 text-indigo-500" />;
+        return <UserCheck className="h-4 w-4 text-teal-600" />;
       case "Asset":
         return <Box className="h-4 w-4 text-emerald-500" />;
       case "Announcement":
-        return <Megaphone className="h-4 w-4 text-purple-500" />;
+        return <Megaphone className="h-4 w-4 text-amber-600" />;
       case "Audit":
         return <ShieldAlert className="h-4 w-4 text-rose-500" />;
       default:

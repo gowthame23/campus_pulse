@@ -235,7 +235,7 @@ export default function ProfilePage() {
                   <button
                     type="button"
                     onClick={() => cameraInputRef.current?.click()}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all shadow-xs active:scale-95"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-lg transition-all shadow-xs active:scale-95"
                   >
                     <Camera className="h-4 w-4" />
                     Take Photo with Camera

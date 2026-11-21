@@ -322,8 +322,8 @@ export default function LocationDashboard() {
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
               Good morning, {user?.name || "Warden"}
             </h1>
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-              <Building className="h-3 w-3 inline mr-1 text-purple-600" />
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+              <Building className="h-3 w-3 inline mr-1 text-teal-600 dark:text-teal-400" />
               {locationTitle}
             </span>
           </div>
@@ -355,7 +355,7 @@ export default function LocationDashboard() {
               const el = document.getElementById("verification-section");
               if (el) el.scrollIntoView({ behavior: "smooth" });
             }}
-            tone="purple"
+            tone="teal"
           />
         </motion.div>
         <motion.div variants={listItem}>
@@ -414,9 +414,9 @@ export default function LocationDashboard() {
             </div>
           )}
           {photoSkipComplaints.length > 0 && (
-            <div className="p-3 rounded-xl border border-purple-200 dark:border-purple-900 bg-purple-50/70 dark:bg-purple-950/30 text-purple-900 dark:text-purple-200 text-xs font-semibold flex items-center justify-between">
+            <div className="p-3 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/70 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 text-xs font-semibold flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <ImageIcon className="h-4 w-4 text-purple-600 shrink-0" />
+                <ImageIcon className="h-4 w-4 text-amber-600 shrink-0" />
                 📸 {photoSkipComplaints.length} complaint(s) with skipped photos or active skip streaks.
               </span>
             </div>
@@ -453,17 +453,17 @@ export default function LocationDashboard() {
       </div>
 
       {/* Needs My Verification Section */}
-      <div id="verification-section" className="rounded-xl border border-purple-200/80 dark:border-purple-900/60 bg-white dark:bg-[#101726] shadow-xs overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-purple-100 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20 flex flex-wrap items-center justify-between gap-3">
+      <div id="verification-section" className="rounded-xl border border-teal-200/80 dark:border-teal-900/60 bg-white dark:bg-[#111827] shadow-xs overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-teal-100 dark:border-teal-900/40 bg-teal-50/40 dark:bg-teal-950/20 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">
+            <div className="p-2 rounded-xl bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300">
               <UserCheck className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-purple-950 dark:text-purple-100">
+              <h2 className="text-sm font-bold text-teal-950 dark:text-teal-100">
                 Needs My Verification ({needsMyVerificationComplaints.length})
               </h2>
-              <p className="text-xs text-purple-800/80 dark:text-purple-300/80">
+              <p className="text-xs text-teal-800/80 dark:text-teal-300/80">
                 Complaints marked fixed by coordinators that require your physical in-person inspection.
               </p>
             </div>
@@ -515,7 +515,7 @@ export default function LocationDashboard() {
                             {c.priority || "Medium"}
                           </Badge>
                           {c.is_spot_check && (
-                            <Badge tone="purple">Spot Check (~10%)</Badge>
+                            <Badge tone="teal">Spot Check (~10%)</Badge>
                           )}
                         </div>
                         <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
@@ -612,7 +612,7 @@ export default function LocationDashboard() {
       </div>
 
       {/* Facility Watch List Section (Rule K4) */}
-      <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#101726] shadow-xs overflow-hidden">
+      <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#111827] shadow-xs overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">

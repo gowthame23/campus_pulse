@@ -959,7 +959,7 @@ export default function DepartmentManagementPage() {
         if (isOther) {
           return (
             <div className="py-1">
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
                 <Shield className="h-3 w-3" /> Admin Triage
               </span>
               <p className="text-[10px] text-slate-400 mt-0.5">Automated to Admin</p>
@@ -1140,7 +1140,7 @@ export default function DepartmentManagementPage() {
                 variant="subtle"
                 size="sm"
                 onClick={() => openWorkforceModal(row)}
-                className="!p-1.5 text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                className="!p-1.5 text-teal-600 hover:text-teal-700 dark:text-teal-400"
                 title="View Eligible Workforce"
               >
                 <Users className="h-3.5 w-3.5" />
@@ -1270,7 +1270,7 @@ export default function DepartmentManagementPage() {
         if (isOther) {
           return (
             <div className="py-1">
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
                 <Shield className="h-3 w-3" /> Admin Triage
               </span>
               <p className="text-[10px] text-slate-400 mt-0.5">Automated to Admin</p>
@@ -1407,7 +1407,7 @@ export default function DepartmentManagementPage() {
                 variant="subtle"
                 size="sm"
                 onClick={() => openWorkforceModal(row)}
-                className="!p-1.5 text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                className="!p-1.5 text-teal-600 hover:text-teal-700 dark:text-teal-400"
                 title="View Eligible Workforce"
               >
                 <Users className="h-4 w-4" />
