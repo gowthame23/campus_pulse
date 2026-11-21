@@ -20,35 +20,39 @@ class PlatformService:
         return conn
 
     def ensure_seed_institutions(self):
-        with self._connect() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) as count FROM institutions")
-            row = cursor.fetchone()
-            if row["count"] == 0:
-                now = now_string()
-                cursor.execute(
-                    """
-                    INSERT INTO institutions (
-                        institution_id, name, code, status, admin_name, admin_email,
-                        contact_info, application_version, deployment_id, created_at, last_health_check
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        "INST_ABC",
-                        "ABC Institute of Technology",
-                        "ABC",
-                        "Active",
-                        "Administrator",
-                        "admin@campuspulse.edu",
-                        "+91-9876543210",
-                        self.PLATFORM_VERSION,
-                        self.DEPLOYMENT_ID,
-                        now,
-                        now,
-                    ),
-                )
-                conn.commit()
-                logger.info("Seeded default institution metadata: INST_ABC")
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) as count FROM institutions")
+                row = cursor.fetchone()
+                if row["count"] == 0:
+                    now = now_string()
+                    cursor.execute(
+                        """
+                        INSERT INTO institutions (
+                            institution_id, name, code, status, admin_name, admin_email,
+                            contact_info, application_version, deployment_id, created_at, last_health_check
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            "INST_ABC",
+                            "ABC Institute of Technology",
+                            "ABC",
+                            "Active",
+                            "Administrator",
+                            "admin@campuspulse.edu",
+                            "+91-9876543210",
+                            self.PLATFORM_VERSION,
+                            self.DEPLOYMENT_ID,
+                            now,
+                            now,
+                        ),
+                    )
+                    conn.commit()
+                    logger.info("Seeded default institution metadata: INST_ABC")
+        except sqlite3.OperationalError:
+            # Database or table not initialized yet (e.g. before migrations)
+            return
 
     def get_platform_dashboard(self):
         with self._connect() as conn:

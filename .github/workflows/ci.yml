@@ -28,5 +28,7 @@ jobs:
 
       - name: Run test suite
         working-directory: ./Backend
+        env:
+          PYTHONPATH: .
         run: |
           python -m pytest tests -v
