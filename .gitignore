@@ -68,3 +68,8 @@ test_run_*.txt
 # Local session notes
 /session.md
 /docs/SESSION_LOG.md
+
+# Keep documents and presentations local only
+*.pdf
+*.pptx
+*.ppt
