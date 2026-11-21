@@ -190,6 +190,11 @@ async def rate_limit_middleware(request: Request, call_next):
                                 f"LOGIN RATE LIMITED | IP: {client_ip} | Account: {username} | "
                                 f"Lockout remaining: {remaining}s"
                             )
+                            resp_headers = {"Retry-After": str(remaining)}
+                            origin = request.headers.get("origin")
+                            if origin:
+                                resp_headers["Access-Control-Allow-Origin"] = origin
+                                resp_headers["Access-Control-Allow-Credentials"] = "true"
                             from fastapi.responses import JSONResponse
 
                             return JSONResponse(
@@ -198,7 +203,7 @@ async def rate_limit_middleware(request: Request, call_next):
                                     "detail": f"Too many failed login attempts. Account temporarily locked. Try again in {max(1, remaining // 60)} minute(s).",
                                     "retry_after": remaining,
                                 },
-                                headers={"Retry-After": str(remaining)},
+                                headers=resp_headers,
                             )
             except Exception:
                 pass
@@ -218,6 +223,11 @@ async def rate_limit_middleware(request: Request, call_next):
                 f"Lockout remaining: {remaining_lockout}s"
             )
 
+            resp_headers = {"Retry-After": str(remaining_lockout)}
+            origin = request.headers.get("origin")
+            if origin:
+                resp_headers["Access-Control-Allow-Origin"] = origin
+                resp_headers["Access-Control-Allow-Credentials"] = "true"
             from fastapi.responses import JSONResponse
 
             return JSONResponse(
@@ -226,7 +236,7 @@ async def rate_limit_middleware(request: Request, call_next):
                     "detail": f"Too many requests. Temporary lockout active. Try again in {max(1, remaining_lockout // 60)} minute(s).",
                     "retry_after": remaining_lockout,
                 },
-                headers={"Retry-After": str(remaining_lockout)},
+                headers=resp_headers,
             )
 
     response = await call_next(request)
