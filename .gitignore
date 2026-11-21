@@ -84,3 +84,8 @@ pdf_preview/
 # Local test suites kept local only
 Backend/tests/
 Backend/pytest.ini
+
+# Keep documents and presentations local only
+*.pdf
+*.pptx
+*.ppt
