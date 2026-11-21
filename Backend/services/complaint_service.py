@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 from datetime import datetime, timedelta
@@ -22,6 +23,7 @@ from core.constants import (
     STATUS_ASSIGNED,
     STATUS_RAISED,
     STATUS_GOING_ON,
+    is_category_priority_enabled,
     STATUS_FIXED,
     STATUS_AUTO_CLOSED,
     STATUS_BLOCKED,
@@ -42,6 +44,8 @@ from models.student import Student
 from storage.sqlite_repository import SQLiteRepository
 from utils.helper import now, now_string, parse_date
 
+logger = logging.getLogger(__name__)
+
 
 class ComplaintConflictError(Exception):
     """Raised when an atomic operation conflicts with existing complaint state."""
@@ -50,10 +54,11 @@ class ComplaintConflictError(Exception):
 
 class ComplaintService:
     def __init__(
-        self, auth_service, notification_service, db_path="storage/campus_pulse.db", team_service=None
+        self, auth_service, notification_service, db_path="storage/campus_pulse.db", team_service=None, department_service=None
     ):
         self.auth_service = auth_service
         self.notification_service = notification_service
+        self.department_service = department_service
         self.repository = SQLiteRepository(db_path, {"complaints": []})
         from services.config_service import ConfigService
 
@@ -327,6 +332,22 @@ class ComplaintService:
             except Exception as e:
                 if isinstance(e, ValueError):
                     raise e
+
+        if not final_priority and department_id and is_category_priority_enabled():
+            try:
+                target_cat = (category or complaint_type or "").strip()
+                if target_cat:
+                    dept_svc = getattr(self, "department_service", None)
+                    if not dept_svc:
+                        from services.department_service import DepartmentService
+                        dept_svc = DepartmentService(self.auth_service)
+                    eff_priority = dept_svc.resolve_category_priority(department_id, target_cat, location_id)
+                    if eff_priority:
+                        final_priority = eff_priority
+            except Exception as e:
+                logger.warning(
+                    f"Error resolving category priority for department='{department_id}', category='{target_cat}', location='{location_id}': {e}"
+                )
 
         if not final_priority:
             cat_key = (category or "").strip().lower()

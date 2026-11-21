@@ -244,3 +244,14 @@ EMERGENCY_OUTCOME_REAL = "real"
 EMERGENCY_OUTCOME_MISTAKE = "mistake"
 EMERGENCY_OUTCOME_MISUSE = "misuse"
 
+
+def is_category_priority_enabled() -> bool:
+    """Check if category priority badges and overrides feature is enabled.
+    Single source of truth for the CATEGORY_PRIORITY_ENABLED setting.
+    Defaults to False. Enable by setting CATEGORY_PRIORITY_ENABLED to 'true', '1', or 'yes'.
+    """
+    import os
+    val = os.getenv("CATEGORY_PRIORITY_ENABLED", "false").strip().lower()
+    return val in ("true", "1", "yes")
+
+

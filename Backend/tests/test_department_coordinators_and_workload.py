@@ -34,7 +34,7 @@ def login(username, password):
 
 
 def test_department_coordinators_retrieval_and_eligibility():
-    admin_hdr = login("gowthamejjurothu@gmail.com", "Admin@123")
+    admin_hdr = login("admin@example.com", "Admin@123")
 
     # Set up baseline department coordinators
     client.put(
@@ -78,7 +78,7 @@ def test_department_coordinators_retrieval_and_eligibility():
 
 
 def test_department_coordinator_rules_and_multi_department_support():
-    admin_hdr = login("gowthamejjurothu@gmail.com", "Admin@123")
+    admin_hdr = login("admin@example.com", "Admin@123")
 
     # 1. Reject same person as both Coordinator 1 and Coordinator 2 in same department
     res = client.put(

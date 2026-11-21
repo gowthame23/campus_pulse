@@ -4,6 +4,10 @@ __pycache__/
 .venv/
 venv/
 .env
+.env.*
+*.env
+!.env.example
+!Backend/.env.example
 .pytest_cache/
 .pytest_tmp/
 Backend/.pytest_tmp/
@@ -58,3 +62,7 @@ CampusPulse_Idea_Blueprint.pptx
 Backend/test_run_*.txt
 test_run_*.txt
 
+
+# Local session notes
+/session.md
+/docs/SESSION_LOG.md

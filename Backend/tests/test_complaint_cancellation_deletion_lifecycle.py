@@ -18,7 +18,7 @@ def _login(username, password):
 
 @pytest.fixture(scope="module")
 def admin_headers():
-    return _login("gowthamejjurothu@gmail.com", "Admin@123")
+    return _login("admin@example.com", "Admin@123")
 
 @pytest.fixture(scope="module")
 def coord_headers():

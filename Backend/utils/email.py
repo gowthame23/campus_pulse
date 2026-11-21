@@ -114,7 +114,7 @@ def _send_via_brevo(to_email: str, subject: str, html_content: str, plain_text: 
         os.environ.get("BREVO_SENDER_EMAIL")
         or os.environ.get("SMTP_FROM")
         or os.environ.get("SMTP_USERNAME")
-        or "gowthamejjurothu1@gmail.com"
+        or "noreply@campuspulse.edu"
     ).strip()
     sender_name = (os.environ.get("SMTP_FROM_NAME") or "Campus Pulse").strip()
 
@@ -266,6 +266,12 @@ def _send_via_smtp(to_email: str, subject: str, html_content: str, plain_text: s
 def _dispatch_email(to_email: str, subject: str, html_content: str, plain_text: str = "") -> bool:
     """Dispatches email across available providers: Brevo HTTPS -> Resend HTTPS -> Standard SMTP."""
     global _last_email_error
+
+    # Local Email Mode: Bypasses Brevo / external SMTP to keep emails local during testing and development
+    # Defaults to false in production to ensure real emails are dispatched.
+    if os.environ.get("USE_LOCAL_EMAIL", "false").lower() in ("true", "1", "yes"):
+        logger.warning(f"[LOCAL EMAIL] USE_LOCAL_EMAIL is enabled: emails are NOT being sent! To: {to_email} | Subject: {subject}")
+        return True
 
     # 1. Brevo HTTPS API (Port 443 - zero credit card, 300 free emails/day)
     if (os.environ.get("BREVO_API_KEY") or "").strip():

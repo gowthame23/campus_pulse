@@ -52,10 +52,7 @@ def app_mgr_headers():
 
 @pytest.fixture(scope="module")
 def coord_headers():
-    try:
-        return _login("gowthamejjurothu15@gmail.com", "Coord@123")
-    except Exception:
-        return _login("coordinator@example.com", "Coord@123")
+    return _login("coordinator@example.com", "Coord@123")
 
 
 @pytest.fixture(scope="module")

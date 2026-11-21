@@ -43,7 +43,7 @@ Following the revert, the full test suite was executed in a single run (`python 
 ---
 
 ## 5. Personal Information (PII) Scrub
-- Removed personal email `gowthamejjurothu@gmail.com` from:
+- Removed personal email `[REDACTED_ADMIN_EMAIL]` from:
   - `CampusPulse_co/README.md` (lines 26 and 65) -> replaced with `superadmin@campuspulse.edu`.
   - `CampusPulse_co/README.md` clone URL -> replaced with generic repository path.
   - `CampusPulse_co/Backend/README.md` (line 36) -> replaced with `admin@campuspulse.edu`.

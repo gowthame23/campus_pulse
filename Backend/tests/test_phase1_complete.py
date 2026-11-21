@@ -11,7 +11,7 @@ if ROOT not in sys.path:
 from fastapi.testclient import TestClient
 from api.main import app
 from middleware.rate_limiter import auth_limiter
-from core.constants import PRESET_PROGRESS_NOTES, STATUS_IN_PROGRESS, STATUS_BLOCKED
+from core.constants import PRESET_PROGRESS_NOTES, STATUS_IN_PROGRESS, STATUS_BLOCKED, STATUS_SUBMITTED
 
 client = TestClient(app)
 
@@ -36,18 +36,12 @@ def admin_headers():
 
 @pytest.fixture(scope="module")
 def app_mgr_headers():
-    try:
-        return _login("ejjurothugowtham@gmail.com", "Manager@123")
-    except Exception:
-        return _login("manager@example.com", "Manager@123")
+    return _login("manager@example.com", "Manager@123")
 
 
 @pytest.fixture(scope="module")
 def coord_headers():
-    try:
-        return _login("gowthamejjurothu15@gmail.com", "Coord@123")
-    except Exception:
-        return _login("coordinator@example.com", "Coord@123")
+    return _login("coordinator@example.com", "Coord@123")
 
 
 @pytest.fixture(scope="module")
@@ -136,19 +130,8 @@ def test_accept_unmapped_coordinator_forbidden(admin_headers):
 
 
 def test_accept_conflict_409_when_already_accepted(admin_headers):
-    # Map a new coordinator to LOC_HOSTEL_1 & DEPT_HOSTEL_ELECTRICAL to create a pooled queue
-    coord_b_headers, coord_b_data = _create_user(admin_headers, "coordinator", "coord_b")
-    # Map coord_b
-    map_res = client.post("/departments/coordinators/assignments", json={
-        "coordinator_id": coord_b_data["user_id"],
-        "location_id": "LOC_HOSTEL_1",
-        "department_id": "DEPT_HOSTEL_ELECTRICAL",
-        "confirm_replacement": True,
-    }, headers=admin_headers)
-    assert map_res.status_code in (200, 201), map_res.text
-
     student_headers, _ = _create_user(admin_headers, "student", "std_pool", location_id="LOC_HOSTEL_1")
-    # File complaint: now >= 2 coordinators mapped -> status Submitted, unassigned
+    # File complaint: multiple coordinators mapped -> status Submitted, unassigned in pooled work queue
     c_res = client.post("/complaints", json={
         "location_id": "LOC_HOSTEL_1",
         "department_id": "DEPT_HOSTEL_ELECTRICAL",
@@ -158,7 +141,10 @@ def test_accept_conflict_409_when_already_accepted(admin_headers):
         "visibility_type": "Private",
     }, headers=student_headers)
     assert c_res.status_code == 201
-    cid = c_res.json()["complaint_id"]
+    c_data = c_res.json()
+    cid = c_data["complaint_id"]
+    assert c_data["assigned_to"] is None
+    assert c_data["status"] == STATUS_SUBMITTED
 
     # First assigner assigns (e.g. admin or coordinator)
     res1 = client.post(f"/complaints/{cid}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=admin_headers)
@@ -170,14 +156,6 @@ def test_accept_conflict_409_when_already_accepted(admin_headers):
     res2 = client.post(f"/complaints/{cid}/assign", json={"assigned_to": "USR_COORDINATOR"}, headers=seed_coord_headers)
     assert res2.status_code == 409
     assert "already assigned" in res2.json()["detail"].lower()
-
-    # Restore USR_COORDINATOR mapping for subsequent tests in module
-    client.post("/departments/coordinators/assignments", json={
-        "coordinator_id": "USR_COORDINATOR",
-        "location_id": "LOC_HOSTEL_1",
-        "department_id": "DEPT_HOSTEL_ELECTRICAL",
-        "confirm_replacement": True,
-    }, headers=admin_headers)
 
 
 def test_single_tap_progress_notes(admin_headers, coord_headers):

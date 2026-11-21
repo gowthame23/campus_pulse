@@ -277,6 +277,10 @@ npm run dev
 ```
 Open `http://localhost:5173` in your browser.
 
+#### 3. Feature Flags & Configuration
+* `CATEGORY_PRIORITY_ENABLED` (default: `false`): Feature flag controlling category-specific priority overrides and management badges. When disabled (`false`), complaint creation uses standard default priorities, priority modification endpoints return 403 Forbidden, GET endpoints return empty priorities, and the frontend hides all priority badges and edit controls. When enabled (`true`), department administrators and app managers can customize priorities per category and per location.
+
+
 ---
 
 ## 🧪 Running Automated Tests
@@ -301,6 +305,21 @@ The following 5 items are documented inconsistencies in legacy application behav
 5. **Level 2 Escalation Warden Assignment Route Guard**: While `assign_work` contains logic allowing a Location In-Charge (Warden) to assign unhandled complaints once escalation reaches Level 2, the FastAPI router dependency on `POST /complaints/{id}/assign` enforces `require_roles(Administrator.ROLE, Coordinator.ROLE, AppManager.ROLE)`, returning HTTP 403 Forbidden before the service logic can execute.
 
 In the automated test suite, these 5 scenarios are marked with `@pytest.mark.xfail(strict=True)` to document expected behavior while ensuring any unintended changes are flagged immediately.
+
+---
+
+## 🚀 Deployment Checklist
+
+Before triggering a production deployment (e.g. on Render or Linux VPS), complete these prerequisite safety steps:
+
+1. **Storage & Database Backup:**
+   - Create a full backup of `platform.db` and the `storage/institutes/` directory to secure staging/storage outside the application directory.
+2. **Administrative Credentials:**
+   - Ensure `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `MANAGER_EMAIL`, and `MANAGER_PASSWORD` are configured in the production environment variables (or Render Dashboard). Initial database seeding requires these values to initialize governance accounts safely.
+3. **Feature Flag Configuration:**
+   - Keep `CATEGORY_PRIORITY_ENABLED=false` on initial deployment. Enable it only after confirming application health and verifying triage behavior on at least one real complaint.
+4. **Email Dispatch Safety:**
+   - Keep `USE_LOCAL_EMAIL` unset or strictly `false` in production to ensure real email notifications (SMTP) are dispatched to coordinators, managers, and students. Local email logging mode should only be used in local development.
 
 ---
 
