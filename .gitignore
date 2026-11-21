@@ -73,3 +73,14 @@ test_run_*.txt
 *.pdf
 *.pptx
 *.ppt
+
+
+# Generated media and pitch decks
+*.pdf
+*.pptx
+*.ppt
+pdf_preview/
+
+# Local test suites kept local only
+Backend/tests/
+Backend/pytest.ini
