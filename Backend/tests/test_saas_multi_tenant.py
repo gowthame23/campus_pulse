@@ -147,7 +147,7 @@ def test_otp_deactivation_reactivation(tenant_svc):
     req = tenant_svc.request_status_otp(
         institution_id=inst_id,
         action="deactivate",
-        superadmin_email="gowthamejjurothu@gmail.com"
+        superadmin_email="superadmin@example.com"
     )
     assert req["status"] == "success"
     otp = req.get("_dev_otp")
@@ -158,7 +158,7 @@ def test_otp_deactivation_reactivation(tenant_svc):
             institution_id=inst_id,
             action="deactivate",
             otp_code="000000",
-            superadmin_email="gowthamejjurothu@gmail.com"
+            superadmin_email="superadmin@example.com"
         )
     assert tenant_svc.is_institution_active(inst_id) is True
 
@@ -167,7 +167,7 @@ def test_otp_deactivation_reactivation(tenant_svc):
         institution_id=inst_id,
         action="deactivate",
         otp_code=otp,
-        superadmin_email="gowthamejjurothu@gmail.com",
+        superadmin_email="superadmin@example.com",
         reason="Administrative audit"
     )
     assert res["status"] == "Inactive"
@@ -177,7 +177,7 @@ def test_otp_deactivation_reactivation(tenant_svc):
     req2 = tenant_svc.request_status_otp(
         institution_id=inst_id,
         action="reactivate",
-        superadmin_email="gowthamejjurothu@gmail.com"
+        superadmin_email="superadmin@example.com"
     )
     assert req2["status"] == "success"
     otp2 = req2.get("_dev_otp")
@@ -186,7 +186,7 @@ def test_otp_deactivation_reactivation(tenant_svc):
         institution_id=inst_id,
         action="reactivate",
         otp_code=otp2,
-        superadmin_email="gowthamejjurothu@gmail.com",
+        superadmin_email="superadmin@example.com",
         reason="Audit completed successfully"
     )
     assert res2["status"] == "Active"

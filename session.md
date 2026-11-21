@@ -4,7 +4,7 @@
 
 - **Git History Audit:** Inspected git history for `CREDENTIALS.local.md` and any `.db` files. Confirmed neither was ever committed to the repository.
 - **Clutter & Cache Cleanup:** Removed all `__pycache__`, `.pytest_cache`, `.pytest_tmp`, and transient SQLite databases (`Backend/storage/*target*.db`). Added `Backend/.pytest_cache/` to `.gitignore`.
-- **PII / Email Sanitization:** Removed personal email address (`gowthamejjurothu@gmail.com`) from `README.md`, `Backend/README.md`, and `Website/index.html`.
+- **PII / Email Sanitization:** Removed personal email address (`[REDACTED_ADMIN_EMAIL]`) from `README.md`, `Backend/README.md`, and `Website/index.html`.
 - **Architecture & Tradeoffs Documentation:** Added a detailed multi-tenant architecture Mermaid flowchart and an in-depth tradeoffs section to `README.md`, explaining the SQLite-per-tenant design, operational simplicity, and how architecture evolves at scale (connection pools, sharding, distributed DBs).
 - **Test Suite Polish (Zero Refactoring of Application Logic):**
   - Resolved `NameError: name 're' is not defined` in `Backend/api/main.py`.

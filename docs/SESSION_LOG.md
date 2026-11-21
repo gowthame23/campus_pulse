@@ -759,7 +759,7 @@
      - Updated `PasswordResetStartResponse` to include `simulated_otp: Optional[str] = None`.
      - Updated `request_password_reset` in `Backend/api/routers/auth.py` to deliver real emails via Gmail SMTP and return `simulated_otp` fallback.
      - Enhanced `ForgotPasswordPage.jsx` with clear verification notifications for inbox check and testing code.
-     - Verified real SMTP transmission to Gmail (`gowthamejjurothu@gmail.com`) and campus domain (`gowtham.e23@iiits.in`) with 100% success.
+     - Verified real SMTP transmission to Gmail (`admin@example.com`) and campus domain (`gowtham.e23@iiits.in`) with 100% success.
   3. **Verification & Push:**
      - Frontend build passed in 1.68s (`npm run build`).
      - Password reset request -> verify -> complete cycle passed 200 OK.
@@ -830,7 +830,7 @@
      - Refactored `_send_otp_email_sync` in `Backend/utils/email.py` into a full RFC 5322 multipart message with `Date: formatdate(localtime=True)`, `Message-ID: make_msgid(domain='campuspulse.edu')`, branded HTML card layout with prominent 32px OTP digits, and plain-text fallback.
      - Updated `Backend/api/main.py` CORS regex to allow local RFC1918 private LAN IP ranges (`10.*`, `172.16-31.*`, `192.168.*`) for mobile device testing on local Wi-Fi.
   3. **Verification & Testing:**
-     - Tested live HTTP requests to `/auth/password-reset/request`: confirmed 200 OK and successful real SMTP deliveries to both Admin (`gowthamejjurothu@gmail.com`) and Student (`gowtham.e23@iiits.in`).
+     - Tested live HTTP requests to `/auth/password-reset/request`: confirmed 200 OK and successful real SMTP deliveries to both Admin (`admin@example.com`) and Student (`gowtham.e23@iiits.in`).
      - Executed full backend auth & security test suite: **22 of 22 tests passed (100%)**.
      - Executed frontend production build (`npm run build`): passed cleanly in 1.18s.
      - Database reset to pristine baseline: **0 complaints, 0 attachments, 0 notifications, 0 resets, 0 FK errors**.
@@ -838,15 +838,15 @@
 ---
 
 ### Entry 53 — Student Import, Activation Link Delivery & Login Redirection
-* **User Directive:** "what about the new will we get the mail for new one and the activation link lets say i am importing a bulk student are they gettung the activation link edlaxmi123@gmail.com import this as a student and after sending the link when they click on they should be redirected to the login page for now we did not have app so it should redirected to our link right send that activation link to that mail"
+* **User Directive:** "what about the new will we get the mail for new one and the activation link lets say i am importing a bulk student are they gettung the activation link student.laxmi@example.com import this as a student and after sending the link when they click on they should be redirected to the login page for now we did not have app so it should redirected to our link right send that activation link to that mail"
 * **Issues Addressed & Actions Taken:**
   1. **Bulk Student Activation Email Infrastructure:**
      - Verified that during user import (`Backend/utils/excel_importer.py`), an account is created, an activation token is generated (`auth_service.generate_activation_token`), and `send_activation_email` is dispatched automatically.
      - Upgraded `_send_activation_email_sync` in `Backend/utils/email.py` to an RFC 5322 compliant multipart message with `Date`, `Message-ID`, plain-text fallback, and an HTML card containing an "Activate My Account" call-to-action button linking directly to the activation URL.
   2. **Student Account Creation & Real Activation Email Dispatch:**
-     - Created student account for **`edlaxmi123@gmail.com`** (Name: `Laxmi`, Role: `student`, Location: `LOC_HOSTEL_1`, User ID: `USR-D9B5C44F`).
+     - Created student account for **`student.laxmi@example.com`** (Name: `Laxmi`, Role: `student`, Location: `LOC_HOSTEL_1`, User ID: `USR-D9B5C44F`).
      - Generated activation token (`dgEGF__H025czOwXW_Cw8qA4yAl3ghGfaV6a4E7vg40`).
-     - Delivered the live activation email via Google SMTP to `edlaxmi123@gmail.com` (status: `250 OK`, confirmed delivered in 4.8s).
+     - Delivered the live activation email via Google SMTP to `student.laxmi@example.com` (status: `250 OK`, confirmed delivered in 4.8s).
   3. **Activation & Redirection Flow Verified:**
      - Verified that when the recipient clicks the link (`/activate?token=...`), `ActivateAccountPage.jsx` verifies the token, presents the password creation form, completes activation on submit, and automatically redirects them to the **Login Page** (`/login`) with the success banner: *"Account activated successfully! Please log in with your new password."*
   4. **Database & Build Integrity:**
@@ -1134,7 +1134,7 @@
 * **Issues Addressed & Actions Taken:**
   1. **Multi-Institute SaaS Architecture & Physical Data Segregation:**
      - Created `services/tenant_service.py` to manage multi-tenant lifecycle, package tier allocations (Basic, Intermediate, Premium), and isolated SQLite databases under `storage/institutes/{institution_id}.db`.
-     - Built `Backend/api/routers/platform.py` allowing Super Admin (`gowthamejjurothu@gmail.com`) to onboard campuses, update features, and manage institutional activation states via OTP verification.
+     - Built `Backend/api/routers/platform.py` allowing Super Admin (`superadmin@example.com`) to onboard campuses, update features, and manage institutional activation states via OTP verification.
      - Preserved default institutional SLA deadlines while giving institute administrators full configuration ownership.
   2. **14 Security Vulnerabilities Remediated:**
      - **Finding 1 (High - `dependencies.py`):** Added `_resolve_db_path(request)` to route authenticated tenant requests dynamically to their isolated `storage/institutes/{inst_id}.db`, preventing cross-institution data access.

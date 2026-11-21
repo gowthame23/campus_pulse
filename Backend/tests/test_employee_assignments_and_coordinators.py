@@ -27,7 +27,7 @@ def login(username, password):
 
 
 def test_eligible_coordinators_endpoint():
-    admin_hdr = login("gowthamejjurothu@gmail.com", "Admin@123")
+    admin_hdr = login("admin@example.com", "Admin@123")
     res = client.get("/teams/eligible-coordinators", headers=admin_hdr)
     assert res.status_code == 200
     data = res.json()
@@ -50,7 +50,7 @@ def test_eligible_coordinators_endpoint():
 
 
 def test_intra_team_coordinator_rule_rejection_and_multi_department_allowed():
-    admin_hdr = login("gowthamejjurothu@gmail.com", "Admin@123")
+    admin_hdr = login("admin@example.com", "Admin@123")
 
     # 1. Attempt to assign same person as Coordinator 1 and Backup Coordinator on same team -> REJECTED
     res = client.post(
@@ -85,7 +85,7 @@ def test_intra_team_coordinator_rule_rejection_and_multi_department_allowed():
 
 
 def test_work_memberships_crud_and_scoping():
-    mgr1_hdr = login("ejjurothugowtham@gmail.com", "Manager@123")
+    mgr1_hdr = login("manager@example.com", "Manager@123")
 
     # App Manager in scope: LOC_ACADEMIC_1 is in Manager 1's facilities
     res = client.post(
@@ -121,7 +121,7 @@ def test_work_memberships_crud_and_scoping():
 
 
 def test_employees_overview_endpoint():
-    admin_hdr = login("gowthamejjurothu@gmail.com", "Admin@123")
+    admin_hdr = login("admin@example.com", "Admin@123")
     res = client.get("/teams/employees-overview", headers=admin_hdr)
     assert res.status_code == 200
     data = res.json()

@@ -114,7 +114,7 @@ def _send_via_brevo(to_email: str, subject: str, html_content: str, plain_text: 
         os.environ.get("BREVO_SENDER_EMAIL")
         or os.environ.get("SMTP_FROM")
         or os.environ.get("SMTP_USERNAME")
-        or "gowthamejjurothu1@gmail.com"
+        or "noreply@campuspulse.edu"
     ).strip()
     sender_name = (os.environ.get("SMTP_FROM_NAME") or "Campus Pulse").strip()
 

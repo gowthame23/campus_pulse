@@ -33,7 +33,7 @@ def login(username, password):
 
 @pytest.fixture(scope="module")
 def admin_hdr():
-    return login("gowthamejjurothu@gmail.com", "Admin@123")
+    return login("admin@example.com", "Admin@123")
 
 
 @pytest.fixture(scope="module", autouse=True)

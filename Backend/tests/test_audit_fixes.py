@@ -46,14 +46,14 @@ def test_sec_007_personal_email_cannot_login_and_placeholder_works():
     auth_limiter._lockouts.clear()
 
     # Unregistered personal emails must NOT be able to log in
-    res_admin_personal = client.post("/auth/login", json={"username": "unregistered_external_user@gmail.com", "password": "Admin@123"})
+    res_admin_personal = client.post("/auth/login", json={"username": "unregistered_external_user@example.com", "password": "Admin@123"})
     assert res_admin_personal.status_code == 401, f"Expected 401 for unregistered email but got {res_admin_personal.status_code}"
 
-    res_student_personal = client.post("/auth/login", json={"username": "unregistered_student@gmail.com", "password": "Student@123"})
+    res_student_personal = client.post("/auth/login", json={"username": "unregistered_student@example.com", "password": "Student@123"})
     assert res_student_personal.status_code == 401, f"Expected 401 for unregistered email but got {res_student_personal.status_code}"
 
     # Standard canonical admin must work
-    res_placeholder = client.post("/auth/login", json={"username": "gowthamejjurothu@gmail.com", "password": "Admin@123"})
+    res_placeholder = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
     assert res_placeholder.status_code == 200, f"Expected 200 for canonical admin but got {res_placeholder.status_code}"
     assert res_placeholder.json()["role"] == "administrator"
 
@@ -84,7 +84,7 @@ def test_sec_006_safety_report_idor_prevention():
     headers_w = {"Authorization": f"Bearer {token_w}"}
 
     # Login Admin
-    res_adm = client.post("/auth/login", json={"username": "gowthamejjurothu@gmail.com", "password": "Admin@123"})
+    res_adm = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
     token_adm = res_adm.json()["access_token"]
     headers_adm = {"Authorization": f"Bearer {token_adm}"}
 
@@ -149,7 +149,7 @@ def test_sec_005_certificate_endpoint_security():
     assert res_unauth.status_code == 401, f"Expected 401 for unauthenticated request, got {res_unauth.status_code}"
 
     # Authenticate as admin
-    login_adm = client.post("/auth/login", json={"username": "gowthamejjurothu@gmail.com", "password": "Admin@123"})
+    login_adm = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
     token_adm = login_adm.json()["access_token"]
     headers_adm = {"Authorization": f"Bearer {token_adm}"}
 
@@ -190,7 +190,7 @@ def test_sec_008_spreadsheet_formula_injection_sanitization():
         conn.commit()
 
     # Login as admin
-    login_adm = client.post("/auth/login", json={"username": "gowthamejjurothu@gmail.com", "password": "Admin@123"})
+    login_adm = client.post("/auth/login", json={"username": "admin@example.com", "password": "Admin@123"})
     token_adm = login_adm.json()["access_token"]
     headers_adm = {"Authorization": f"Bearer {token_adm}"}
 

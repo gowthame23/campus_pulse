@@ -372,11 +372,11 @@ class AuthService:
 
                 "name": "Platform Administrator",
 
-                "email": os.environ.get("ADMIN_EMAIL", "gowthamejjurothu@gmail.com"),
+                "email": os.environ.get("ADMIN_EMAIL"),
 
                 "password_env": "ADMIN_PASSWORD",
 
-                "default_password": "Admin@123",
+                "default_password": None,
 
                 "first_login": False,
 
@@ -392,11 +392,11 @@ class AuthService:
 
                 "name": "App Manager 1",
 
-                "email": os.environ.get("MANAGER_EMAIL", "ejjurothugowtham@gmail.com"),
+                "email": os.environ.get("MANAGER_EMAIL"),
 
                 "password_env": "MANAGER_PASSWORD",
 
-                "default_password": "Manager@123",
+                "default_password": None,
 
                 "first_login": False,
 
@@ -610,43 +610,67 @@ class AuthService:
 
         for spec in seed_users_spec:
 
-            explicit_password = os.environ.get(spec["password_env"]) if spec.get("password_env") else None
-
-            force_first_login = False
-
-
-
             if is_production:
                 spec["password"] = os.environ.get(f"SEED_{spec['id']}_PASSWORD")
                 if not spec["password"]:
                     continue
-            elif allow_demo_passwords:
-                spec["password"] = explicit_password or spec["default_password"]
-            elif explicit_password:
-
-                spec["password"] = explicit_password
-
+                if spec["id"] in ("USR_ADMIN", "USR_MANAGER"):
+                    email_var = "ADMIN_EMAIL" if spec["id"] == "USR_ADMIN" else "MANAGER_EMAIL"
+                    email_val = os.environ.get(email_var)
+                    if not email_val:
+                        logger.error(
+                            f"[SECURITY] Refusing to seed {spec['id']}: required environment variable "
+                            f"{email_var} is missing or empty in production. Account will NOT be created (fail closed)."
+                        )
+                        continue
+                    spec["email"] = email_val
+                force_first_login = False
+            elif spec["id"] in ("USR_ADMIN", "USR_MANAGER"):
+                email_var = "ADMIN_EMAIL" if spec["id"] == "USR_ADMIN" else "MANAGER_EMAIL"
+                pwd_var = "ADMIN_PASSWORD" if spec["id"] == "USR_ADMIN" else "MANAGER_PASSWORD"
+                email_val = os.environ.get(email_var)
+                pwd_val = os.environ.get(pwd_var)
+                if not email_val or not pwd_val:
+                    logger.error(
+                        f"[SECURITY] Refusing to seed {spec['id']}: required environment variables "
+                        f"({email_var} and {pwd_var}) are missing or empty. Account will NOT be created (fail closed)."
+                    )
+                    continue
+                spec["email"] = email_val
+                spec["password"] = pwd_val
+                force_first_login = False
             else:
+                explicit_password = os.environ.get(spec["password_env"]) if spec.get("password_env") else None
 
-                spec["password"] = generate_temp_password()
+                force_first_login = False
 
-                force_first_login = True
+                if allow_demo_passwords:
+                    spec["password"] = explicit_password or spec["default_password"]
+                elif explicit_password:
 
-                env_note = (
+                    spec["password"] = explicit_password
 
-                    f"no {spec['password_env']} set and" if spec.get("password_env")
+                else:
 
-                    else "no explicit password configured and"
+                    spec["password"] = generate_temp_password()
 
-                )
+                    force_first_login = True
 
-                logger.warning(
+                    env_note = (
 
-                    f"{env_note} ALLOW_DEMO_SEED_PASSWORDS is not enabled -- generated a random "
+                        f"no {spec['password_env']} set and" if spec.get("password_env")
 
-                    f"first-login password for {spec['id']} ({spec['email']}): {spec['password']}"
+                        else "no explicit password configured and"
 
-                )
+                    )
+
+                    logger.warning(
+
+                        f"{env_note} ALLOW_DEMO_SEED_PASSWORDS is not enabled -- generated a random "
+
+                        f"first-login password for {spec['id']} ({spec['email']}): {spec['password']}"
+
+                    )
 
 
 
@@ -740,13 +764,21 @@ class AuthService:
 
         with self._connect() as conn:
 
-            conn.execute("UPDATE users SET email = ? WHERE user_id = 'USR_ADMIN'", (os.environ.get("ADMIN_EMAIL", "gowthamejjurothu@gmail.com"),))
+            admin_email = os.environ.get("ADMIN_EMAIL")
+            if admin_email:
+                conn.execute("UPDATE users SET email = ? WHERE user_id = 'USR_ADMIN'", (admin_email,))
 
-            conn.execute("UPDATE users SET email = ? WHERE user_id = 'USR_MANAGER'", (os.environ.get("MANAGER_EMAIL", "ejjurothugowtham@gmail.com"),))
+            mgr_email = os.environ.get("MANAGER_EMAIL")
+            if mgr_email:
+                conn.execute("UPDATE users SET email = ? WHERE user_id = 'USR_MANAGER'", (mgr_email,))
 
-            conn.execute("UPDATE users SET email = ?, name = 'Student 1' WHERE user_id = 'USR_STUDENT'", (os.environ.get("STUDENT_EMAIL", "gowtham.e23@iiits.in"),))
+            student_email = os.environ.get("STUDENT_EMAIL")
+            if student_email:
+                conn.execute("UPDATE users SET email = ?, name = 'Student 1' WHERE user_id = 'USR_STUDENT'", (student_email,))
 
-            conn.execute("UPDATE users SET email = ? WHERE user_id = 'USR_WARDEN'", (os.environ.get("WARDEN_EMAIL", "naveen@campus.edu"),))
+            warden_email = os.environ.get("WARDEN_EMAIL")
+            if warden_email:
+                conn.execute("UPDATE users SET email = ? WHERE user_id = 'USR_WARDEN'", (warden_email,))
 
 
 

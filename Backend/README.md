@@ -33,12 +33,14 @@ The app creates `storage/campus_pulse.db` automatically if it does not exist.
 | Role | Email | Password | Responsibilities |
 | --- | --- | --- | --- |
 | Super Admin | superadmin@campuspulse.edu | Admin@123 | Platform Owner & Governance |
-| Administrator | admin@campuspulse.edu | Admin@123 | Campus Operations & Admin Controls |
-| App Manager 1 | ejjurothugowtham@gmail.com | Manager@123 | Operations Supervisor (North Zone) |
+| Administrator | admin@example.com (set via ADMIN_EMAIL) | (set via ADMIN_PASSWORD) | Campus Operations & Admin Controls |
+| App Manager 1 | manager@example.com (set via MANAGER_EMAIL) | (set via MANAGER_PASSWORD) | Operations Supervisor (North Zone) |
 | App Manager 2 | appmanager2@campus.edu | Manager@123 | Operations Supervisor (South Zone) |
 | Employees (6 total) | employee.a1@campuspulse.edu to employee.b3@campuspulse.edu | Employee@123 | Field Maintenance (4 serve as C1/C2 Coordinators) |
-| Students (2 total) | gowtham.e23@iiits.in, student2@campus.edu | Student@123 | Student Residents |
+| Students (2 total) | student1@campuspulse.edu, student2@campus.edu | Student@123 | Student Residents |
 | Wardens (2 total) | naveen@campus.edu, warden2@campus.edu | warden@123 | Hostel Wardens |
+
+> [!NOTE] Default administrative credentials must be supplied via environment variables (`ADMIN_EMAIL`, `ADMIN_PASSWORD`, `MANAGER_EMAIL`, `MANAGER_PASSWORD`) in `.env` before running or deploying.
 
 Use `/auth/login` to get a bearer token, then authorize in Swagger UI with that token.
 

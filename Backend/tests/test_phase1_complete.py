@@ -36,18 +36,12 @@ def admin_headers():
 
 @pytest.fixture(scope="module")
 def app_mgr_headers():
-    try:
-        return _login("ejjurothugowtham@gmail.com", "Manager@123")
-    except Exception:
-        return _login("manager@example.com", "Manager@123")
+    return _login("manager@example.com", "Manager@123")
 
 
 @pytest.fixture(scope="module")
 def coord_headers():
-    try:
-        return _login("gowthamejjurothu15@gmail.com", "Coord@123")
-    except Exception:
-        return _login("coordinator@example.com", "Coord@123")
+    return _login("coordinator@example.com", "Coord@123")
 
 
 @pytest.fixture(scope="module")

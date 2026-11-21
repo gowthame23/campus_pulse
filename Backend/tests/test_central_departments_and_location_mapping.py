@@ -14,13 +14,13 @@ def login(username, password):
 
 @pytest.fixture(scope="module")
 def admin_hdr():
-    return login("gowthamejjurothu@gmail.com", "Admin@123")
+    return login("admin@example.com", "Admin@123")
 
 
 @pytest.fixture(scope="module")
 def app_mgr_hdr():
     # Manager for Hostel 1 (USR_MANAGER)
-    return login("ejjurothugowtham@gmail.com", "Manager@123")
+    return login("manager@example.com", "Manager@123")
 
 
 @pytest.fixture(scope="module")

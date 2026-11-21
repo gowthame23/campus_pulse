@@ -13,6 +13,13 @@ BASE_DB_PATH = os.path.join(ROOT, "storage", "campus_pulse.db")
 
 # Force DATABASE_PATH to pytest_isolated.db at import time so tests never touch main campus_pulse.db
 os.environ["DATABASE_PATH"] = TEST_DB_PATH
+os.environ["RUN_SCHEDULER"] = "false"
+
+# Test environment administrative credentials (fail-closed seed requirements)
+os.environ.setdefault("ADMIN_EMAIL", "admin@example.com")
+os.environ.setdefault("ADMIN_PASSWORD", "Admin@123")
+os.environ.setdefault("MANAGER_EMAIL", "manager@example.com")
+os.environ.setdefault("MANAGER_PASSWORD", "Manager@123")
 
 # The full suite logs in as the seeded demo accounts (admin@..., coordinator1@...,
 # etc.) with their documented default passwords. Outside of tests, AuthService
@@ -99,6 +106,14 @@ def _cleanup_isolated_db():
         if os.path.exists(target):
             try:
                 os.remove(target)
+            except Exception:
+                pass
+    storage_dir = os.path.join(ROOT, "storage")
+    for f in ["restore_pending.marker", "restore_pending.db"]:
+        fpath = os.path.join(storage_dir, f)
+        if os.path.exists(fpath):
+            try:
+                os.remove(fpath)
             except Exception:
                 pass
     for ppath in [os.path.join(ROOT, "..", "storage", "platform.db"), os.path.join(ROOT, "storage", "platform.db")]:

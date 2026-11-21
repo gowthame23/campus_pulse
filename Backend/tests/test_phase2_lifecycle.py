@@ -25,14 +25,7 @@ def _login(username, password):
 
 @pytest.fixture(scope="module")
 def admin_headers():
-    for user, pwd in [
-        ("gowthamejjurothu@gmail.com", "Admin@123"),
-        ("admin@example.com", "Admin@123"),
-    ]:
-        try:
-            return _login(user, pwd)
-        except Exception:
-            continue
+    return _login("admin@example.com", "Admin@123")
     raise RuntimeError("Failed to login as administrator")
 
 @pytest.fixture(scope="module")

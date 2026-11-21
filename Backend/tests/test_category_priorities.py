@@ -528,6 +528,25 @@ def test_app_manager_scoping_rules(monkeypatch):
     assert unassigned_loc.location_id not in updated_loc_ids
 
 
+def test_fail_closed_seed_when_credentials_missing(monkeypatch, caplog):
+    import logging
+    from services.auth_service import AuthService
+
+    # Clear environment variables
+    monkeypatch.delenv("ADMIN_EMAIL", raising=False)
+    monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
+    monkeypatch.delenv("MANAGER_EMAIL", raising=False)
+    monkeypatch.delenv("MANAGER_PASSWORD", raising=False)
+
+    with caplog.at_level(logging.ERROR):
+        auth_svc = AuthService()
+
+    records = [r.message for r in caplog.records]
+    assert any("Refusing to seed USR_ADMIN" in msg for msg in records)
+    assert any("Refusing to seed USR_MANAGER" in msg for msg in records)
+
+
+
 
 
 
