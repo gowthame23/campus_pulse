@@ -10,11 +10,11 @@ Run with:
 
 import json
 import time
-
-import requests
-from websocket import create_connection
-
 import pytest
+
+requests = pytest.importorskip("requests")
+websocket = pytest.importorskip("websocket")
+from websocket import create_connection
 
 BASE = "http://127.0.0.1:8000"
 
