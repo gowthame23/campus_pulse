@@ -83,3 +83,13 @@
   - Committed all changes to branch `feature/category-priority-badges` (`commit 672c18d`).
 
 
+
+## 2026-11-21 — Priority Feature Hardening & Audit (Branch `feature/category-priority-badges`)
+- Completed 7 hardening items per user specification:
+  - **Item 1 (commit `1ceb724`):** Defaulted `USE_LOCAL_EMAIL` to `false` in `Backend/utils/email.py` for real production dispatch, added warning logging when local mode is enabled, documented in `.env.example`, verified deployment files, added dispatch tests.
+  - **Item 2 (commit `d5b12dc`):** Reverted unrelated `ON CONFLICT` clause in `Backend/services/auth_service.py` to restore original app behavior. Documented duplicate assignment unique constraint violation under Needs My Decision.
+  - **Item 3 (commit `e355e0b`):** Routed category priority lookup via `department_service.resolve_category_priority` with warning logging and fallback to prevent silent lookup swallows.
+  - **Item 4 (commit `f49242b`):** Added `CATEGORY_PRIORITY_ENABLED` feature flag (defaults to false), gating backend resolution, department responses, router endpoints (403 on disabled PUT), and frontend UI badges/dropdowns.
+  - **Item 5 (commit `6ef56b2`):** Added `location_category_priority_history` table, collision-safe UUID IDs, change tracking (skips no-ops), 400 validation for invalid locations, and App Manager scoping rules.
+  - **Item 6 (commit `e7aede2`):** Removed all personal emails and default passwords from tracked files. Implemented fail-closed initial seeding requiring explicit credentials. Added test fixture credentials and disabled scheduler in `conftest.py`.
+  - **Item 7:** Ran full backend pytest suite (334 passed, 1 failed [Item 2 revert], 2 skipped, 5 xfailed), frontend build (clean) and lint (clean, 0 errors). Created `PRIORITY_FEATURE_REPORT.md`.
