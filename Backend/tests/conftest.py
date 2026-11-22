@@ -16,6 +16,8 @@ os.environ["DATABASE_PATH"] = TEST_DB_PATH
 os.environ["RUN_SCHEDULER"] = "false"
 
 # Test environment administrative credentials (fail-closed seed requirements)
+# Tests log in with the built-in super admin address; never inherit a real one from a local .env.
+os.environ["SUPER_ADMIN_EMAIL"] = "superadmin@campuspulse.edu"
 os.environ.setdefault("ADMIN_EMAIL", "admin@example.com")
 os.environ.setdefault("ADMIN_PASSWORD", "Admin@123")
 os.environ.setdefault("MANAGER_EMAIL", "manager@example.com")
