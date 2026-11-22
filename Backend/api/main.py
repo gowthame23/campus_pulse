@@ -169,8 +169,9 @@ def root_index():
     }
 
 
-@app.get("/api/health", tags=["health"])
-@app.get("/health", tags=["health"])
+# HEAD is allowed so uptime monitors (e.g. UptimeRobot free plan) can ping without a body.
+@app.api_route("/api/health", methods=["GET", "HEAD"], tags=["health"])
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["health"])
 def health_check():
     import sqlite3
     db_path = os.environ.get("DATABASE_PATH", "storage/campus_pulse.db")

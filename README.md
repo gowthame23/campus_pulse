@@ -317,7 +317,9 @@ pytest tests/test_emergency_flow.py -v
 | `CORS_ORIGINS` | Comma-separated allowed frontend origins, e.g. `https://campuspulse-frontend-wlws.onrender.com`. Never use `*`. |
 | `FRONTEND_URL` | Frontend address used in email links |
 | `DB_ENGINE`, `DATABASE_URL` | PostgreSQL connection (secret). Without it the backend falls back to SQLite files, which Render's free plan erases on every redeploy or restart. |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `MANAGER_EMAIL`, `MANAGER_PASSWORD` | Initial governance accounts (secret) |
+| `SUPER_ADMIN_EMAIL`, `SEED_USR_SUPER_ADMIN_PASSWORD` | Super admin login. Recreated on every start, so it survives a wiped disk. |
+| `ADMIN_EMAIL`, `SEED_USR_ADMIN_PASSWORD` | Administrator login, same behaviour. |
+| `MANAGER_EMAIL`, `SEED_USR_MANAGER_PASSWORD` | Optional app manager login. |
 | `RUN_SCHEDULER` | `true` to run the SLA escalation scheduler |
 | `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` or `SMTP_*` | Email delivery (secret) |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web push notifications (optional, secret) |
@@ -326,7 +328,7 @@ pytest tests/test_emergency_flow.py -v
 
 **Single-page app routing:** the static site needs a rewrite rule from `/*` to `/index.html` (Render dashboard → static site → *Redirects/Rewrites*). Without it, refreshing any page other than the home page returns 404.
 
-**Keep-alive:** the free backend sleeps after 15 minutes without traffic. An UptimeRobot HTTP monitor on `/health` every 5 minutes keeps it awake.
+**Keep-alive:** the free backend sleeps after 15 minutes without traffic. An UptimeRobot HTTP monitor on `/health` every 5 minutes keeps it awake. The health route answers both GET and HEAD requests.
 
 ### Deployment Checklist
 
@@ -335,7 +337,7 @@ Before triggering a production deployment (e.g. on Render or Linux VPS), complet
 1. **Storage & Database Backup:**
    - Create a full backup of `platform.db` and the `storage/institutes/` directory to secure staging/storage outside the application directory.
 2. **Administrative Credentials:**
-   - Ensure `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `MANAGER_EMAIL`, and `MANAGER_PASSWORD` are configured in the production environment variables (or Render Dashboard). Initial database seeding requires these values to initialize governance accounts safely.
+   - In production (`ENVIRONMENT=production`), accounts are only seeded from `SEED_USR_<ID>_PASSWORD` variables, for example `SEED_USR_SUPER_ADMIN_PASSWORD` and `SEED_USR_ADMIN_PASSWORD`, plus `SUPER_ADMIN_EMAIL` and `ADMIN_EMAIL`. Without them no one can log in. `ADMIN_PASSWORD` and `MANAGER_PASSWORD` are used only outside production.
 3. **Feature Flag Configuration:**
    - Keep `CATEGORY_PRIORITY_ENABLED=false` on initial deployment. Enable it only after confirming application health and verifying triage behavior on at least one real complaint.
 4. **Email Dispatch Safety:**
