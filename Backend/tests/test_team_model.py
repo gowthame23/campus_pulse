@@ -395,7 +395,6 @@ def test_l6_reassign_requires_reason(services):
         assert notif_new is not None
 
 
-@pytest.mark.xfail(strict=True, reason="Leave update query checks status 'Assigned' but complaint status is saved as 'Going On'; app unchanged by freeze, see README Known Issues.")
 def test_l7_employee_on_leave_flags(services):
     """L7: Employee marks himself on leave: open complaints get assignee_on_leave_flag = 1; cancelling leave clears it."""
     auth = services["auth"]
@@ -539,7 +538,6 @@ def test_l8_coordinator_on_leave_backup(services):
         assert notif_w is not None
 
 
-@pytest.mark.xfail(strict=True, reason="Assign endpoint require_roles guard excludes LocationInCharge preventing level 2 warden assignment; app unchanged by freeze, see README Known Issues.")
 def test_l9_assign_deadline_escalation(services):
     """L9: Assign deadline passes:
     - Level 1: backup coordinator can now assign (and is notified)

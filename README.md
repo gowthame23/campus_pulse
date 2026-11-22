@@ -294,20 +294,6 @@ pytest tests/test_emergency_flow.py -v
 
 ---
 
-## ⚠️ Known Issues
-
-The following 5 items are documented inconsistencies in legacy application behavior. They are deliberately retained under the project freeze policy; modifying them would alter live application logic and role authorization boundaries, requiring an explicit product decision before any behavioral change is introduced:
-
-1. **Active Jobs Count for Assigned Complaints**: When a complaint is assigned, `assign_work` saves the complaint with canonical status `Complaint.ASSIGNED` (`"Going On"`), whereas `get_eligible_assignees` executes SQL querying `status IN ('Assigned', 'In Progress', 'Waiting for Parts')`. Because `'Going On'` is not in this query, `active_jobs_count` reports `0` for newly assigned staff.
-2. **Employee Status Start Transition**: In `/complaints/{id}/status`, `Complaint.ASSIGNED` and `Complaint.IN_PROGRESS` both evaluate to `"Going On"`. Sending `{"status": "In Progress"}` fails the equality check against `Complaint.IN_PROGRESS`, while sending `{"status": "Going On"}` matches `Complaint.ASSIGNED` which explicitly forbids non-admin callers. Employees therefore cannot transition tickets to In Progress via this endpoint.
-3. **Closed Complaint Feedback Status Check**: Confirming resolution via `POST /confirm` sets `complaint.status = Complaint.CLOSED` (`"Fixed"`). However, `POST /feedback` requires `status in (STATUS_CLOSED, STATUS_AUTO_CLOSED, "Closed", "Closed (Auto Closed)")`. Because `STATUS_CLOSED` is `"Closed"`, verified complaints with status `"Fixed"` cannot accept feedback.
-4. **Assignee On-Leave Complaint Flagging**: When staff submit a leave request via `POST /leaves`, `mark_employee_on_leave` updates complaints matching `status IN ('Assigned', 'In Progress', 'Waiting for Parts')`. Complaints holding canonical status `"Going On"` are not matched, so `assignee_on_leave_flag` remains `0`.
-5. **Level 2 Escalation Warden Assignment Route Guard**: While `assign_work` contains logic allowing a Location In-Charge (Warden) to assign unhandled complaints once escalation reaches Level 2, the FastAPI router dependency on `POST /complaints/{id}/assign` enforces `require_roles(Administrator.ROLE, Coordinator.ROLE, AppManager.ROLE)`, returning HTTP 403 Forbidden before the service logic can execute.
-
-In the automated test suite, these 5 scenarios are marked with `@pytest.mark.xfail(strict=True)` to document expected behavior while ensuring any unintended changes are flagged immediately.
-
----
-
 ## 🚀 Deployment Checklist
 
 Before triggering a production deployment (e.g. on Render or Linux VPS), complete these prerequisite safety steps:

@@ -189,7 +189,6 @@ def test_department_coordinator_routing_when_coord1_on_leave():
         assert cancel_res.status_code == 200
 
 
-@pytest.mark.xfail(strict=True, reason="Complaint.ASSIGNED is 'Going On' while active jobs query filters for 'Assigned' and 'In Progress'; app unchanged by freeze, see README Known Issues.")
 def test_eligible_assignees_and_cross_department_workload():
     student_hdr = login("gowtham.e23@iiits.in", "Student@123")
     res = client.post(

@@ -132,7 +132,6 @@ def test_employees_overview_endpoint():
         assert "open_jobs" in emp
 
 
-@pytest.mark.xfail(strict=True, reason="Complaint.ASSIGNED and Complaint.IN_PROGRESS are both 'Going On' preventing employee status start transition; app unchanged by freeze, see README Known Issues.")
 def test_complaint_job_visibility_and_actions():
     # 1. Student files a complaint
     student_hdr = login("gowtham.e23@iiits.in", "Student@123")
