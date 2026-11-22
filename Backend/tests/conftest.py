@@ -16,6 +16,12 @@ os.environ["DATABASE_PATH"] = TEST_DB_PATH
 os.environ["RUN_SCHEDULER"] = "false"
 
 # Test environment administrative credentials (fail-closed seed requirements)
+# Tests must never send real email. Local email mode short-circuits every dispatch.
+# The placeholder key only satisfies "is an email provider configured?" checks on a
+# fresh checkout (e.g. CI) where no .env exists; it is never used to send anything.
+os.environ["USE_LOCAL_EMAIL"] = "true"
+os.environ.setdefault("BREVO_API_KEY", "test-placeholder-key")
+
 # Tests log in with the built-in super admin address; never inherit a real one from a local .env.
 os.environ["SUPER_ADMIN_EMAIL"] = "superadmin@campuspulse.edu"
 os.environ.setdefault("ADMIN_EMAIL", "admin@example.com")
@@ -143,11 +149,25 @@ def pytest_configure(config):
             dst.close()
             src.close()
         os.environ["DATABASE_PATH"] = TEST_DB_PATH
+        if not os.path.exists(BASE_DB_PATH):
+            # Fresh checkout (e.g. CI): there is no local database to copy, so build the
+            # full schema and seed data with the app's own setup code before any test runs.
+            _build_fresh_test_db()
         _seed_test_coordinators(TEST_DB_PATH)
         from api.dependencies import _service_cache
         _service_cache.clear()
     except Exception:
         pass
+
+
+def _build_fresh_test_db():
+    from api.dependencies import _get_services_for_db
+    from api.routers.auth import _get_db as _create_password_resets_table
+    _get_services_for_db(TEST_DB_PATH)
+    _create_password_resets_table().close()
+    # Several services still default to storage/campus_pulse.db instead of DATABASE_PATH,
+    # so give that default file the same full schema the app builds on its first start.
+    _get_services_for_db(BASE_DB_PATH)
 
 
 @pytest.fixture(autouse=True)
