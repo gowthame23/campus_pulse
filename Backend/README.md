@@ -1,17 +1,11 @@
-# Campus Pulse v1 - CLI and FastAPI Backend
+# Campus Pulse - FastAPI Backend
 
-Campus Pulse is a campus complaint management system. The original CLI business logic is preserved, and the FastAPI backend now reuses the same models and services.
+REST and WebSocket backend for the Campus Pulse campus complaint management platform. See the root `README.md` for full setup and deployment notes.
 
 ## Install API Dependencies
 
 ```bash
 pip install -r requirements.txt
-```
-
-## Run the CLI
-
-```bash
-python main.py
 ```
 
 ## Run the FastAPI Backend
@@ -26,36 +20,26 @@ Then open:
 http://127.0.0.1:8000/docs
 ```
 
-The app creates `storage/campus_pulse.db` automatically if it does not exist.
+Copy `.env.example` to `.env` first. For a local run without PostgreSQL, set `DB_ENGINE=sqlite`; the app then creates `storage/campus_pulse.db` automatically.
 
-## Standard 14 Clean Baseline Accounts
+## Initial Accounts
 
-| Role | Email | Password | Responsibilities |
-| --- | --- | --- | --- |
-| Super Admin | superadmin@campuspulse.edu | [Configured via .env / Demo Placeholder] | Platform Owner & Governance |
-| Administrator | admin@example.com (set via ADMIN_EMAIL) | (set via ADMIN_PASSWORD) | Campus Operations & Admin Controls |
-| App Manager 1 | manager@example.com (set via MANAGER_EMAIL) | (set via MANAGER_PASSWORD) | Operations Supervisor (North Zone) |
-| App Manager 2 | appmanager2@campus.edu | [Configured via .env / Demo Placeholder] | Operations Supervisor (South Zone) |
-| Employees (6 total) | employee.a1@campuspulse.edu to employee.b3@campuspulse.edu | [Demo Placeholder] | Field Maintenance (4 serve as C1/C2 Coordinators) |
-| Students (2 total) | student1@campuspulse.edu, student2@campus.edu | [Demo Placeholder] | Student Residents |
-| Wardens (2 total) | naveen@campus.edu, warden2@campus.edu | [Demo Placeholder] | Hostel Wardens |
+Production (`ENVIRONMENT=production`) seeds no demo accounts. The administrator and app manager accounts come from `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `MANAGER_EMAIL` and `MANAGER_PASSWORD`, which must be set before the first start.
 
-> [!NOTE]
-> Set ADMIN_EMAIL, ADMIN_PASSWORD, MANAGER_EMAIL, MANAGER_PASSWORD in .env. Demo passwords exist only when ALLOW_DEMO_SEED_PASSWORDS=true (development only). Default administrative credentials must be supplied via environment variables (`ADMIN_EMAIL`, `ADMIN_PASSWORD`, `MANAGER_EMAIL`, `MANAGER_PASSWORD`) in `.env` before running or deploying.
+For local development on a fresh database, other seeded accounts get a random password that must be changed on first login. Set `ALLOW_DEMO_SEED_PASSWORDS=true` in `.env` to use the well-known demo passwords instead. Never set it in a real deployment.
 
 Use `/auth/login` to get a bearer token, then authorize in Swagger UI with that token.
 
 ## Automated Test Execution
 
 ```bash
-python -m pytest tests/test_multi_department_coordinators.py tests/test_remediation_f01_f15.py -v
+python -m pytest tests -v
 ```
-All 29 tests pass with 100% pass rate.
 
 ## Backend Architecture
 
 - `models/`: existing domain entities.
-- `services/`: existing business logic used by both CLI and API.
+- `services/`: business logic used by the API routers.
 - `storage/sqlite_repository.py`: SQLite persistence behind a `load()` / `save()` interface.
 - `api/schemas.py`: Pydantic request and response schemas.
 - `api/security.py`: token session handling and role guards.
@@ -74,4 +58,4 @@ All 29 tests pass with 100% pass rate.
 
 ## Design Notes
 
-The API does not duplicate complaint workflow rules. Endpoint functions validate HTTP input, enforce role access, and call the existing services. This keeps the CLI and API behavior aligned.
+The API does not duplicate complaint workflow rules. Endpoint functions validate HTTP input, enforce role access, and call the services.

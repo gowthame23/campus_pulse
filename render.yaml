@@ -19,7 +19,9 @@ services:
       - key: RUN_SCHEDULER
         value: "true"
       - key: CORS_ORIGINS
-        value: "https://campuspulse-frontend.onrender.com,http://localhost:5173"
+        value: "https://campuspulse-frontend-wlws.onrender.com,http://localhost:5173"
+      - key: FRONTEND_URL
+        value: https://campuspulse-frontend-wlws.onrender.com
       - key: BREVO_API_KEY
         sync: false
       - key: BREVO_SENDER_EMAIL

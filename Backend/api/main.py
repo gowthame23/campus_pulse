@@ -77,8 +77,7 @@ if not cors_origins:
     cors_origins = [
         "http://127.0.0.1:5173",
         "http://localhost:5173",
-        "https://campuspulse-rho.vercel.app",
-        "https://campuspulse.vercel.app",
+        "https://campuspulse-frontend-wlws.onrender.com",
     ]
 
 app.add_middleware(

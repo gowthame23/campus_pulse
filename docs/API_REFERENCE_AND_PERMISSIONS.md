@@ -27,7 +27,7 @@
 ---
 
 ### Module 1: Authentication & Account Management (`/auth`)
-*Router file:* [`Backend/api/routers/auth.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/api/routers/auth.py)
+*Router file:* [`Backend/api/routers/auth.py`](../Backend/api/routers/auth.py)
 
 | Method | Endpoint | Description | Roles | Auth Required | Request Body / Params | Status Codes |
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |
@@ -43,7 +43,7 @@
 ---
 
 ### Module 2: User & Roster Management (`/users`)
-*Router file:* [`Backend/api/routers/users.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/api/routers/users.py)
+*Router file:* [`Backend/api/routers/users.py`](../Backend/api/routers/users.py)
 
 | Method | Endpoint | Description | Roles | Auth Required | Request Body / Params | Status Codes |
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |
@@ -59,7 +59,7 @@
 ---
 
 ### Module 3: Facility & Location Management (`/locations`)
-*Router file:* [`Backend/api/routers/locations.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/api/routers/locations.py)
+*Router file:* [`Backend/api/routers/locations.py`](../Backend/api/routers/locations.py)
 
 | Method | Endpoint | Description | Roles | Auth Required | Request Body / Params | Status Codes |
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |
@@ -72,7 +72,7 @@
 ---
 
 ### Module 4: Department Management (`/departments`)
-*Router file:* [`Backend/api/routers/departments.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/api/routers/departments.py)
+*Router file:* [`Backend/api/routers/departments.py`](../Backend/api/routers/departments.py)
 
 | Method | Endpoint | Description | Roles | Auth Required | Request Body / Params | Status Codes |
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |
@@ -85,7 +85,7 @@
 ---
 
 ### Module 5: Complaint Operations (`/complaints`)
-*Router file:* [`Backend/api/routers/complaints.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/api/routers/complaints.py)
+*Router file:* [`Backend/api/routers/complaints.py`](../Backend/api/routers/complaints.py)
 
 | Method | Endpoint | Description | Roles | Auth Required | Request Body / Params | Status Codes |
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |
@@ -106,7 +106,7 @@
 ---
 
 ### Module 6: Campus Announcements & Notices (`/announcements`)
-*Router file:* [`Backend/api/routers/announcements.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/api/routers/announcements.py)
+*Router file:* [`Backend/api/routers/announcements.py`](../Backend/api/routers/announcements.py)
 
 | Method | Endpoint | Description | Roles | Auth Required | Request Body / Params | Status Codes |
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |
@@ -123,7 +123,7 @@
 ---
 
 ### Module 7: Lost & Found Service (`/lost-found`)
-*Router file:* [`Backend/api/routers/lost_found.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/api/routers/lost_found.py)
+*Router file:* [`Backend/api/routers/lost_found.py`](../Backend/api/routers/lost_found.py)
 
 | Method | Endpoint | Description | Roles | Auth Required | Request Body / Params | Status Codes |
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |
@@ -137,7 +137,7 @@
 ---
 
 ### Module 8: Notifications & WebSockets (`/notifications`, `/ws`)
-*Router file:* [`Backend/api/routers/notifications.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/api/routers/notifications.py)
+*Router file:* [`Backend/api/routers/notifications.py`](../Backend/api/routers/notifications.py)
 
 | Method | Endpoint | Description | Roles | Auth Required | Request Body / Params | Status Codes |
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |
@@ -168,7 +168,7 @@
 ---
 
 ### Module 10: Multi-Tenant Platform Operations (`/platform`, `/superadmin`)
-*Router file:* [`Backend/api/routers/platform.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/api/routers/platform.py)  
+*Router file:* [`Backend/api/routers/platform.py`](../Backend/api/routers/platform.py)  
 *(Note: Campus Pulse operates as a self-contained single-institution deployment per SQLite database. Platform endpoints provide optional multi-campus registration scaffolding)*
 
 | Method | Endpoint | Description | Roles | Auth Required | Request Body / Params | Status Codes |
@@ -181,7 +181,7 @@
 ---
 
 ### Module 11: Confidential Safety Reports (`/safety-reports`)
-*Router file:* [`Backend/api/routers/safety_reports.py`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/Backend/api/routers/safety_reports.py)
+*Router file:* [`Backend/api/routers/safety_reports.py`](../Backend/api/routers/safety_reports.py)
 
 | Method | Endpoint | Description | Roles | Auth Required | Request Body / Params | Status Codes |
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |

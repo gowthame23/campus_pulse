@@ -9,7 +9,8 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 🌐 **Official Showcase Website:** [https://gowthame23.github.io/campus_pulse/](https://gowthame23.github.io/campus_pulse/)  
-🚀 **Live Production Application:** [https://campuspulse-frontend-wlws.onrender.com](https://campuspulse-frontend-wlws.onrender.com)
+🚀 **Live Production Application:** [https://campuspulse-frontend-wlws.onrender.com](https://campuspulse-frontend-wlws.onrender.com)  
+🩺 **Backend API Health:** [https://campus-pulse-et7u.onrender.com/health](https://campus-pulse-et7u.onrender.com/health)
 
 **Campus Pulse** is a high-accountability, multi-tenant campus grievance, emergency response, and facilities management SaaS platform. Engineered to eliminate the "black hole" of collegiate ticketing systems, Campus Pulse enforces physical tenant data isolation, direct coordinator ownership, tamper-evident photo verification, zero-knowledge anonymous whistleblowing, and automated SLA escalations.
 
@@ -243,7 +244,7 @@ Campus Pulse enforces a role hierarchy with zero ambiguous "employee" intermedia
 ### Option A: Docker Compose (Recommended)
 Clone the repository and spin up the full stack in one command:
 ```bash
-git clone https://github.com/campuspulse/campus_pulse.git
+git clone https://github.com/gowthame23/campus_pulse.git
 cd campus_pulse
 docker-compose up --build
 ```
@@ -266,8 +267,12 @@ source venv/bin/activate
 
 pip install -r requirements.txt
 cp .env.example .env
-uvicorn api.main:app --reload --port 8000
+python run_api.py
 ```
+
+> **No PostgreSQL installed?** The example `.env` uses `DB_ENGINE=postgres`, and the backend will not start without a running Postgres server. For a quick local run, change it to `DB_ENGINE=sqlite` in `Backend/.env`. The SQLite database is then created automatically under `Backend/storage/`.
+>
+> On a fresh local database, set `ALLOW_DEMO_SEED_PASSWORDS=true` in `Backend/.env` if you want the well-known demo logins. Never set it in production.
 
 #### 2. Frontend Setup
 ```bash
@@ -275,7 +280,7 @@ cd Frontend
 npm install
 npm run dev
 ```
-Open `http://localhost:5173` in your browser.
+Open `http://localhost:5173` in your browser. Locally the frontend talks to `http://127.0.0.1:8000` automatically. To point it somewhere else, set `VITE_API_BASE_URL` in `Frontend/.env`.
 
 #### 3. Feature Flags & Configuration
 * `CATEGORY_PRIORITY_ENABLED` (default: `false`): Feature flag controlling category-specific priority overrides and management badges. When disabled (`false`), complaint creation uses standard default priorities, priority modification endpoints return 403 Forbidden, GET endpoints return empty priorities, and the frontend hides all priority badges and edit controls. When enabled (`true`), department administrators and app managers can customize priorities per category and per location.
@@ -294,7 +299,36 @@ pytest tests/test_emergency_flow.py -v
 
 ---
 
-## 🚀 Deployment Checklist
+## ☁️ Production Deployment (Render)
+
+| Part | Render service type | URL |
+| :--- | :--- | :--- |
+| Backend (FastAPI) | Web Service, root directory `Backend`, start command `python run_api.py` | https://campus-pulse-et7u.onrender.com |
+| Frontend (React + Vite) | Static Site, root directory `Frontend`, publish directory `dist` | https://campuspulse-frontend-wlws.onrender.com |
+| Showcase website | GitHub Pages, deployed from `Website/` by `.github/workflows/deploy-showcase.yml` | https://gowthame23.github.io/campus_pulse/ |
+
+`render.yaml` describes both Render services. Secret values are set only in the Render dashboard, never in the repository.
+
+**Backend environment variables** (Render dashboard → backend service → *Environment*):
+
+| Variable | Purpose |
+| :--- | :--- |
+| `ENVIRONMENT` | `production` |
+| `CORS_ORIGINS` | Comma-separated allowed frontend origins, e.g. `https://campuspulse-frontend-wlws.onrender.com`. Never use `*`. |
+| `FRONTEND_URL` | Frontend address used in email links |
+| `DB_ENGINE`, `DATABASE_URL` | PostgreSQL connection (secret). Without it the backend falls back to SQLite files, which Render's free plan erases on every redeploy or restart. |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `MANAGER_EMAIL`, `MANAGER_PASSWORD` | Initial governance accounts (secret) |
+| `RUN_SCHEDULER` | `true` to run the SLA escalation scheduler |
+| `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` or `SMTP_*` | Email delivery (secret) |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web push notifications (optional, secret) |
+
+**Frontend environment variable:** `VITE_API_BASE_URL` (or `VITE_API_URL`) set to the backend URL. It is baked in at build time, so redeploy the static site after changing it.
+
+**Single-page app routing:** the static site needs a rewrite rule from `/*` to `/index.html` (Render dashboard → static site → *Redirects/Rewrites*). Without it, refreshing any page other than the home page returns 404.
+
+**Keep-alive:** the free backend sleeps after 15 minutes without traffic. An UptimeRobot HTTP monitor on `/health` every 5 minutes keeps it awake.
+
+### Deployment Checklist
 
 Before triggering a production deployment (e.g. on Render or Linux VPS), complete these prerequisite safety steps:
 

@@ -10,7 +10,7 @@
 
 Campus Pulse utilizes **SQLite 3** as its active persistence engine. The runtime database file is located at `Backend/storage/campus_pulse.db`.
 
-Active runtime schema comprises ~39 production tables and active indexes. Speculative enterprise tables (~135 unused tables from earlier architecture drafts) have been cleanly isolated into `Backend/scripts/legacy_scaffold_schema.py` and documented in [`docs/UNUSED_TABLES.md`](file:///c:/Users/gowth/OneDrive/Desktop/GOWTHAM/CampusPulse/CampusPulse_co/docs/UNUSED_TABLES.md).
+Active runtime schema comprises ~39 production tables and active indexes. Speculative enterprise tables (~135 unused tables from earlier architecture drafts) are no longer created. `Backend/scripts/drop_unused_tables.py` removes them from older databases.
 
 ```mermaid
 erDiagram
