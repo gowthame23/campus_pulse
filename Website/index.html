@@ -173,7 +173,7 @@ nav.scrolled{background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-fi
 .sos-types span{padding:8px 16px;border-radius:99px;border:1px solid var(--line);font-size:13.5px;background:var(--bg2)}
 
 /* roles */
-.roles{margin-top:56px;display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+.roles{margin-top:56px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .role{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:24px 20px;transition:.3s}
 .role:hover{transform:translateY(-4px);border-color:rgba(34,211,238,.5)}
 .role .em{font-size:30px;margin-bottom:12px}
@@ -291,8 +291,15 @@ nav.scrolled{background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-fi
 .cta-box h2{font-size:clamp(32px,5vw,56px);max-width:760px;margin:0 auto 16px}
 .cta-box .lead{margin:0 auto}
 .cta-box .cta-row{justify-content:center}
-.demo{max-width:720px;margin:44px auto 0;background:var(--bg);border:1px solid var(--line);border-radius:18px;padding:26px 28px;text-align:left;display:flex;gap:20px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-.demo h4{font-size:18px;margin-bottom:4px}.demo p{color:var(--muted);font-size:14.5px;max-width:430px}
+.demo-accts{max-width:720px;margin:44px auto 0;background:var(--bg);border:1px solid var(--line);border-radius:18px;padding:26px 28px;text-align:left}
+.demo-accts h4{font-size:18px;margin-bottom:4px}.demo-accts>p{color:var(--muted);font-size:14.5px;margin-bottom:16px}
+.acct-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.acct{display:block;width:100%;text-align:left;font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;transition:border-color .15s,transform .15s}
+.acct:hover{border-color:var(--brand2);transform:translateY(-1px)}
+.acct b{display:block;font-size:14px}.acct span{display:block;font-size:12.5px;color:var(--muted);word-break:break-all}
+.acct code{font-size:12.5px;color:var(--brand2)}
+.acct.copied{border-color:var(--brand2)}
+.demo-note{margin-top:14px;font-size:13px;color:var(--muted)}
 .mailline{margin-top:18px;font-size:14px;color:var(--muted)}
 .mailline a{color:var(--brand2);font-weight:600;border-bottom:1px dashed currentColor}
 
@@ -326,7 +333,6 @@ footer{border-top:1px solid var(--line);padding:36px 0;color:var(--muted);font-s
   .cta-box{padding:52px 22px}
   .btn{width:100%;justify-content:center}
   .cta-row{flex-direction:column}
-  .demo .btn{width:100%}
 }
 </style>
 </head>
@@ -402,7 +408,7 @@ footer{border-top:1px solid var(--line);padding:36px 0;color:var(--muted);font-s
         <div class="a"><span class="lbl">Our answer</span><p>Every complaint is <b>automatically routed by department and location</b> to a named coordinator who owns it end to end. You see their name, their progress and a live status — no more black hole.</p></div></div>
 
       <div class="qa rv"><div class="q"><span class="lbl">The question</span><h3>“They marked it ‘resolved’ — but nothing was fixed.”</h3></div>
-        <div class="a"><span class="lbl">Our answer</span><p>Fixes need <b>proof photos</b>, and each photo is fingerprinted to catch re-used images and tampered timestamps. You then get <b>48 hours to confirm or dispute</b>. A dispute sends the on-site Warden to inspect.</p></div></div>
+        <div class="a"><span class="lbl">Our answer</span><p>If you attached a photo, the fix needs an <b>after-repair photo</b> (or a logged reason to skip it), and every photo is fingerprinted to catch re-used images and tampered timestamps. You then get <b>48 hours to confirm or dispute</b>. A dispute sends the on-site Warden to inspect.</p></div></div>
 
       <div class="qa rv"><div class="q"><span class="lbl">The question</span><h3>“What if the problem is urgent — will anyone act in time?”</h3></div>
         <div class="a"><span class="lbl">Our answer</span><p>Every ticket carries a <b>deadline by priority</b> — 4h critical, 24h high, 48h medium, 72h low. A scheduler keeps watching the clock every few minutes and <b>auto-escalates</b> to managers and admins the moment a deadline is missed.</p></div></div>
@@ -414,7 +420,7 @@ footer{border-top:1px solid var(--line);padding:36px 0;color:var(--muted);font-s
         <div class="a"><span class="lbl">Our answer</span><p>One tap on <b>SOS</b> — Medical, Fire or Security — instantly broadcasts your <b>location, block and room</b> to dispatchers via real-time alerts. The call chain is simple: <b>Security and your Warden</b> first, and if neither answers, the <b>App Manager</b>.</p></div></div>
 
       <div class="qa rv"><div class="q"><span class="lbl">The question</span><h3>“I lost my ID card / laptop. Where do I even start looking?”</h3></div>
-        <div class="a"><span class="lbl">Our answer</span><p>Built-in <b>Lost &amp; Found</b>: post what you found or lost, claim items, and get notified — all inside the same app, alongside announcements and direct chat with staff.</p></div></div>
+        <div class="a"><span class="lbl">Our answer</span><p>Built-in <b>Lost &amp; Found</b>: post what you found or lost, claim items, and get notified — all inside the same app, alongside announcements and comment threads with staff on every complaint.</p></div></div>
     </div>
   </div>
 </section>
@@ -456,7 +462,7 @@ footer{border-top:1px solid var(--line);padding:36px 0;color:var(--muted);font-s
         <ul class="checks">
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg><span><b>Duplicate photo detection.</b> Every image is hashed with SHA-256; a photo used on any other complaint is instantly flagged <b>REUSED</b>.</span></li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg><span><b>Timestamp tamper check.</b> A “after repair” photo taken <i>before</i> the job started is flagged <b>OLDER_THAN_JOB</b>.</span></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg><span><b>Skip-streak penalty.</b> Repeatedly closing without proof locks the ticket and forces an in-person Warden inspection.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg><span><b>Skip-streak penalty.</b> Skip the after photo twice in a row and the next skip needs a typed reason, the Warden is alerted, and the coordinator's next job gets an in-person Warden inspection.</span></li>
         </ul>
       </div>
       <div class="vis rv"><div class="code">
@@ -467,7 +473,7 @@ footer{border-top:1px solid var(--line);padding:36px 0;color:var(--muted);font-s
         <span class="k">exif.DateTimeOriginal</span> = <span class="g">09:12</span><br>
         <span class="k">job.started_at</span> = <span class="g">11:40</span><br>
         <span class="r">⚠ photo older than job → OLDER_THAN_JOB</span><br><br>
-        <span class="g">✓ Warden inspection triggered automatically</span>
+        <span class="g">⚑ flag shown on the complaint for Warden and staff</span>
       </div></div>
     </div>
 
@@ -542,20 +548,19 @@ footer{border-top:1px solid var(--line);padding:36px 0;color:var(--muted);font-s
       <div class="glow g1" style="opacity:.25"></div>
       <span class="eyebrow">Your turn</span>
       <h2 style="margin-top:14px">Stop wondering. <span class="grad">See it working.</span></h2>
-      <p class="lead">Open the live app, request a demo login, then file a complaint, watch it get an owner and follow it to “Fixed”.</p>
+      <p class="lead">Open the live app, pick a demo account, then file a complaint, watch it get an owner and follow it to “Fixed”.</p>
       <div class="cta-row">
         <a class="btn btn-primary js-live" target="_blank" rel="noopener">Open Campus Pulse
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>
       </div>
       <div class="patience"><span>⏳</span><span><b>It may take a little time to open.</b> The first visit can take up to a minute while the server wakes up — please be patient, it's worth the wait.</span></div>
-      <div class="demo">
-        <div>
-          <h4>Want to explore the dashboards too?</h4>
-          <p>Interested in seeing the Student, Coordinator, Warden, App Manager and Administrator views? Email us and we'll send you demo login credentials.</p>
-        </div>
-        <a class="btn btn-ghost js-mail">✉ Request demo access</a>
+      <div class="demo-accts">
+        <h4>Demo accounts — no sign-up needed</h4>
+        <p>On the login page, click <b>Demo accounts</b> (top right) and pick a role to sign in with one click. Or click a card below to copy its login.</p>
+        <div class="acct-grid" id="accts"></div>
+        <p class="demo-note">These are shared demo mailboxes with sample data. Everything resets when the server restarts, so feel free to click around.</p>
       </div>
-      <p class="mailline">Write to <a class="js-mailtext"></a> — we usually reply quickly.</p>
+      <p class="mailline">Want Campus Pulse for your institution? Write to <a class="js-mailtext"></a> — we usually reply quickly.</p>
     </div>
   </div>
 </section>
@@ -587,28 +592,52 @@ const icons = {
   globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
   mega:'<path d="M3 10v4h4l8 5V5l-8 5zM18 9a4 4 0 0 1 0 6"/>',
   chart:'<path d="M4 20V4M4 20h16M8 16v-5M13 16V8M18 16v-9"/>',
-  phone:'<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>'
+  phone:'<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
+  users:'<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M17 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6"/>'
 };
 const svg = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icons[k]}</svg>`;
 
 /* links */
 $$('.js-live').forEach(a => a.href = LIVE_URL);
-const mailto = `mailto:${CONTACT}?subject=${encodeURIComponent('Campus Pulse — demo access request')}&body=${encodeURIComponent('Hi,\n\nI tried Campus Pulse and would like demo credentials to explore the role dashboards.\n\nName:\nOrganisation / Institution:\nRole I am interested in (Student / Coordinator / Warden / App Manager / Administrator):\n\nThanks!')}`;
+const mailto = `mailto:${CONTACT}?subject=${encodeURIComponent('Campus Pulse — enquiry')}&body=${encodeURIComponent('Hi,\n\nI tried the Campus Pulse demo and would like to know more about using it at our institution.\n\nName:\nOrganisation / Institution:\n\nThanks!')}`;
 $$('.js-mail').forEach(a => a.href = mailto);
 $$('.js-mailtext').forEach(a => { a.textContent = CONTACT; a.href = mailto; });
 $('#yr').textContent = new Date().getFullYear();
+
+/* demo accounts (same as the live app's "Demo accounts" menu) */
+const DEMO_ACCOUNTS = [
+  ['Super Admin','superadmin@campuspulse.edu','Superadmin@123'],
+  ['Administrator','admin@campuspulse.edu','Admin@123'],
+  ['App Manager 1','manager1@campuspulse.edu','Manager@123'],
+  ['App Manager 2','manager2@campuspulse.edu','Manager@123'],
+  ['Coordinator 1','coordinator1@campuspulse.edu','Coord@123'],
+  ['Coordinator 2','coordinator2@campuspulse.edu','Coord@123'],
+  ['Student 1','student1@campuspulse.edu','Student@123'],
+  ['Student 2','student2@campuspulse.edu','Student@123'],
+  ['Warden 1','warden1@campuspulse.edu','Warden@123'],
+  ['Warden 2','warden2@campuspulse.edu','Warden@123'],
+];
+const accts = $('#accts');
+accts.innerHTML = DEMO_ACCOUNTS.map(([r,e,p]) =>
+  `<button type="button" class="acct" data-e="${e}" data-p="${p}" title="Click to copy"><b>${r}</b><span>${e}</span><code>${p}</code></button>`).join('');
+accts.addEventListener('click', ev => {
+  const b = ev.target.closest('.acct'); if (!b) return;
+  const text = `${b.dataset.e} / ${b.dataset.p}`;
+  const done = () => { const t = b.querySelector('b'), o = t.textContent; b.classList.add('copied'); t.textContent = 'Copied ✓'; setTimeout(() => { t.textContent = o; b.classList.remove('copied'); }, 1400); };
+  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(done, done);
+});
 
 /* workflow */
 const flow = [
   {n:1, t:'Complaint Raised', s:'Student reports the issue', stage:'Stage 1', h:'Report it in under a minute',
    p:'Pick the location, describe the problem, attach a photo. Campus Pulse does the routing for you.',
-   li:['Auto-routed to the right department and location','Assigned coordinator is notified in real time','SLA deadline set instantly from category and priority','Write in English, Telugu or Hindi — translation is built in']},
+   li:['Auto-routed to the right department and location','Assigned coordinator is notified in real time','SLA deadline set instantly from category and priority','Add a photo so the coordinator can see the problem before arriving']},
   {n:2, t:'Going On', s:'Coordinator starts the work', stage:'Stage 2', h:'Someone owns it — visibly',
    p:'The coordinator taps “Start” and the status changes for everyone. You can see exactly who is working on it and when.',
-   li:['Live progress updates and comments','Chat directly with the people handling it','Critical issues auto-escalate to App Manager and Admin on breach','Scheduler checks every active ticket every minute']},
-  {n:3, t:'Fixed', s:'Done — with proof', stage:'Stage 3', h:'No proof, no “done”',
-   p:'When the coordinator taps “Done”, a resolution photo is attached and automatically checked for fraud.',
-   li:['SHA-256 and timestamp checks on every photo','High / Critical tickets get a physical Warden inspection','Warden finds it not fixed? It goes back to “Going On”','Routine tickets move straight to your confirmation']},
+   li:['Live progress updates and comments','Message the people handling it, right on the complaint','Critical issues auto-escalate to App Manager and Admin on breach','Scheduler checks every active ticket every 5 minutes']},
+  {n:3, t:'Fixed', s:'Done — with proof', stage:'Stage 3', h:'“Done” has to be backed up',
+   p:'When the coordinator taps “Done”, they add an after-repair photo (required if you attached one) or a resolution note. Every photo is automatically checked for fraud.',
+   li:['SHA-256 and timestamp checks on every photo','High / Critical tickets get a physical Warden inspection','Warden finds it not fixed? It goes back to “Going On”','Routine tickets go to your confirmation, with random Warden spot checks']},
   {n:4, t:'Closed', s:'You confirm — or dispute', stage:'Final', h:'The last word is yours',
    p:'You get a 48-hour window to verify the fix. Happy? Confirm. Not fixed? Dispute it.',
    li:['Confirm — or it auto-closes after 48 hours','“Not Fixed” reopens the ticket and sends the Warden','A 3rd repeated dispute escalates to the Administrator','Feedback and recognition for great work']}
@@ -635,11 +664,11 @@ const feats = [
   ['clock','Will it ever get done?','SLA &amp; escalation','Priority-based deadlines with multi-tier escalation when a milestone is missed.'],
   ['cam','Was it really fixed?','Photo-proof checks','Duplicate-image and timestamp verification stops phantom fixes.'],
   ['bell',"How will I know what's happening?",'Real-time alerts','WebSocket updates and web push notifications keep everyone in the loop.'],
-  ['chat','Can I just talk to someone?','Direct chat','Personal and complaint-linked chat between students and staff.'],
+  ['chat','Can I just talk to someone?','Built-in messaging','Message the staff handling your complaint right on it. Staff also get private 1:1 chat, and Lost &amp; Found claims get their own chat.'],
   ['box',"Where's my lost item?",'Lost &amp; Found','Post, search and claim lost items right inside the app.'],
   ['leaf','Is my coordinator even available?','Leave awareness','Team leave tracking so work gets reassigned, not stalled.'],
   ['star','Does good work get noticed?','Recognition &amp; feedback','Appreciate great service and collect honest feedback after every fix.'],
-  ['globe',"What if I don't write in English?",'Multilingual','Complaint translation across English, Telugu and Hindi.'],
+  ['users',"Is someone already reporting this?",'Join, don’t duplicate','See open complaints at your location and join one instead of filing the same problem again.'],
   ['mega','How do I hear about campus updates?','Announcements','Targeted announcements and programs from administration.'],
   ['chart','Is the campus improving?','Analytics &amp; reports','SLA health, workload and trend dashboards for managers and admins.'],
   ['phone','Can I use it on my phone?','Mobile-friendly web app','Runs in any browser on phone or desktop. A dedicated mobile app is not available yet.']
@@ -658,7 +687,8 @@ const roles = [
   ['👔','Coordinator','Owns complaints end to end and posts proof of every fix.'],
   ['🛡️','Warden','On-site in-charge who physically verifies high-priority and disputed fixes.'],
   ['📊','App Manager','Supervises zones, SLA health and unassigned tickets.'],
-  ['⚡','Administrator','Governs the campus, decides disputes and holds the audit trail.']
+  ['⚡','Administrator','Governs the campus, decides disputes and holds the audit trail.'],
+  ['🏛️','Super Admin','Runs the platform: onboards institutions and activates or deactivates them with an emailed one-time code.']
 ];
 $('#rolegrid').innerHTML = roles.map(r => `<div class="role rv"><div class="em">${r[0]}</div><h4>${r[1]}</h4><p>${r[2]}</p></div>`).join('');
 
@@ -779,7 +809,19 @@ const dashboards = [
    <div class="card purc"><div class="chd" style="border-color:#e9d5ff"><h2>Admin Review Queue (Disputes)</h2></div>
      <div class="rowi"><div><div class="t">Mess hall cleanliness ${bd('High','warning')}${bd('Admin Review','purple')}</div>${meta(loc('Mess 2'),'Housekeeping','Reopen count: <b>3 / 3</b>')}</div><div class="nbtn">${bt('Decide Dispute','pri')}${bt('View Timeline')}</div></div></div>
    <div class="card"><div class="chd"><h2>Active Complaint Ownership</h2>${bt('All Tickets')}</div>
-     <div class="rowi"><div><div class="t">Water leakage in Room 214 ${bd('High','warning')}${bd('Going On','warning')}</div>${meta(loc('Hostel 1'),'Plumbing')}</div>${bt('Reassign')}</div></div>`}
+     <div class="rowi"><div><div class="t">Water leakage in Room 214 ${bd('High','warning')}${bd('Going On','warning')}</div>${meta(loc('Hostel 1'),'Plumbing')}</div>${bt('Reassign')}</div></div>`},
+
+{ t:'Super Admin', e:'🏛️', url:'/superadmin', role:'Super Admin', initial:'P',
+  nav:[['PLATFORM',[['Home','home'],['Institutions','bld'],['Support Requests','help'],['Platform Health','act']]],ACCT],
+  page:()=>`
+   <div><h1>Campus Pulse</h1><div class="sub">Platform console • Institutions, support and system health</div></div>
+   <div class="stats">${stat('Institutions',3)}${stat('System Status','Healthy')}${stat('Support Requests',1,'',1)}${stat('Version','v1.0.0')}</div>
+   <div class="two"><div class="card"><div class="chd"><h2>System Platform Health</h2>${bt('Diagnostics')}</div>
+       <div class="rowi"><div><div class="t">Platform Core Version</div></div>${bd('v1.0.0','info')}</div>
+       <div class="rowi"><div><div class="t">Tenant Deployments</div></div>${bd('2 / 3 Active','success')}</div>
+       <div class="rowi"><div><div class="t">Operational Data Boundary</div></div>${bd('Isolated','purple')}</div></div>
+     <div class="card"><div class="chd"><h2>Data Privacy &amp; Boundary Scope</h2></div>
+       <div class="sub" style="line-height:1.6">Super Admin works only at the platform level. Each institution's complaints, students and staff stay in its own database and are not visible here.</div></div></div>`}
 ];
 
 /* ---- sidebar pages: titles and descriptions are the real ones from the app; rows are sample data ---- */
@@ -799,6 +841,13 @@ const fld = t => `<div class="fld">${t}</div>`;
 const tbl = (h,rows) => `<div class="card" style="padding:0;overflow:auto"><table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map(x=>`<td>${x}</td>`).join('')}</tr>`).join('')}</table></div>`;
 
 const PAGES = {
+ 'Institutions': () => head('Platform Institution Registry','Manage registered institution tenants, platform metadata, and initial admin onboarding.', bt('Onboard Institution','pri','plus')) +
+   `<div class="two">${[['ABC Institute of Technology','ABC','Active','success','Deactivate','rose'],['State Technical University','STU','Active','success','Deactivate','rose'],['Riverside College','RVC','Inactive','','Reactivate','pri']].map(([n,c,st,tone,act,k])=>`<div class="card"><div class="chd"><div><h2>${n}</h2><p>Code: ${c}</p></div>${bd(st,tone)}</div><div class="sub">admin@${c.toLowerCase()}.edu (Administrator)</div><div class="nbtn" style="margin-top:10px">${bt(act,k)}</div></div>`).join('')}</div>
+   <div class="note"><span>Deactivating or reactivating an institution needs a 6-digit code emailed to the Super Admin.</span></div>`,
+ 'Support Requests': () => head('Technical Support Center — Super Admin','Investigate and resolve platform technical issues reported by Institution Admins.') +
+   tbl(['Issue','Institution','Priority','Status'],[['<b>Report export times out</b>','ABC Institute of Technology',bd('Medium','info'),bd('Investigating','warning')],['<b>Push notifications not received</b>','State Technical University',bd('High','warning'),bd('Resolved','success')]]),
+ 'Platform Health': () => head('Application Health &amp; Version Diagnostics','Real-time system health checks, database connectivity status, and software version details.') +
+   `<div class="card"><div class="chd"><h2>System Diagnostics Status</h2>${bd('Healthy','success')}</div><div class="rowi"><div><div class="t">Database Connection</div></div>${bd('Connected','success')}</div><div class="rowi"><div><div class="t">Application Version</div></div>${bd('v1.0.0','info')}</div></div>`,
  'Complaints': () => head('Complaints Tracker','Monitor, filter, and track campus complaints by location, department, status, or keyword.', bt('+ New complaint','pri')) +
    `<div class="toolbar">${fld('🔍 Search complaints...')}${fld('Location ▾')}${fld('Department ▾')}${tabs(['Active','Closed'],0)}</div><div>${CPL.slice(0,5).map(c=>cRow(c)).join('')}</div>`,
  'Workload': () => head('Workload &amp; Assignments','Monitor staff operational workload, track active open complaints, and process unassigned tickets.') +
@@ -810,8 +859,8 @@ const PAGES = {
  'Announcements': () => head('Announcements &amp; Official Notices','Official campus circulars, academic notices, exam timetables, emergency alerts, and events.', bt('Compose &amp; Publish Notice','pri')) +
    `<div class="stats">${stat('Active',4)}${stat('Unread',2,'',1)}${stat('Critical',1)}${stat('Pending',0)}</div>` +
    [['Water supply interruption — Hostel 2','Critical','Today, 08:00'],['Mid-semester timetable released','Medium','02 Nov'],['Sports day registrations open','Low','01 Nov']].map(a=>`<div class="rowi"><div><div class="t">${a[0]} ${bd(a[1],pTone(a[1]))}</div>${meta('Administration',a[2])}</div>${bt('Read')}</div>`).join(''),
- 'Chat': () => head('Chat','Message coordinators, wardens and students directly, or chat inside a complaint.') +
-   `<div class="card" style="display:grid;grid-template-columns:200px 1fr;gap:0;padding:0;overflow:hidden"><div style="border-right:1px solid var(--s2)">${['Coordinator 1','Warden — Hostel 1','Complaint #A1B2C3'].map((n,i)=>`<div style="padding:11px 13px;border-bottom:1px solid var(--s1);${i===0?'background:#f0fdfa':''}"><b>${n}</b><div style="color:var(--s5);font-size:11px">${['On my way to check the tap','Please confirm the inspection','Photo attached'][i]}</div></div>`).join('')}</div>
+ 'Chat': () => head('Chat','Message admins, app managers, wardens and coordinators directly. Students reach you through complaint comments.') +
+   `<div class="card" style="display:grid;grid-template-columns:200px 1fr;gap:0;padding:0;overflow:hidden"><div style="border-right:1px solid var(--s2)">${['Coordinator 1','Warden — Hostel 1','App Manager — Zone 1'].map((n,i)=>`<div style="padding:11px 13px;border-bottom:1px solid var(--s1);${i===0?'background:#f0fdfa':''}"><b>${n}</b><div style="color:var(--s5);font-size:11px">${['On my way to check the tap','Please confirm the inspection','Reassigned the plumbing ticket'][i]}</div></div>`).join('')}</div>
    <div style="padding:14px;display:grid;gap:8px;align-content:start"><div class="bd" style="justify-self:start;border-radius:12px">Is the leakage still active?</div><div class="bd info" style="justify-self:end;border-radius:12px">Yes, near the main valve</div><div class="bd" style="justify-self:start;border-radius:12px">On my way to check the tap</div><div style="margin-top:50px">${fld('Type a message...')}</div></div></div>`,
  'Notifications': () => head('Notifications','Deliver, track, and configure system alerts, complaint updates, and operational broadcast notices.') + tabs(['Alerts &amp; Messages','Delivery Preferences'],0) +
    [['Complaint #A1B2C3 moved to Going On','Coordinator started work','2m ago','info'],['SLA warning: Power outage — 2h left','Escalation engine','1h ago','danger'],['Your complaint was fixed — please verify','Verification window: 48h','3h ago','success']].map(n=>`<div class="rowi"><div><div class="t">${n[0]}</div>${meta(n[1],n[2])}</div>${bd('New',n[3])}</div>`).join(''),
@@ -858,10 +907,11 @@ dashboards.forEach((d,i) => {
 });
 const features = {
   Student:['Raise a complaint with location, photo and priority','Track live status and see who owns it','Confirm a fix, or reopen it with “Still not fixed” (3 reopens escalate to Admin Review)','SOS, Lost &amp; Found and anonymous safety reports'],
-  Coordinator:['Assign incoming complaints to workers and track the team board','Mark jobs done with an after-repair photo (fraud-checked)','Team stats: assign time, overdue, on-time rate','Mark yourself on leave so a backup covers'],
+  Coordinator:['Assign incoming complaints to workers and track the team board','Mark jobs done with an after-repair photo (fraud-checked) or a resolution note','Team stats: assign time, overdue, on-time rate','Mark yourself on leave so a backup covers'],
   Warden:['Physically verify High / Critical fixes and random spot checks','Send work back for rework with a mandatory reason','Change a complaint’s priority with a recorded justification','Coordinator performance: resolution time and reopen rate'],
   'App Manager':['See overdue and critical tickets across all your locations','Reassign any complaint with a recorded reason','Find coverage gaps and manage teams and locations','Reports, analytics, audit log and backups'],
-  Administrator:['Decide disputes escalated to Admin Review','Manage users, departments, locations and emergency setup','Review anonymous safety reports (identity sealed)','Audit log, backups, settings and technical support']
+  Administrator:['Decide disputes escalated to Admin Review','Manage users, departments, locations and emergency setup','Review anonymous safety reports (identity sealed)','Audit log, backups, settings and technical support'],
+  'Super Admin':['Onboard new institutions, each with its own isolated database','Deactivate or reactivate an institution with an emailed one-time code','Resolve technical support requests from institution admins','Platform health and version diagnostics — no access to campus data']
 };
 function showDash(){
   const d = dashboards[curDash];
@@ -883,7 +933,7 @@ function showDash(){
     </div>
   </div>
   <div class="drole"><div><span class="eyebrow">${d.t} view</span><h3>What the ${d.t} can do</h3>
-    <p class="note-small">Click any menu item to explore. Illustrative preview built from the real screens, with sample data. Want the real ${d.t} dashboard? <a style="color:var(--brand2);font-weight:600" href="${mailto}">Request demo access</a>.</p></div>
+    <p class="note-small">Click any menu item to explore. Illustrative preview built from the real screens, with sample data. Want the real ${d.t} dashboard? <a style="color:var(--brand2);font-weight:600" href="#try">Use a demo account</a> in the live app.</p></div>
     <ul class="checks">${features[d.t].map(x=>`<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg><span>${x}</span></li>`).join('')}</ul>
   </div>`;
 }
