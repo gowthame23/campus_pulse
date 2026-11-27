@@ -9,6 +9,7 @@ export const authService = {
       token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
     ),
   me: () => apiClient.get("/auth/me"),
+  demoAccounts: () => apiClient.get("/auth/demo-accounts"),
   changePassword: (payload) => apiClient.post("/auth/change-password", payload),
   resetPassword: (payload) => apiClient.post("/auth/reset-password", payload),
   requestPasswordReset: (payload) =>

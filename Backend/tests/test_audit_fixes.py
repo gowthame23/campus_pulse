@@ -69,7 +69,7 @@ def test_sec_006_safety_report_idor_prevention():
     auth_limiter._lockouts.clear()
 
     # Login Student A
-    res_a = client.post("/auth/login", json={"username": "gowtham.e23@iiits.in", "password": "Student@123"})
+    res_a = client.post("/auth/login", json={"username": "student1@campuspulse.edu", "password": "Student@123"})
     token_a = res_a.json()["access_token"]
     headers_a = {"Authorization": f"Bearer {token_a}"}
 
@@ -79,7 +79,7 @@ def test_sec_006_safety_report_idor_prevention():
     headers_b = {"Authorization": f"Bearer {token_b}"}
 
     # Login Warden
-    res_w = client.post("/auth/login", json={"username": "naveen@campus.edu", "password": "Warden@123"})
+    res_w = client.post("/auth/login", json={"username": "warden1@campuspulse.edu", "password": "Warden@123"})
     token_w = res_w.json()["access_token"]
     headers_w = {"Authorization": f"Bearer {token_w}"}
 

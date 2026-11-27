@@ -68,12 +68,12 @@ def emp_b2_hdr():
 
 @pytest.fixture(scope="module")
 def student_hdr():
-    return login("gowtham.e23@iiits.in", "Student@123")
+    return login("student1@campuspulse.edu", "Student@123")
 
 
 @pytest.fixture(scope="module")
 def warden_hdr():
-    return login("naveen@campus.edu", "Warden@123")
+    return login("warden1@campuspulse.edu", "Warden@123")
 
 
 

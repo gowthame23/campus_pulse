@@ -134,7 +134,7 @@ def test_employees_overview_endpoint():
 
 def test_complaint_job_visibility_and_actions():
     # 1. Student files a complaint
-    student_hdr = login("gowtham.e23@iiits.in", "Student@123")
+    student_hdr = login("student1@campuspulse.edu", "Student@123")
     res = client.post(
         "/complaints",
         json={

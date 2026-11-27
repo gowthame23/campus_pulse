@@ -148,6 +148,22 @@ def logout(
     return {"message": "Logged out successfully."}
 
 
+@router.get("/demo-accounts")
+def demo_accounts():
+    """Public list of demo logins for the login page. Empty unless DEMO_MODE=true."""
+    from services.auth_service import DEMO_ACCOUNTS, is_demo_mode
+
+    if not is_demo_mode():
+        return {"enabled": False, "accounts": []}
+    return {
+        "enabled": True,
+        "accounts": [
+            {"label": d["label"], "email": d["email"], "password": d["password"]}
+            for d in DEMO_ACCOUNTS
+        ],
+    }
+
+
 @router.get("/me")
 def me(current_user=Depends(get_current_user)):
     return user_to_response(current_user)

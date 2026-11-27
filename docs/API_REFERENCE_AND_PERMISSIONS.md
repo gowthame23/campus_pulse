@@ -33,6 +33,7 @@
 | :--- | :--- | :--- | :--- | :---: | :--- | :--- |
 | `POST` | `/auth/login` | User login & token issuance | Public | No | `LoginRequest(username, password)` | 200, 401, 403, 429 |
 | `POST` | `/auth/logout` | Terminates active session | Any | Yes | None (Bearer Token) | 200, 401 |
+| `GET` | `/auth/demo-accounts` | Lists the public demo logins for the login page (empty unless `DEMO_MODE=true`) | Public | No | None | 200 |
 | `GET` | `/auth/me` | Fetches active caller profile | Any | Yes | None | 200, 401 |
 | `POST` | `/auth/change-password` | Updates password & revokes other sessions | Any | Yes | `PasswordChangeRequest(old_password, new_password)` | 200, 400, 401 |
 | `POST` | `/auth/forgot-password` | Requests password reset email link | Public | No | `ForgotPasswordRequest(email)` | 200, 404 |

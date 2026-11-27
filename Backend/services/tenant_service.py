@@ -611,13 +611,31 @@ class TenantService:
             )
             conn.commit()
 
-        # In production, this dispatches via SMTP/Brevo to the Super Admin's registered email.
-        # For development and testing resilience, we log the dispatch securely.
-        logger.info(f"Dispatched {clean_act.upper()} verification code to {superadmin_email} for institution {clean_id}")
+        demo_mode = os.environ.get("DEMO_MODE", "").strip().lower() in ("1", "true", "yes")
+        if demo_mode:
+            # Demo inboxes do not exist, so the code is shown on screen instead of emailed.
+            message = "Demo mode: no email is sent. Use the code shown below. It expires in 10 minutes."
+        else:
+            from utils.email import send_notification_email
+
+            verb = "deactivate" if clean_act == "deactivate" else "reactivate"
+            sent = send_notification_email(
+                superadmin_email,
+                f"Code to {verb} {inst['name']}",
+                f"Your verification code to {verb} <strong>{inst['name']}</strong> ({clean_id}) is "
+                f"<strong style=\"font-size:20px;letter-spacing:4px\">{otp_code}</strong>. "
+                "It expires in 10 minutes. If you did not request this, ignore this email.",
+            )
+            if not sent:
+                logger.error(f"Could not email {clean_act} verification code for institution {clean_id}: email is not configured or failed.")
+                raise ValueError("Could not send the verification email. Check the email settings on the server.")
+            logger.info(f"Dispatched {clean_act.upper()} verification code to {superadmin_email} for institution {clean_id}")
+            message = f"Verification code sent to {superadmin_email}. Code expires in 10 minutes."
 
         return {
             "status": "success",
-            "message": f"Verification code sent to {superadmin_email}. Code expires in 10 minutes.",
+            "message": message,
+            "demo_otp": otp_code if demo_mode else None,
             "otp_id": otp_id,
             "institution_id": clean_id,
             "action": clean_act,

@@ -57,6 +57,28 @@ _DUMMY_PASSWORD_HASH = hash_password("timing-equalization-only")
 logger = get_logger(__name__)
 
 
+# Public demo accounts. With DEMO_MODE=true these ten users are recreated on
+# every start with exactly these emails and passwords (overriding any
+# *_EMAIL / *_PASSWORD env vars), and GET /auth/demo-accounts lists them so the
+# login page can show them. Never enable DEMO_MODE on a deployment with real data.
+DEMO_ACCOUNTS = [
+    {"user_id": "USR_SUPER_ADMIN", "label": "Super Admin", "email": "superadmin@campuspulse.edu", "password": "Superadmin@123"},
+    {"user_id": "USR_ADMIN", "label": "Admin", "email": "admin@campuspulse.edu", "password": "Admin@123"},
+    {"user_id": "USR_MANAGER", "label": "App Manager 1", "email": "manager1@campuspulse.edu", "password": "Manager@123"},
+    {"user_id": "USR_MANAGER_2", "label": "App Manager 2", "email": "manager2@campuspulse.edu", "password": "Manager@123"},
+    {"user_id": "USR_COORD_1", "label": "Coordinator 1", "email": "coordinator1@campuspulse.edu", "password": "Coord@123"},
+    {"user_id": "USR_COORD_2", "label": "Coordinator 2", "email": "coordinator2@campuspulse.edu", "password": "Coord@123"},
+    {"user_id": "USR_STUDENT", "label": "Student 1", "email": "student1@campuspulse.edu", "password": "Student@123"},
+    {"user_id": "USR_STUDENT_2", "label": "Student 2", "email": "student2@campuspulse.edu", "password": "Student@123"},
+    {"user_id": "USR_WARDEN", "label": "Warden 1", "email": "warden1@campuspulse.edu", "password": "Warden@123"},
+    {"user_id": "USR_WARDEN_2", "label": "Warden 2", "email": "warden2@campuspulse.edu", "password": "Warden@123"},
+]
+
+
+def is_demo_mode():
+    return os.environ.get("DEMO_MODE", "").strip().lower() in ("1", "true", "yes")
+
+
 
 class AuthService:
 
@@ -484,7 +506,7 @@ class AuthService:
 
                 "name": "Student 1",
 
-                "email": os.environ.get("STUDENT_EMAIL", "gowtham.e23@iiits.in"),
+                "email": os.environ.get("STUDENT_EMAIL", "student1@campuspulse.edu"),
 
                 "password_env": "STUDENT_PASSWORD",
 
@@ -524,7 +546,7 @@ class AuthService:
 
                 "name": "Warden 1",
 
-                "email": os.environ.get("WARDEN_EMAIL", "naveen@campus.edu"),
+                "email": os.environ.get("WARDEN_EMAIL", "warden1@campuspulse.edu"),
 
                 "password_env": "WARDEN_PASSWORD",
 
@@ -608,9 +630,21 @@ class AuthService:
 
         allow_demo_passwords = os.environ.get("ALLOW_DEMO_SEED_PASSWORDS", "").lower() in ("1", "true", "yes")
 
+        demo_mode = is_demo_mode()
+
+        demo_by_id = {d["user_id"]: d for d in DEMO_ACCOUNTS}
+
         for spec in seed_users_spec:
 
-            if is_production:
+            if demo_mode and spec["id"] in demo_by_id:
+
+                spec["email"] = demo_by_id[spec["id"]]["email"]
+
+                spec["password"] = demo_by_id[spec["id"]]["password"]
+
+                force_first_login = False
+
+            elif is_production:
                 spec["password"] = os.environ.get(f"SEED_{spec['id']}_PASSWORD")
                 if not spec["password"]:
                     continue
@@ -716,6 +750,22 @@ class AuthService:
 
                     changed = True
 
+                if demo_mode and spec["id"] in demo_by_id and target_user.get("user_id") == spec["id"]:
+
+                    if not verify_password(spec["password"], target_user.get("password") or ""):
+
+                        target_user["password"] = hash_password(spec["password"])
+
+                        changed = True
+
+                    if target_user.get("first_login") or target_user.get("status") != "Active":
+
+                        target_user["first_login"] = False
+
+                        target_user["status"] = "Active"
+
+                        changed = True
+
                 if target_user.get("name") in ("App Manager", "Warden", "Coordinator", "Student", "Student User"):
 
                     target_user["name"] = spec["name"]
@@ -764,19 +814,21 @@ class AuthService:
 
         with self._connect() as conn:
 
-            admin_email = os.environ.get("ADMIN_EMAIL")
+            # In demo mode the demo emails win over any *_EMAIL env vars.
+            env_email = (lambda name: None) if demo_mode else os.environ.get
+            admin_email = env_email("ADMIN_EMAIL")
             if admin_email:
                 conn.execute("UPDATE users SET email = ? WHERE user_id = 'USR_ADMIN'", (admin_email,))
 
-            mgr_email = os.environ.get("MANAGER_EMAIL")
+            mgr_email = env_email("MANAGER_EMAIL")
             if mgr_email:
                 conn.execute("UPDATE users SET email = ? WHERE user_id = 'USR_MANAGER'", (mgr_email,))
 
-            student_email = os.environ.get("STUDENT_EMAIL")
+            student_email = env_email("STUDENT_EMAIL")
             if student_email:
                 conn.execute("UPDATE users SET email = ?, name = 'Student 1' WHERE user_id = 'USR_STUDENT'", (student_email,))
 
-            warden_email = os.environ.get("WARDEN_EMAIL")
+            warden_email = env_email("WARDEN_EMAIL")
             if warden_email:
                 conn.execute("UPDATE users SET email = ? WHERE user_id = 'USR_WARDEN'", (warden_email,))
 

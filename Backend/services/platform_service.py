@@ -97,6 +97,16 @@ class PlatformService:
             row = cursor.fetchone()
             return dict(row) if row else None
 
+    def set_institution_status(self, institution_id: str, status: str):
+        """Mirror a status change made in the tenant registry (platform.db) so the
+        super admin list and dashboard show the same status that gates logins."""
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE institutions SET status = ? WHERE institution_id = ?",
+                (status, institution_id.strip().upper()),
+            )
+            conn.commit()
+
     def _delete_institution(self, institution_id: str):
         with self._connect() as conn:
             conn.execute("DELETE FROM institutions WHERE institution_id = ?", (institution_id,))

@@ -31,7 +31,7 @@ def admin_headers():
 @pytest.fixture(scope="module")
 def warden_headers():
     for user, pwd in [
-        ("naveen@campus.edu", "Warden@123"),
+        ("warden1@campuspulse.edu", "Warden@123"),
         ("warden2@campus.edu", "Warden@123"),
     ]:
         try:

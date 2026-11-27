@@ -219,16 +219,19 @@ def confirm_deactivation(
     institution_id: str,
     payload: StatusOtpConfirm,
     current_user: User = Depends(require_super_admin()),
+    platform_service: PlatformService = Depends(get_platform_service),
 ):
     """Confirm deactivation with the submitted OTP code. Zero data deletion."""
     try:
-        return get_tenant_service().confirm_status_change(
+        result = get_tenant_service().confirm_status_change(
             institution_id=institution_id,
             action="deactivate",
             otp_code=payload.otp_code,
             superadmin_email=current_user.email,
             reason=payload.reason,
         )
+        platform_service.set_institution_status(institution_id, result["status"])
+        return result
     except ValueError as e:
         import logging
         logging.getLogger("campus_pulse").error(f"ONBOARD_INSTITUTION_ERROR: {e}")
@@ -258,16 +261,19 @@ def confirm_reactivation(
     institution_id: str,
     payload: StatusOtpConfirm,
     current_user: User = Depends(require_super_admin()),
+    platform_service: PlatformService = Depends(get_platform_service),
 ):
     """Confirm reactivation with the submitted OTP code. Restores access to existing data."""
     try:
-        return get_tenant_service().confirm_status_change(
+        result = get_tenant_service().confirm_status_change(
             institution_id=institution_id,
             action="reactivate",
             otp_code=payload.otp_code,
             superadmin_email=current_user.email,
             reason=payload.reason,
         )
+        platform_service.set_institution_status(institution_id, result["status"])
+        return result
     except ValueError as e:
         import logging
         logging.getLogger("campus_pulse").error(f"ONBOARD_INSTITUTION_ERROR: {e}")

@@ -164,7 +164,7 @@ def test_workflow_6_security_ownership_authorization():
     admin_headers = _get_admin_headers()
     u_res = client.post("/users", json={
         "name": f"Student B {uid}",
-        "email": f"studentb_{uid}@iiits.in",
+        "email": f"studentb_{uid}@campuspulse.edu",
         "password": "Student@123",
         "role": "student"
     }, headers=admin_headers)
@@ -177,7 +177,7 @@ def test_workflow_6_security_ownership_authorization():
     conn.close()
 
     _reset_limiter()
-    res_b = client.post("/auth/login", json={"username": f"studentb_{uid}@iiits.in", "password": "Student@123"})
+    res_b = client.post("/auth/login", json={"username": f"studentb_{uid}@campuspulse.edu", "password": "Student@123"})
     assert res_b.status_code == 200
     std_b_headers = {"Authorization": f"Bearer {res_b.json()['access_token']}"}
 

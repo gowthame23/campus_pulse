@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
-import { Loader2, Sun, Moon, Globe, ChevronDown, Check } from "lucide-react";
+import { Loader2, Sun, Moon, Globe, ChevronDown, Check, Users } from "lucide-react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import Button from "../../components/Button.jsx";
 import Input from "../../components/Input.jsx";
 import Toast from "../../components/Toast.jsx";
 import { getApiError } from "../../api/axios.js";
+import { authService } from "../../services/authService.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import { useLanguage } from "../../context/LanguageContext.jsx";
@@ -23,6 +24,9 @@ export default function LoginPage() {
   const { language, setLanguage, t } = useLanguage();
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const langRef = useRef(null);
+  const [demoAccounts, setDemoAccounts] = useState([]);
+  const [demoMenuOpen, setDemoMenuOpen] = useState(false);
+  const demoRef = useRef(null);
   const [error, setError] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
@@ -32,13 +36,31 @@ export default function LoginPage() {
       if (langRef.current && !langRef.current.contains(e.target)) {
         setLangMenuOpen(false);
       }
+      if (demoRef.current && !demoRef.current.contains(e.target)) {
+        setDemoMenuOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+  // Demo logins are only listed when the backend runs with DEMO_MODE=true.
+  useEffect(() => {
+    let cancelled = false;
+    authService
+      .demoAccounts()
+      .then(({ data }) => {
+        if (!cancelled && data?.enabled) setDemoAccounts(data.accounts || []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: { email: "", password: "" },
@@ -84,8 +106,8 @@ export default function LoginPage() {
   return (
     <main className="relative flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 px-4 py-12 transition-colors duration-200">
       {/* Top-Right Corner outside the box: Compact Language Dropdown */}
-      <div className="fixed top-4 right-4 z-30" ref={langRef}>
-        <div className="relative">
+      <div className="fixed top-4 right-4 z-30 flex flex-col items-end gap-2">
+        <div className="relative" ref={langRef}>
           <button
             type="button"
             onClick={() => setLangMenuOpen((prev) => !prev)}
@@ -121,6 +143,46 @@ export default function LoginPage() {
             </div>
           )}
         </div>
+
+        {demoAccounts.length > 0 && (
+          <div className="relative" ref={demoRef}>
+            <button
+              type="button"
+              onClick={() => setDemoMenuOpen((prev) => !prev)}
+              className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 hover:bg-white dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 shadow-xs backdrop-blur-xs transition-colors cursor-pointer"
+              title="Sign in with a demo account"
+              aria-label="Demo accounts"
+              aria-expanded={demoMenuOpen}
+            >
+              <Users className="h-3.5 w-3.5 text-primary" />
+              <span>{t("auth.demo_accounts", "Demo accounts")}</span>
+              <ChevronDown className={`h-3 w-3 text-slate-400 transition-transform ${demoMenuOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {demoMenuOpen && (
+              <div className="absolute right-0 mt-1 w-64 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg py-1 z-30 animate-in fade-in zoom-in-95 duration-100">
+                <p className="px-2.5 pt-1 pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                  {t("auth.demo_pick", "Click one to fill the login")}
+                </p>
+                {demoAccounts.map((acc) => (
+                  <button
+                    key={acc.email}
+                    type="button"
+                    onClick={() => {
+                      setValue("email", acc.email, { shouldValidate: true });
+                      setValue("password", acc.password, { shouldValidate: true });
+                      setDemoMenuOpen(false);
+                    }}
+                    className="w-full flex flex-col items-start px-2.5 py-1.5 text-left transition-colors cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{acc.label}</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{acc.email}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="relative w-full max-w-[420px] rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-md md:p-8 animate-in fade-in duration-200">

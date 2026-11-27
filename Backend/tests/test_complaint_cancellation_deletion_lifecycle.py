@@ -26,7 +26,7 @@ def coord_headers():
 
 @pytest.fixture(scope="module")
 def student_headers():
-    return _login("gowtham.e23@iiits.in", "Student@123")
+    return _login("student1@campuspulse.edu", "Student@123")
 
 def test_unassigned_complaint_direct_soft_delete(student_headers):
     # 1. Student creates unassigned complaint

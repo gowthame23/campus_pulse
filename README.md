@@ -12,6 +12,20 @@
 🚀 **Live Production Application:** [https://campuspulse-frontend-wlws.onrender.com](https://campuspulse-frontend-wlws.onrender.com)  
 🩺 **Backend API Health:** [https://campus-pulse-et7u.onrender.com/health](https://campus-pulse-et7u.onrender.com/health)
 
+### 🔑 Try the Live Demo
+Open the live app and click **Demo accounts** (top right, under the language menu) to sign in with one click. All addresses are fake demo mailboxes, and the demo data resets whenever the free server restarts.
+
+| Role | Email | Password |
+| :--- | :--- | :--- |
+| Super Admin | `superadmin@campuspulse.edu` | `Superadmin@123` |
+| Administrator | `admin@campuspulse.edu` | `Admin@123` |
+| App Manager 1 / 2 | `manager1@campuspulse.edu` / `manager2@campuspulse.edu` | `Manager@123` |
+| Coordinator 1 / 2 | `coordinator1@campuspulse.edu` / `coordinator2@campuspulse.edu` | `Coord@123` |
+| Student 1 / 2 | `student1@campuspulse.edu` / `student2@campuspulse.edu` | `Student@123` |
+| Warden 1 / 2 | `warden1@campuspulse.edu` / `warden2@campuspulse.edu` | `Warden@123` |
+
+> The first request after the server has been idle can take up to a minute while Render's free plan wakes it up.
+
 **Campus Pulse** is a high-accountability, multi-tenant campus grievance, emergency response, and facilities management SaaS platform. Engineered to eliminate the "black hole" of collegiate ticketing systems, Campus Pulse enforces physical tenant data isolation, direct coordinator ownership, tamper-evident photo verification, zero-knowledge anonymous whistleblowing, and automated SLA escalations.
 
 ---
@@ -63,9 +77,9 @@ Campus Pulse features a modular entitlement engine gating capabilities per tier:
 *Dynamic Feature Overrides*: Super Admins can customize individual feature flags per institute without migrating database schemas.
 
 ### 3. Dual-Factor Email OTP Institute Security
-* **Tamper-Proof Status Management**: Deactivating or reactivating an institution requires a cryptographically generated, 6-digit one-time password (OTP) dispatched to the Super Admin's registered email (`superadmin@campuspulse.edu`).
+* **Tamper-Proof Status Management**: Each institution card in the Super Admin registry has a **Deactivate** / **Reactivate** button. The change only goes through after the Super Admin enters a 6-digit one-time password (OTP) emailed to their registered address. If the email cannot be sent, no code is issued. In demo mode (`DEMO_MODE=true`) no email is sent and the code is shown on screen instead, because the demo mailboxes do not exist.
 * **Brute-Force Protection**: OTPs expire after 10 minutes, use cryptographic salt hashing, and automatically lock after 5 failed attempts.
-* **Instant Session Block**: When an institution is marked `Inactive`, all active sessions for that campus are immediately blocked with `403 Forbidden`.
+* **Instant Session Block**: When an institution is marked `Inactive`, every request from its users (except the Super Admin) is refused with `403 Forbidden` until it is reactivated. No data is deleted.
 
 ---
 
@@ -273,6 +287,8 @@ python run_api.py
 > **No PostgreSQL installed?** The example `.env` uses `DB_ENGINE=postgres`, and the backend will not start without a running Postgres server. For a quick local run, change it to `DB_ENGINE=sqlite` in `Backend/.env`. The SQLite database is then created automatically under `Backend/storage/`.
 >
 > On a fresh local database, set `ALLOW_DEMO_SEED_PASSWORDS=true` in `Backend/.env` if you want the well-known demo logins. Never set it in production.
+>
+> To get the same one-click **Demo accounts** menu as the live demo, set `DEMO_MODE=true` instead. It recreates the 10 demo users listed above on every start.
 
 #### 2. Frontend Setup
 ```bash
@@ -320,6 +336,7 @@ pytest tests/test_emergency_flow.py -v
 | `SUPER_ADMIN_EMAIL`, `SEED_USR_SUPER_ADMIN_PASSWORD` | Super admin login. Recreated on every start, so it survives a wiped disk. |
 | `ADMIN_EMAIL`, `SEED_USR_ADMIN_PASSWORD` | Administrator login, same behaviour. |
 | `MANAGER_EMAIL`, `SEED_USR_MANAGER_PASSWORD` | Optional app manager login. |
+| `DEMO_MODE` | `true` creates the 10 public demo accounts (`superadmin@`, `admin@`, `manager1@`/`manager2@`, `coordinator1@`/`coordinator2@`, `student1@`/`student2@`, `warden1@`/`warden2@campuspulse.edu`) on every start, overriding the `*_EMAIL` and seed password variables, and lists them in a "Demo accounts" menu on the login page. Only for a public demo with no real data. |
 | `RUN_SCHEDULER` | `true` to run the SLA escalation scheduler |
 | `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` or `SMTP_*` | Email delivery (secret) |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web push notifications (optional, secret) |

@@ -26,7 +26,7 @@ def app_mgr_hdr():
 @pytest.fixture(scope="module")
 def student_hdr():
     # Student in Hostel 1 (USR_STUDENT)
-    return login("gowtham.e23@iiits.in", "Student@123")
+    return login("student1@campuspulse.edu", "Student@123")
 
 
 def test_scenario_1_to_4_central_department_creation_and_multi_location_mapping(admin_hdr):

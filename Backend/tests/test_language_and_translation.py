@@ -21,7 +21,7 @@ def _reset_limiter():
     client.cookies.clear()
 
 
-def _login(username="gowtham.e23@iiits.in", password="Student@123"):
+def _login(username="student1@campuspulse.edu", password="Student@123"):
     _reset_limiter()
     resp = client.post("/auth/login", json={"username": username, "password": password})
     assert resp.status_code == 200, f"Login failed: {resp.text}"

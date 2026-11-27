@@ -109,7 +109,7 @@ def test_department_coordinator_rules_and_multi_department_support():
 
 
 def test_department_coordinator_routing_when_available():
-    student_hdr = login("gowtham.e23@iiits.in", "Student@123")
+    student_hdr = login("student1@campuspulse.edu", "Student@123")
 
     # Create a complaint in Hostel 1 for Electrical
     res = client.post(
@@ -157,7 +157,7 @@ def test_department_coordinator_routing_when_coord1_on_leave():
     assert leave_res.status_code == 201
 
     # Submit complaint as student
-    student_hdr = login("gowtham.e23@iiits.in", "Student@123")
+    student_hdr = login("student1@campuspulse.edu", "Student@123")
     res = client.post(
         "/complaints",
         json={
@@ -190,7 +190,7 @@ def test_department_coordinator_routing_when_coord1_on_leave():
 
 
 def test_eligible_assignees_and_cross_department_workload():
-    student_hdr = login("gowtham.e23@iiits.in", "Student@123")
+    student_hdr = login("student1@campuspulse.edu", "Student@123")
     res = client.post(
         "/complaints",
         json={

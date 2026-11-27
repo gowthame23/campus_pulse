@@ -58,7 +58,7 @@ def coord_headers():
 @pytest.fixture(scope="module")
 def warden_headers():
     try:
-        return _login("naveen@campus.edu", "Warden@123")
+        return _login("warden1@campuspulse.edu", "Warden@123")
     except Exception:
         return _login("warden@example.com", "Warden@123")
 

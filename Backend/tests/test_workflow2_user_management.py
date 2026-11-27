@@ -28,7 +28,7 @@ def _get_admin_headers():
 
 def _get_student_headers():
     _reset_limiter()
-    login_res = client.post("/auth/login", json={"username": "gowtham.e23@iiits.in", "password": "Student@123"})
+    login_res = client.post("/auth/login", json={"username": "student1@campuspulse.edu", "password": "Student@123"})
     token = login_res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 

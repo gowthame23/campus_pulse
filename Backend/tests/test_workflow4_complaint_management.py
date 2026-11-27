@@ -184,7 +184,7 @@ def test_workflow_4_complaint_deletion_ownership_and_status_controls():
     # 1. Create Student B at same hostel location
     u_res = client.post("/users", json={
         "name": f"Student B {uid}",
-        "email": f"studentb_{uid}@iiits.in",
+        "email": f"studentb_{uid}@campuspulse.edu",
         "password": "Student@123",
         "role": "student",
         "location_id": "LOC_HOSTEL_A"
@@ -198,7 +198,7 @@ def test_workflow_4_complaint_deletion_ownership_and_status_controls():
     conn.close()
 
     _reset_limiter()
-    login_b = client.post("/auth/login", json={"username": f"studentb_{uid}@iiits.in", "password": "Student@123"})
+    login_b = client.post("/auth/login", json={"username": f"studentb_{uid}@campuspulse.edu", "password": "Student@123"})
     std_b_headers = {"Authorization": f"Bearer {login_b.json()['access_token']}"}
 
     # 2. Student A creates a community complaint
